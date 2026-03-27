@@ -6,6 +6,9 @@ import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
+import OnboardingFlow from './components/OnboardingFlow.js'
+import SourcesPanel from './components/SourcesPanel.js'
+import CaptureUrlModal from './components/CaptureUrlModal.js'
 
 type View = 'search' | 'session'
 
@@ -35,6 +38,12 @@ export default function App() {
   const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([])
   const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string }>>(new Map())
   const aiAnswerRef = useRef('')
+
+  // OpenCLI modal state
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showSourcesPanel, setShowSourcesPanel] = useState(false)
+  const [showCaptureModal, setShowCaptureModal] = useState(false)
+  const [captureCount, setCaptureCount] = useState<number | null>(null)
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
@@ -73,7 +82,20 @@ export default function App() {
   useEffect(() => {
     if (!window.spool) return
     window.spool.getStatus().then(setStatus).catch(console.error)
+    // Load capture count
+    if (window.spool.opencli) {
+      window.spool.opencli.getCaptureCount().then(setCaptureCount).catch(console.error)
+    }
   }, [syncStatus])
+
+  // Listen for ⌘K capture modal shortcut
+  useEffect(() => {
+    if (!window.spool?.onOpenCaptureModal) return () => {}
+    const off = window.spool.onOpenCaptureModal(() => {
+      setShowCaptureModal(true)
+    })
+    return off
+  }, [])
 
   useEffect(() => {
     if (!window.spool) return () => {}
@@ -180,6 +202,29 @@ export default function App() {
     setView('search'); setSelectedSession(null)
   }, [])
 
+  const handleConnectClick = useCallback(async () => {
+    if (!window.spool?.opencli) return
+    const setupDone = await window.spool.opencli.getSetupValue('onboarding_complete')
+    if (setupDone === 'true') {
+      setShowSourcesPanel(true)
+    } else {
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  const handleOnboardingComplete = useCallback(() => {
+    setShowOnboarding(false)
+    setShowSourcesPanel(true)
+  }, [])
+
+  const handleCaptured = useCallback(() => {
+    // Refresh capture count and re-search if active
+    if (window.spool?.opencli) {
+      window.spool.opencli.getCaptureCount().then(setCaptureCount).catch(console.error)
+    }
+    if (query.trim() && searchMode === 'fast') doSearch(query)
+  }, [query, searchMode, doSearch])
+
   const activeAgentName = availableAgents.find(a => a.id === aiAgent)?.name ?? aiAgent
   const hasAgents = availableAgents.length > 0
 
@@ -196,8 +241,10 @@ export default function App() {
             isSearching={isSearching}
             claudeCount={status?.claudeSessions ?? null}
             codexCount={status?.codexSessions ?? null}
+            captureCount={captureCount}
             mode={searchMode}
             onModeChange={hasAgents ? handleModeChange : undefined}
+            onConnectClick={handleConnectClick}
           />
         ) : (
           <>
@@ -272,6 +319,27 @@ export default function App() {
         searchMode={searchMode}
         aiAgent={activeAgentName}
       />
+
+      {/* Modals */}
+      {showOnboarding && (
+        <OnboardingFlow
+          onClose={() => setShowOnboarding(false)}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
+      {showSourcesPanel && (
+        <SourcesPanel
+          onClose={() => setShowSourcesPanel(false)}
+          claudeCount={status?.claudeSessions ?? null}
+          codexCount={status?.codexSessions ?? null}
+        />
+      )}
+      {showCaptureModal && (
+        <CaptureUrlModal
+          onClose={() => setShowCaptureModal(false)}
+          onCaptured={handleCaptured}
+        />
+      )}
     </div>
   )
 }

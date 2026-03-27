@@ -39,7 +39,8 @@ function runMigrations(db: Database.Database): void {
 
     INSERT OR IGNORE INTO sources (name, base_path) VALUES
       ('claude', '~/.claude/projects'),
-      ('codex',  '~/.codex/sessions');
+      ('codex',  '~/.codex/sessions'),
+      ('opencli', '~/.spool/opencli');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,
@@ -115,6 +116,69 @@ function runMigrations(db: Database.Database): void {
       status    TEXT NOT NULL,
       message   TEXT,
       synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ── OpenCLI tables ──────────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS opencli_sources (
+      id          INTEGER PRIMARY KEY,
+      source_id   INTEGER NOT NULL REFERENCES sources(id),
+      platform    TEXT NOT NULL,
+      command     TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      last_synced TEXT,
+      sync_count  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (platform, command)
+    );
+
+    CREATE TABLE IF NOT EXISTS captures (
+      id              INTEGER PRIMARY KEY,
+      source_id       INTEGER NOT NULL REFERENCES sources(id),
+      opencli_src_id  INTEGER REFERENCES opencli_sources(id),
+      capture_uuid    TEXT NOT NULL UNIQUE,
+      url             TEXT NOT NULL,
+      title           TEXT NOT NULL DEFAULT '',
+      content_text    TEXT NOT NULL DEFAULT '',
+      author          TEXT,
+      platform        TEXT NOT NULL,
+      platform_id     TEXT,
+      content_type    TEXT NOT NULL DEFAULT 'page',
+      thumbnail_url   TEXT,
+      metadata        TEXT NOT NULL DEFAULT '{}',
+      captured_at     TEXT NOT NULL,
+      indexed_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      raw_json        TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_captures_source   ON captures(source_id);
+    CREATE INDEX IF NOT EXISTS idx_captures_platform ON captures(platform);
+    CREATE INDEX IF NOT EXISTS idx_captures_url      ON captures(url);
+    CREATE INDEX IF NOT EXISTS idx_captures_captured ON captures(captured_at DESC);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS captures_fts USING fts5(
+      title,
+      content_text,
+      content='captures',
+      content_rowid='id',
+      tokenize='unicode61 remove_diacritics 1'
+    );
+
+    CREATE TRIGGER IF NOT EXISTS captures_fts_insert
+    AFTER INSERT ON captures BEGIN
+      INSERT INTO captures_fts(rowid, title, content_text)
+        VALUES(NEW.id, NEW.title, NEW.content_text);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS captures_fts_delete
+    AFTER DELETE ON captures BEGIN
+      INSERT INTO captures_fts(captures_fts, rowid, title, content_text)
+        VALUES('delete', OLD.id, OLD.title, OLD.content_text);
+    END;
+
+    CREATE TABLE IF NOT EXISTS opencli_setup (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `)
 }

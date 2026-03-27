@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, OpenCLISource, SearchResult, Source } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
 
 export function getOrCreateProject(
@@ -302,4 +303,239 @@ function rowToSession(r: Record<string, unknown>): Session {
     projectDisplayPath: r['projectDisplayPath'] as string,
     projectDisplayName: r['projectDisplayName'] as string,
   }
+}
+
+// ── OpenCLI / Captures ──────────────────────────────────────────────────────
+
+export function getOpenCLISourceId(db: Database.Database): number {
+  const row = db.prepare('SELECT id FROM sources WHERE name = ?').get('opencli') as
+    | { id: number }
+    | undefined
+  if (!row) throw new Error("Source 'opencli' not found in DB")
+  return row.id
+}
+
+export function insertCapture(
+  db: Database.Database,
+  sourceId: number,
+  opencliSrcId: number | null,
+  item: CapturedItem,
+): number {
+  const captureUuid = randomUUID()
+
+  // Dedup by platform_id if provided
+  if (item.platformId) {
+    const existing = db
+      .prepare('SELECT id FROM captures WHERE platform = ? AND platform_id = ?')
+      .get(item.platform, item.platformId) as { id: number } | undefined
+    if (existing) {
+      db.prepare(`
+        UPDATE captures SET
+          title = ?, content_text = ?, author = ?, metadata = ?,
+          captured_at = ?, raw_json = ?
+        WHERE id = ?
+      `).run(
+        item.title, item.contentText, item.author,
+        JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
+        existing.id,
+      )
+      return existing.id
+    }
+  }
+
+  // Dedup by URL for one-off captures
+  if (!item.platformId) {
+    const existing = db
+      .prepare('SELECT id FROM captures WHERE url = ? AND opencli_src_id IS NULL')
+      .get(item.url) as { id: number } | undefined
+    if (existing) {
+      db.prepare(`
+        UPDATE captures SET
+          title = ?, content_text = ?, author = ?, metadata = ?,
+          captured_at = ?, raw_json = ?
+        WHERE id = ?
+      `).run(
+        item.title, item.contentText, item.author,
+        JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
+        existing.id,
+      )
+      return existing.id
+    }
+  }
+
+  const result = db.prepare(`
+    INSERT INTO captures
+      (source_id, opencli_src_id, capture_uuid, url, title, content_text,
+       author, platform, platform_id, content_type, thumbnail_url,
+       metadata, captured_at, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    sourceId, opencliSrcId, captureUuid, item.url, item.title, item.contentText,
+    item.author, item.platform, item.platformId, item.contentType, item.thumbnailUrl,
+    JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
+  )
+
+  return Number(result.lastInsertRowid)
+}
+
+export function searchCaptures(
+  db: Database.Database,
+  query: string,
+  opts: { limit?: number; platform?: string; since?: string } = {},
+): CaptureResult[] {
+  const { limit = 10, platform, since } = opts
+
+  const ftsQuery = query.includes('"') || query.includes('*') || query.includes(' OR ')
+    ? query
+    : `"${query.replace(/"/g, '""')}"`
+
+  const conditions: string[] = ['captures_fts MATCH ?']
+  const params: (string | number)[] = [ftsQuery]
+
+  if (platform) {
+    conditions.push('c.platform = ?')
+    params.push(platform)
+  }
+  if (since) {
+    conditions.push('c.captured_at >= ?')
+    params.push(since)
+  }
+  params.push(limit)
+
+  const sql = `
+    SELECT
+      rank,
+      c.id            AS captureId,
+      c.capture_uuid  AS captureUuid,
+      c.url,
+      c.title,
+      c.author,
+      c.platform,
+      c.content_type  AS contentType,
+      c.captured_at   AS capturedAt,
+      snippet(captures_fts, -1, '<mark>', '</mark>', '…', 20) AS snippet
+    FROM captures_fts
+    JOIN captures c ON c.id = captures_fts.rowid
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY rank
+    LIMIT ?
+  `
+
+  return (db.prepare(sql).all(...params) as Array<Record<string, unknown>>).map(
+    (row, i) => ({
+      rank: i + 1,
+      captureId: row['captureId'] as number,
+      captureUuid: row['captureUuid'] as string,
+      url: row['url'] as string,
+      title: (row['title'] as string) || '(no title)',
+      snippet: row['snippet'] as string,
+      platform: row['platform'] as string,
+      contentType: row['contentType'] as string,
+      author: (row['author'] as string | null) ?? null,
+      capturedAt: row['capturedAt'] as string,
+    }),
+  )
+}
+
+export function searchAll(
+  db: Database.Database,
+  query: string,
+  opts: { limit?: number; source?: Source; since?: string } = {},
+): SearchResult[] {
+  const { limit = 20, source, since } = opts
+
+  const fragOpts: { limit: number; source?: 'claude' | 'codex'; since?: string } = { limit }
+  if (source === 'claude' || source === 'codex') fragOpts.source = source
+  if (since) fragOpts.since = since
+
+  const fragments = searchFragments(db, query, fragOpts)
+    .map(f => ({ ...f, kind: 'fragment' as const }))
+
+  const capOpts: { limit: number; since?: string } = { limit }
+  if (since) capOpts.since = since
+
+  const captures = (source && source !== 'opencli' ? [] : searchCaptures(db, query, capOpts))
+    .map(c => ({ ...c, kind: 'capture' as const }))
+
+  return [...fragments, ...captures]
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+}
+
+export function listOpenCLISources(db: Database.Database): OpenCLISource[] {
+  const rows = db.prepare(`
+    SELECT
+      os.id, os.source_id AS sourceId, os.platform, os.command,
+      os.enabled, os.last_synced AS lastSynced, os.sync_count AS syncCount
+    FROM opencli_sources os
+    ORDER BY os.created_at
+  `).all() as Array<Record<string, unknown>>
+
+  return rows.map(r => ({
+    id: r['id'] as number,
+    sourceId: r['sourceId'] as number,
+    platform: r['platform'] as string,
+    command: r['command'] as string,
+    enabled: Boolean(r['enabled']),
+    lastSynced: (r['lastSynced'] as string | null) ?? null,
+    syncCount: r['syncCount'] as number,
+  }))
+}
+
+export function addOpenCLISource(
+  db: Database.Database,
+  sourceId: number,
+  platform: string,
+  command: string,
+): number {
+  const result = db.prepare(`
+    INSERT OR IGNORE INTO opencli_sources (source_id, platform, command)
+    VALUES (?, ?, ?)
+  `).run(sourceId, platform, command)
+
+  if (result.changes === 0) {
+    const existing = db
+      .prepare('SELECT id FROM opencli_sources WHERE platform = ? AND command = ?')
+      .get(platform, command) as { id: number }
+    return existing.id
+  }
+
+  return Number(result.lastInsertRowid)
+}
+
+export function removeOpenCLISource(db: Database.Database, id: number): void {
+  db.transaction(() => {
+    db.prepare('DELETE FROM captures WHERE opencli_src_id = ?').run(id)
+    db.prepare('DELETE FROM opencli_sources WHERE id = ?').run(id)
+  })()
+}
+
+export function updateOpenCLISourceSynced(
+  db: Database.Database,
+  id: number,
+  count: number,
+): void {
+  db.prepare(`
+    UPDATE opencli_sources
+    SET last_synced = datetime('now'), sync_count = sync_count + ?
+    WHERE id = ?
+  `).run(count, id)
+}
+
+export function getCaptureCount(db: Database.Database, platform?: string): number {
+  if (platform) {
+    const row = db.prepare('SELECT COUNT(*) AS cnt FROM captures WHERE platform = ?').get(platform) as { cnt: number }
+    return row.cnt
+  }
+  const row = db.prepare('SELECT COUNT(*) AS cnt FROM captures').get() as { cnt: number }
+  return row.cnt
+}
+
+export function getSetupValue(db: Database.Database, key: string): string | null {
+  const row = db.prepare('SELECT value FROM opencli_setup WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+export function setSetupValue(db: Database.Database, key: string, value: string): void {
+  db.prepare('INSERT OR REPLACE INTO opencli_setup (key, value) VALUES (?, ?)').run(key, value)
 }
