@@ -7,6 +7,13 @@ export interface AgentInfo {
   path: string
 }
 
+export interface ToolCallEvent {
+  toolCallId: string
+  title: string
+  status: string
+  kind?: string
+}
+
 interface AcpSession {
   proc: ChildProcess
   conn: any // ClientSideConnection
@@ -50,8 +57,9 @@ export class AcpManager {
   async query(
     agentId: string,
     userQuery: string,
-    context: FragmentResult[],
+    _context: FragmentResult[],
     onChunk: (text: string) => void,
+    onToolCall?: (event: ToolCallEvent) => void,
   ): Promise<string> {
     const agents = await this.detectAgents()
     const agent = agents.find(a => a.id === agentId)
@@ -60,10 +68,10 @@ export class AcpManager {
     // Cancel any running query
     this.cancel()
 
-    const prompt = this.buildPrompt(userQuery, context)
+    const prompt = this.buildPrompt(userQuery)
 
     if (agentId === 'claude') {
-      return this.queryViaAcp(prompt, onChunk)
+      return this.queryViaAcp(prompt, onChunk, onToolCall)
     } else {
       return this.queryCodex(agent.path, prompt, onChunk)
     }
@@ -77,6 +85,7 @@ export class AcpManager {
   private async queryViaAcp(
     prompt: string,
     onChunk: (text: string) => void,
+    onToolCall?: (event: ToolCallEvent) => void,
   ): Promise<string> {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
@@ -127,13 +136,34 @@ export class AcpManager {
       }),
       sessionUpdate: async (notification: any) => {
         const update = notification.update
-        if (update &&
-            'sessionUpdate' in update &&
-            update.sessionUpdate === 'agent_message_chunk') {
-          const content = update.content
-          if (content?.type === 'text' && content.text) {
-            fullText += content.text
-            onChunk(content.text)
+        if (!update || !('sessionUpdate' in update)) return
+
+        switch (update.sessionUpdate) {
+          case 'agent_message_chunk': {
+            const content = update.content
+            if (content?.type === 'text' && content.text) {
+              fullText += content.text
+              onChunk(content.text)
+            }
+            break
+          }
+          case 'tool_call': {
+            onToolCall?.({
+              toolCallId: update.toolCallId,
+              title: update.title ?? 'Tool call',
+              status: update.status ?? 'in_progress',
+              kind: update.kind,
+            })
+            break
+          }
+          case 'tool_call_update': {
+            onToolCall?.({
+              toolCallId: update.toolCallId,
+              title: update.title ?? '',
+              status: update.status ?? 'in_progress',
+              kind: update.kind,
+            })
+            break
           }
         }
       },
@@ -265,21 +295,41 @@ export class AcpManager {
     }
   }
 
-  private buildPrompt(userQuery: string, context: FragmentResult[]): string {
-    const fragments = context.slice(0, 8).map((f, i) => {
-      const snippet = f.snippet.replace(/<\/?mark>/g, '')
-      const date = f.startedAt.slice(0, 10)
-      return `[${i + 1}] ${f.source} · ${date} · ${f.project.split('/').pop()}\n${snippet}`
-    }).join('\n\n')
-
+  /**
+   * Build a prompt that gives the agent knowledge about the Spool SQLite DB
+   * and lets it decide how to query the knowledge base.
+   */
+  private buildPrompt(userQuery: string): string {
     return [
-      `I'm searching my personal knowledge base for: "${userQuery}"`,
+      'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI).',
+      'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
       '',
-      'Here are the most relevant fragments from my indexed sessions:',
+      'Schema:',
+      '  sources(id, name TEXT, base_path TEXT)  -- "claude" or "codex"',
+      '  projects(id, source_id, slug, display_path, display_name, last_synced)',
+      '  sessions(id, project_id, source_id, session_uuid TEXT, title TEXT, started_at TEXT, ended_at TEXT, message_count INT, has_tool_use INT)',
+      '  messages(id, session_id, source_id, role TEXT, content_text TEXT, timestamp TEXT, tool_names TEXT)',
+      '  messages_fts(content_text)  -- FTS5 virtual table, content synced from messages',
       '',
-      fragments,
+      'Example queries:',
+      '  # FTS search',
+      '  sqlite3 ~/.spool/spool.db "SELECT m.content_text, s.title, s.started_at, p.display_name FROM messages_fts f JOIN messages m ON m.id = f.rowid JOIN sessions s ON s.id = m.session_id JOIN projects p ON p.id = s.project_id WHERE messages_fts MATCH \'search terms\' ORDER BY rank LIMIT 10"',
       '',
-      'Based on these fragments from my own notes and conversations, synthesize a concise answer to my query. Reference which sources (by number) support your answer.',
+      '  # Recent sessions',
+      '  sqlite3 ~/.spool/spool.db "SELECT session_uuid, title, started_at, message_count FROM sessions ORDER BY started_at DESC LIMIT 20"',
+      '',
+      '  # Sessions from last N days',
+      '  sqlite3 ~/.spool/spool.db "SELECT s.title, s.started_at, p.display_name, src.name FROM sessions s JOIN projects p ON p.id = s.project_id JOIN sources src ON src.id = s.source_id WHERE s.started_at > datetime(\'now\', \'-7 days\') ORDER BY s.started_at DESC"',
+      '',
+      'Important:',
+      '- Interpret the user\'s intent and decide what to search. Don\'t just match their exact words.',
+      '- For temporal queries ("what did I do recently"), filter by date.',
+      '- You may run multiple queries to find relevant information.',
+      '- Synthesize a concise answer. Reference specific sessions or projects when relevant.',
+      '- If no results, say so clearly.',
+      '- ALWAYS reply in the same language as the user\'s query.',
+      '',
+      `User query: "${userQuery}"`,
     ].join('\n')
   }
 }

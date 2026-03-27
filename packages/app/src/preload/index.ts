@@ -53,6 +53,12 @@ const api = {
     return () => ipcRenderer.removeListener('spool:ai-done', handler)
   },
 
+  onAiToolCall: (cb: (data: { toolCallId: string; title: string; status: string; kind?: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { toolCallId: string; title: string; status: string; kind?: string })
+    ipcRenderer.on('spool:ai-tool-call', handler)
+    return () => ipcRenderer.removeListener('spool:ai-tool-call', handler)
+  },
+
   onSyncProgress: (cb: (e: { phase: string; count: number; total: number }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { phase: string; count: number; total: number })
     ipcRenderer.on('spool:sync-progress', handler)

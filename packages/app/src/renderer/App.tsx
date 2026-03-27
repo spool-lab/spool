@@ -33,6 +33,7 @@ export default function App() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiAgent, setAiAgent] = useState('claude')
   const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([])
+  const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string }>>(new Map())
   const aiAnswerRef = useRef('')
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
@@ -48,7 +49,7 @@ export default function App() {
     }).catch(console.error)
   }, [])
 
-  // Listen for AI streaming chunks
+  // Listen for AI streaming chunks and tool calls
   useEffect(() => {
     if (!window.spool?.onAiChunk) return () => {}
     const offChunk = window.spool.onAiChunk(({ text }) => {
@@ -59,7 +60,14 @@ export default function App() {
       setAiStreaming(false)
       if (error) setAiError(error)
     })
-    return () => { offChunk(); offDone() }
+    const offToolCall = window.spool.onAiToolCall?.((tc) => {
+      setAiToolCalls(prev => {
+        const next = new Map(prev)
+        next.set(tc.toolCallId, { title: tc.title || prev.get(tc.toolCallId)?.title || '', status: tc.status, kind: tc.kind })
+        return next
+      })
+    })
+    return () => { offChunk(); offDone(); offToolCall?.() }
   }, [])
 
   useEffect(() => {
@@ -107,6 +115,7 @@ export default function App() {
     setAiAnswer('')
     setAiError(null)
     setAiStreaming(true)
+    setAiToolCalls(new Map())
 
     // Fire AI query
     window.spool.aiSearch(query, aiAgent, ftsResults).catch((err) => {
@@ -147,6 +156,7 @@ export default function App() {
       setAiAnswer('')
       setAiError(null)
       setAiStreaming(false)
+      setAiToolCalls(new Map())
       aiAnswerRef.current = ''
       if (query.trim()) doSearch(query)
     } else {
@@ -228,6 +238,7 @@ export default function App() {
                       agentName={activeAgentName}
                       sources={results}
                       error={aiError}
+                      toolCalls={aiToolCalls}
                     />
                   )}
                   {/* Show "Sources used" label in AI mode */}

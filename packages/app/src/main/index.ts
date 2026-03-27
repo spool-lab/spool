@@ -179,6 +179,8 @@ ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { quer
   try {
     const fullText = await acpManager.query(agentId, query, context, (text) => {
       mainWindow?.webContents.send('spool:ai-chunk', { text })
+    }, (toolCall) => {
+      mainWindow?.webContents.send('spool:ai-tool-call', toolCall)
     })
     mainWindow?.webContents.send('spool:ai-done', { fullText })
     return { ok: true, fullText }
