@@ -1,4 +1,8 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 import type { FragmentResult } from '@spool/core'
 
 export interface AgentInfo {
@@ -16,10 +20,15 @@ export interface ToolCallEvent {
 
 interface AcpSession {
   proc: ChildProcess
-  conn: any // ClientSideConnection
+  conn: unknown
   sessionId: string | null
   initialized: boolean
 }
+
+interface TerminalParams { command?: string; args?: string[]; cwd?: string; sessionId?: string }
+interface TerminalIdParams { terminalId: string; sessionId?: string }
+interface ReadFileParams { path: string; sessionId?: string }
+interface SessionNotification { update?: { sessionUpdate?: string; content?: { type: string; text?: string }; toolCallId?: string; title?: string; status?: string; kind?: string } }
 
 /**
  * ACP Manager — connects to local agents via the Agent Client Protocol.
@@ -47,9 +56,6 @@ function resolveSystemBinary(name: string, extraSearchPaths: string[] = []): str
     if (p) return p
   } catch {}
 
-  // Check well-known paths directly
-  const { existsSync } = require('node:fs')
-  const { homedir } = require('node:os')
   const home = homedir()
   const searchPaths = [
     ...extraSearchPaths,
@@ -72,6 +78,27 @@ function cachedResolve(name: string, extras: string[] = []): string | null {
   return resolvedPaths[name]
 }
 
+interface AgentConfig {
+  name: string
+  bin: string
+  envSetup?: () => Record<string, string>
+}
+
+const AGENT_CONFIGS: Record<string, AgentConfig> = {
+  claude: {
+    name: 'Claude Code',
+    bin: 'claude',
+    envSetup: () => {
+      const claudePath = cachedResolve('claude')
+      return claudePath ? { CLAUDE_CODE_EXECUTABLE: claudePath } : {}
+    },
+  },
+  codex: {
+    name: 'Codex CLI',
+    bin: 'codex',
+  },
+}
+
 export class AcpManager {
   private detectedAgents: AgentInfo[] | null = null
   private activeSession: AcpSession | null = null
@@ -81,14 +108,9 @@ export class AcpManager {
     if (this.detectedAgents) return this.detectedAgents
 
     const agents: AgentInfo[] = []
-    const candidates = [
-      { id: 'claude', name: 'Claude Code', bin: 'claude' },
-      { id: 'codex', name: 'Codex CLI', bin: 'codex' },
-    ]
-
-    for (const c of candidates) {
-      const p = cachedResolve(c.bin)
-      if (p) agents.push({ id: c.id, name: c.name, path: p })
+    for (const [id, config] of Object.entries(AGENT_CONFIGS)) {
+      const p = cachedResolve(config.bin)
+      if (p) agents.push({ id, name: config.name, path: p })
     }
 
     this.detectedAgents = agents
@@ -111,11 +133,7 @@ export class AcpManager {
 
     const prompt = this.buildPrompt(userQuery)
 
-    if (agentId === 'claude') {
-      return this.queryViaAcp(prompt, onChunk, onToolCall)
-    } else {
-      return this.queryCodex(agent.path, prompt, onChunk)
-    }
+    return this.queryViaAcp(agentId, prompt, onChunk, onToolCall)
   }
 
   /**
@@ -124,6 +142,7 @@ export class AcpManager {
    * then does initialize → newSession → prompt with streaming sessionUpdate chunks.
    */
   private async queryViaAcp(
+    agentId: string,
     prompt: string,
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
@@ -131,8 +150,8 @@ export class AcpManager {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
 
-    // Resolve the acp-extension-claude binary
-    const agentBin = this.resolveAcpExtensionClaude()
+    // Resolve the acp-extension binary for this agent
+    const agentBin = this.resolveAcpExtension(agentId)
 
     // Spawn the ACP agent subprocess.
     // Must use system Node.js — not Electron's binary — because the extension
@@ -140,17 +159,18 @@ export class AcpManager {
     // Also set CLAUDE_CODE_EXECUTABLE so the SDK finds the real CLI.
     const nodePath = cachedResolve('node')
     if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
-    const claudePath = cachedResolve('claude')
+    const config = AGENT_CONFIGS[agentId]
+    const agentEnv = {
+      ...process.env as Record<string, string>,
+      ...config?.envSetup?.() ?? {},
+    }
     const proc = spawn(nodePath, [agentBin], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        ...(claudePath ? { CLAUDE_CODE_EXECUTABLE: claudePath } : {}),
-      },
+      env: agentEnv,
     })
 
     proc.stderr?.on('data', (d: Buffer) => {
-      console.error(`[acp-claude] ${d.toString().trim()}`)
+      console.error(`[acp-${agentId}] ${d.toString().trim()}`)
     })
 
     // Convert Node streams to Web streams for the ACP SDK
@@ -180,11 +200,73 @@ export class AcpManager {
 
     let fullText = ''
 
+    const MAX_TERMINAL_OUTPUT = 1024 * 1024 // 1 MB cap
+    const terminals = new Map<string, { proc: ChildProcess; output: string; exitCode: number | null }>()
+    let terminalCounter = 0
+
+    function killTerminalProc(t: { proc: ChildProcess }) {
+      if (t.proc.exitCode === null) try { t.proc.kill() } catch {}
+    }
+
+    function cleanupAllTerminals() {
+      for (const t of terminals.values()) killTerminalProc(t)
+      terminals.clear()
+    }
+
     const conn = new acp.ClientSideConnection(() => ({
       requestPermission: async () => ({
         outcome: { outcome: 'selected' as const, optionId: 'allow' },
       }),
-      sessionUpdate: async (notification: any) => {
+      extMethod: async () => ({}),
+      createTerminal: async (params: TerminalParams) => {
+        const id = `term-${++terminalCounter}`
+        const termProc = spawn(params.command ?? 'bash', params.args ?? [], {
+          cwd: params.cwd || process.cwd(),
+          env: process.env,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: true,
+        })
+        const state = { proc: termProc, output: '', exitCode: null as number | null }
+        const append = (d: Buffer) => {
+          if (state.output.length < MAX_TERMINAL_OUTPUT) state.output += d.toString()
+        }
+        termProc.stdout?.on('data', append)
+        termProc.stderr?.on('data', append)
+        termProc.on('close', (code) => { state.exitCode = code })
+        terminals.set(id, state)
+        return { terminalId: id }
+      },
+      terminalOutput: async (params: TerminalIdParams) => {
+        const t = terminals.get(params.terminalId)
+        return { output: t?.output ?? '', exitCode: t?.exitCode ?? null }
+      },
+      waitForTerminalExit: async (params: TerminalIdParams) => {
+        const t = terminals.get(params.terminalId)
+        if (!t) return { exitCode: -1 }
+        if (t.exitCode !== null) return { exitCode: t.exitCode }
+        return new Promise((resolve) => {
+          t.proc.on('close', (code) => resolve({ exitCode: code ?? -1 }))
+        })
+      },
+      killTerminal: async (params: TerminalIdParams) => {
+        const t = terminals.get(params.terminalId)
+        if (t) killTerminalProc(t)
+        return {}
+      },
+      releaseTerminal: async (params: TerminalIdParams) => {
+        const t = terminals.get(params.terminalId)
+        if (t) killTerminalProc(t)
+        terminals.delete(params.terminalId)
+        return {}
+      },
+      readTextFile: async (params: ReadFileParams) => {
+        try {
+          return { content: await readFile(params.path, 'utf8') }
+        } catch {
+          return { content: '' }
+        }
+      },
+      sessionUpdate: async (notification: SessionNotification) => {
         const update = notification.update
         if (!update || !('sessionUpdate' in update)) return
 
@@ -247,10 +329,10 @@ export class AcpManager {
       return fullText
     } catch (err) {
       if (fullText) return fullText
-      const msg = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as any).message) : String(err)
+      const msg = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as Record<string, unknown>).message) : String(err)
       throw new Error(msg)
     } finally {
-      // Clean up the subprocess
+      cleanupAllTerminals()
       this.killSession()
     }
   }
@@ -259,74 +341,21 @@ export class AcpManager {
    * Resolve the path to the acp-extension-claude entry point.
    * The package is ESM-only so require.resolve() won't work directly.
    */
-  private resolveAcpExtensionClaude(): string {
-    const path = require('node:path')
-    const fs = require('node:fs')
-    // __dirname in dev = packages/app/out/main
-    // node_modules is at packages/app/node_modules (../../node_modules from __dirname)
-    const candidates = [
-      path.resolve(__dirname, '..', '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
-      path.resolve(__dirname, '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
-      path.resolve(__dirname, '..', '..', '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
+  private resolveAcpExtension(name: string): string {
+    const pkg = `acp-extension-${name}`
+    const entryPoints = ['dist/index.js', `bin/${pkg}.js`]
+    const roots = [
+      resolve(__dirname, '..', '..', 'node_modules', pkg),
+      resolve(__dirname, '..', 'node_modules', pkg),
+      resolve(__dirname, '..', '..', '..', 'node_modules', pkg),
     ]
-    for (const c of candidates) {
-      if (fs.existsSync(c)) return c
+    for (const root of roots) {
+      for (const entry of entryPoints) {
+        const candidate = join(root, entry)
+        if (existsSync(candidate)) return candidate
+      }
     }
-    throw new Error('Could not find acp-extension-claude. Run: pnpm add acp-extension-claude')
-  }
-
-  /**
-   * Codex CLI: use `codex exec --json <prompt>`
-   */
-  private queryCodex(
-    binPath: string,
-    prompt: string,
-    onChunk: (text: string) => void,
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const proc = spawn(binPath, ['exec', '--json', prompt], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
-      })
-
-      const session: AcpSession = { proc, conn: null, sessionId: null, initialized: false }
-      this.activeSession = session
-
-      let fullText = ''
-      const readline = require('node:readline')
-      const rl = readline.createInterface({ input: proc.stdout! })
-      rl.on('line', (line: string) => {
-        try {
-          const event = JSON.parse(line)
-          if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
-            fullText += event.item.text
-            onChunk(event.item.text)
-          }
-        } catch {
-          // skip non-JSON lines
-        }
-      })
-
-      proc.stderr?.on('data', (d: Buffer) => {
-        console.error(`[codex] ${d.toString().trim()}`)
-      })
-
-      proc.stdin!.end()
-
-      proc.on('close', (code) => {
-        this.activeSession = null
-        if (code === 0 || fullText) {
-          resolve(fullText)
-        } else {
-          reject(new Error(`Codex exited with code ${code}`))
-        }
-      })
-
-      proc.on('error', (err) => {
-        this.activeSession = null
-        reject(err)
-      })
-    })
+    throw new Error(`Could not find ${pkg}. Run: pnpm add ${pkg}`)
   }
 
   cancel(): void {
