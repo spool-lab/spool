@@ -185,7 +185,7 @@ ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { quer
     mainWindow?.webContents.send('spool:ai-done', { fullText })
     return { ok: true, fullText }
   } catch (err) {
-    const error = String(err instanceof Error ? err.message : err)
+    const error = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as any).message) : String(err)
     mainWindow?.webContents.send('spool:ai-done', { fullText: '', error })
     return { ok: false, error }
   }

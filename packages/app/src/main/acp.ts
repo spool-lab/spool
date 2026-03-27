@@ -27,6 +27,51 @@ interface AcpSession {
  * For Claude Code, spawns `acp-extension-claude` as subprocess and communicates
  * via JSON-RPC over stdio using the @agentclientprotocol/sdk.
  */
+/**
+ * Resolve a binary path that works in both dev (terminal-launched) and
+ * production (GUI-launched, minimal PATH) contexts on macOS.
+ *
+ * Strategy: try `which` first (works in dev), then check common locations
+ * including nvm/fnm/Homebrew paths. Results are cached for the process lifetime.
+ */
+function resolveSystemBinary(name: string, extraSearchPaths: string[] = []): string | null {
+  // Try shell lookup first — works when launched from terminal
+  try {
+    const p = execSync(`which ${name}`, { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+    if (p) return p
+  } catch {}
+
+  // Try login shell — picks up nvm/fnm/etc even in GUI context
+  try {
+    const p = execSync(`bash -lc "which ${name}"`, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+    if (p) return p
+  } catch {}
+
+  // Check well-known paths directly
+  const { existsSync } = require('node:fs')
+  const { homedir } = require('node:os')
+  const home = homedir()
+  const searchPaths = [
+    ...extraSearchPaths,
+    `/usr/local/bin/${name}`,
+    `/opt/homebrew/bin/${name}`,
+    `${home}/.local/bin/${name}`,
+    `${home}/.nvm/current/bin/${name}`,
+  ]
+  for (const p of searchPaths) {
+    if (existsSync(p)) return p
+  }
+  return null
+}
+
+const resolvedPaths: Record<string, string | null> = {}
+function cachedResolve(name: string, extras: string[] = []): string | null {
+  if (!(name in resolvedPaths)) {
+    resolvedPaths[name] = resolveSystemBinary(name, extras)
+  }
+  return resolvedPaths[name]
+}
+
 export class AcpManager {
   private detectedAgents: AgentInfo[] | null = null
   private activeSession: AcpSession | null = null
@@ -42,12 +87,8 @@ export class AcpManager {
     ]
 
     for (const c of candidates) {
-      try {
-        const p = execSync(`which ${c.bin}`, { encoding: 'utf8', timeout: 5000 }).trim()
-        if (p) agents.push({ id: c.id, name: c.name, path: p })
-      } catch {
-        // not found
-      }
+      const p = cachedResolve(c.bin)
+      if (p) agents.push({ id: c.id, name: c.name, path: p })
     }
 
     this.detectedAgents = agents
@@ -93,10 +134,19 @@ export class AcpManager {
     // Resolve the acp-extension-claude binary
     const agentBin = this.resolveAcpExtensionClaude()
 
-    // Spawn the ACP agent subprocess
-    const proc = spawn(process.execPath, [agentBin], {
+    // Spawn the ACP agent subprocess.
+    // Must use system Node.js — not Electron's binary — because the extension
+    // passes process.execPath to claude-agent-sdk as the Node executable.
+    // Also set CLAUDE_CODE_EXECUTABLE so the SDK finds the real CLI.
+    const nodePath = cachedResolve('node')
+    if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
+    const claudePath = cachedResolve('claude')
+    const proc = spawn(nodePath, [agentBin], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        ...(claudePath ? { CLAUDE_CODE_EXECUTABLE: claudePath } : {}),
+      },
     })
 
     proc.stderr?.on('data', (d: Buffer) => {
@@ -142,8 +192,9 @@ export class AcpManager {
           case 'agent_message_chunk': {
             const content = update.content
             if (content?.type === 'text' && content.text) {
-              fullText += content.text
-              onChunk(content.text)
+              const text = typeof content.text === 'string' ? content.text : JSON.stringify(content.text)
+              fullText += text
+              onChunk(text)
             }
             break
           }
@@ -196,7 +247,8 @@ export class AcpManager {
       return fullText
     } catch (err) {
       if (fullText) return fullText
-      throw err
+      const msg = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as any).message) : String(err)
+      throw new Error(msg)
     } finally {
       // Clean up the subprocess
       this.killSession()
