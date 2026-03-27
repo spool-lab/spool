@@ -10,13 +10,13 @@ interface Props {
   isSearching: boolean
   claudeCount: number | null
   codexCount: number | null
-  captureCount: number | null
+  captureSources: Array<{ label: string; count: number }>
   mode: SearchMode
   onModeChange: (mode: SearchMode) => void
   onConnectClick: () => void
 }
 
-export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount, captureCount, mode, onModeChange, onConnectClick }: Props) {
+export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount, captureSources, mode, onModeChange, onConnectClick }: Props) {
   const showSuggestions = query.trim().length > 0 && suggestions.length > 0
 
   return (
@@ -72,7 +72,7 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
           </div>
         )}
       </div>
-      <SourceChips claudeCount={claudeCount} codexCount={codexCount} captureCount={captureCount} onConnectClick={onConnectClick} />
+      <SourceChips claudeCount={claudeCount} codexCount={codexCount} captureSources={captureSources} onConnectClick={onConnectClick} />
     </div>
   )
 }
@@ -80,17 +80,20 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
 interface SourceChipsProps {
   claudeCount: number | null
   codexCount: number | null
-  captureCount: number | null
+  captureSources: Array<{ label: string; count: number }>
   onConnectClick: () => void
 }
 
-function SourceChips({ claudeCount, codexCount, captureCount, onConnectClick }: SourceChipsProps) {
+function SourceChips({ claudeCount, codexCount, captureSources, onConnectClick }: SourceChipsProps) {
   const sources = [
     { id: 'claude', label: 'Claude Chats', color: '#6B5B8A', count: claudeCount },
     { id: 'codex',  label: 'Codex Chats',  color: '#1A6B3C', count: codexCount },
-    ...(captureCount != null && captureCount > 0
-      ? [{ id: 'opencli', label: 'Captures', color: '#C85A00', count: captureCount }]
-      : []),
+    ...captureSources.map((s, i) => ({
+      id: `capture-${i}`,
+      label: s.label,
+      color: '#C85A00',
+      count: s.count as number | null,
+    })),
   ]
 
   return (

@@ -24,6 +24,15 @@ const DOMAIN_PLATFORM_MAP: Record<string, string> = {
   'instagram.com': 'instagram',
   'facebook.com': 'facebook',
   'linkedin.com': 'linkedin',
+  'douyin.com': 'douyin',
+  'jike.city': 'jike',
+  'okjike.com': 'jike',
+  'v2ex.com': 'v2ex',
+  'dev.to': 'devto',
+  'lobste.rs': 'lobsters',
+  'wikipedia.org': 'wikipedia',
+  'store.steampowered.com': 'steam',
+  'arxiv.org': 'arxiv',
 }
 
 /** Infer content type from platform */
@@ -35,6 +44,24 @@ const PLATFORM_CONTENT_TYPE: Record<string, string> = {
   hackernews: 'post',
   bilibili: 'video',
   tiktok: 'video',
+  douyin: 'video',
+  weibo: 'post',
+  xiaohongshu: 'post',
+  zhihu: 'post',
+  jike: 'post',
+  douban: 'review',
+  v2ex: 'post',
+  devto: 'article',
+  lobsters: 'post',
+  substack: 'article',
+  medium: 'article',
+  linkedin: 'post',
+  instagram: 'post',
+  facebook: 'post',
+  notion: 'page',
+  stackoverflow: 'post',
+  wikipedia: 'article',
+  steam: 'page',
 }
 
 /** Detect platform from URL domain. */
@@ -65,16 +92,23 @@ export function parseOpenCLIItem(
   platform: string,
   sourceUrl?: string,
 ): CapturedItem {
+  // Flatten GitHub starred repos: {starred_at, repo: {...}} → flat repo with starred_at
+  if (raw['repo'] && typeof raw['repo'] === 'object' && 'html_url' in (raw['repo'] as object)) {
+    const repo = raw['repo'] as Record<string, unknown>
+    const starredAt = raw['starred_at'] as string | undefined
+    raw = { ...repo, starred_at: starredAt ?? repo['created_at'] }
+  }
+
   const url = String(raw['url'] ?? raw['link'] ?? raw['html_url'] ?? sourceUrl ?? '')
   const title = String(raw['title'] ?? raw['name'] ?? raw['full_name'] ?? '')
   const contentText = String(
     raw['content'] ?? raw['description'] ?? raw['text'] ?? raw['body']
     ?? raw['selftext'] ?? raw['summary'] ?? '',
   )
-  const author = (raw['author'] ?? raw['user'] ?? raw['username'] ?? raw['screen_name'] ?? null) as string | null
+  const author = (raw['author'] ?? raw['user'] ?? raw['owner'] ?? raw['username'] ?? raw['screen_name'] ?? null) as string | null
   const capturedAt = String(
-    raw['created_at'] ?? raw['date'] ?? raw['timestamp'] ?? raw['pushed_at']
-    ?? new Date().toISOString(),
+    raw['starred_at'] ?? raw['created_at'] ?? raw['date'] ?? raw['timestamp']
+    ?? raw['pushed_at'] ?? new Date().toISOString(),
   )
   const platformId = (raw['id'] ?? raw['platform_id'] ?? null) as string | null
   const thumbnailUrl = (raw['thumbnail'] ?? raw['thumbnail_url'] ?? raw['avatar_url'] ?? null) as string | null

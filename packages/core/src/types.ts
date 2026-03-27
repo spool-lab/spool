@@ -116,7 +116,8 @@ export interface OpenCLISetupStatus {
 
 export interface PlatformInfo {
   platform: string
-  commands: string[]
+  command: string
+  label: string
   description: string
 }
 

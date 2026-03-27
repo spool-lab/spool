@@ -15,16 +15,26 @@ export default function OnboardingFlow({ onClose, onComplete }: Props) {
   const [installing, setInstalling] = useState(false)
   const [installError, setInstallError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [bridgeError, setBridgeError] = useState<string | null>(null)
 
   const checkStatus = useCallback(async () => {
     if (!window.spool?.opencli) return
     setChecking(true)
+    setBridgeError(null)
     try {
       const status = await window.spool.opencli.checkSetup()
       setCliInstalled(status.cliInstalled)
       setBridgeReady(status.browserBridgeReady)
       if (status.cliInstalled && step === 'install') setStep('bridge')
-      if (status.browserBridgeReady && step === 'bridge') setStep('done')
+      if (status.browserBridgeReady && step === 'bridge') {
+        setStep('done')
+      } else if (step === 'bridge' && !status.browserBridgeReady) {
+        setBridgeError('Browser Bridge not detected. Make sure the Chrome extension is installed and Chrome is running.')
+      }
+    } catch {
+      if (step === 'bridge') {
+        setBridgeError('Could not check bridge status. Make sure OpenCLI is installed correctly.')
+      }
     } finally {
       setChecking(false)
     }
@@ -163,17 +173,28 @@ export default function OnboardingFlow({ onClose, onComplete }: Props) {
               <p className="text-xs text-warm-faint dark:text-dark-muted mb-4">
                 Make sure Chrome is running and you're logged into the platforms you want to connect.
               </p>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setStep('install')} className="px-4 py-2 text-sm text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors rounded-[6px]">
-                  Back
-                </button>
+              {bridgeError && (
+                <p className="text-xs text-red-500 mb-3">{bridgeError}</p>
+              )}
+              <div className="flex justify-between items-center">
                 <button
-                  onClick={checkStatus}
-                  disabled={checking}
-                  className="px-4 py-2 text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity rounded-[6px] disabled:opacity-50"
+                  onClick={() => setStep('done')}
+                  className="text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:underline"
                 >
-                  {checking ? 'Checking...' : 'Verify'}
+                  Skip for now
                 </button>
+                <div className="flex gap-3">
+                  <button onClick={() => setStep('install')} className="px-4 py-2 text-sm text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors rounded-[6px]">
+                    Back
+                  </button>
+                  <button
+                    onClick={checkStatus}
+                    disabled={checking}
+                    className="px-4 py-2 text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity rounded-[6px] disabled:opacity-50"
+                  >
+                    {checking ? 'Checking...' : 'Verify'}
+                  </button>
+                </div>
               </div>
             </>
           )}

@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3'
 import type { OpenCLISetupStatus, PlatformInfo, CapturedItem } from '../types.js'
 import { cachedResolve } from '../util/resolve-bin.js'
 import { parseOpenCLIOutput, parseOpenCLIItem, detectPlatform } from './parser.js'
+import { getStrategy, SYNC_STRATEGIES } from './strategies.js'
 import {
   getOpenCLISourceId,
   insertCapture,
@@ -46,12 +47,11 @@ export class OpenCLIManager {
       result.cliVersion = version.trim()
     } catch {}
 
-    // Check browser bridge status
+    // Check browser bridge status via `opencli doctor`
     try {
-      const bridgeOutput = await this.exec(['bridge', 'status'], 5000)
-      result.browserBridgeReady = bridgeOutput.toLowerCase().includes('connected')
-        || bridgeOutput.toLowerCase().includes('ready')
-        || bridgeOutput.toLowerCase().includes('running')
+      const bridgeOutput = await this.exec(['doctor'], 10000)
+      const lower = bridgeOutput.toLowerCase()
+      result.browserBridgeReady = lower.includes('[ok]') && lower.includes('extension')
     } catch {}
 
     // Check if Chrome is running
@@ -96,24 +96,14 @@ export class OpenCLIManager {
   // ── Platform Discovery ─────────────────────────────────────────────────
 
   async listAvailablePlatforms(): Promise<PlatformInfo[]> {
-    try {
-      const output = await this.exec(['list', '-f', 'json'], 15000)
-      const parsed = JSON.parse(output.trim())
-
-      if (Array.isArray(parsed)) {
-        return parsed.map((item: Record<string, unknown>) => ({
-          platform: String(item['name'] ?? item['platform'] ?? ''),
-          commands: Array.isArray(item['commands'])
-            ? (item['commands'] as string[])
-            : [String(item['command'] ?? 'default')],
-          description: String(item['description'] ?? ''),
-        }))
-      }
-
-      return []
-    } catch {
-      return []
-    }
+    // Return our curated sync strategies — only commands known to work
+    // as batch-syncable list operations
+    return SYNC_STRATEGIES.map(s => ({
+      platform: s.platform,
+      command: s.command,
+      label: s.label,
+      description: s.description,
+    }))
   }
 
   // ── Source Sync ────────────────────────────────────────────────────────
@@ -125,9 +115,20 @@ export class OpenCLIManager {
   ): Promise<{ items: CapturedItem[]; added: number }> {
     this.onProgress?.({ phase: 'fetching', message: `Fetching ${platform} ${command}...` })
 
-    const args = command.split(/\s+/)
-    const stdout = await this.exec([platform, ...args, '-f', 'json'], 60000)
-    const items = parseOpenCLIOutput(stdout, platform)
+    const strategy = getStrategy(platform, command)
+    let stdout: string
+    let items: CapturedItem[]
+
+    if (strategy?.customExec) {
+      // Custom binary path (e.g. gh api for GitHub Stars)
+      stdout = await this.execCustom(strategy.customExec.bin, strategy.customExec.args, 60000)
+      items = parseOpenCLIOutput(stdout, platform)
+    } else {
+      const cmdArgs = command.split(/\s+/)
+      const extraArgs = strategy?.args ?? []
+      stdout = await this.exec([platform, ...cmdArgs, ...extraArgs, '-f', 'json'], 60000)
+      items = parseOpenCLIOutput(stdout, platform)
+    }
 
     this.onProgress?.({ phase: 'indexing', message: `Indexing ${items.length} items...` })
 
@@ -215,6 +216,30 @@ export class OpenCLIManager {
       proc.on('close', (code) => {
         if (code === 0) resolve(stdout)
         else reject(new Error(`opencli exited with code ${code}: ${stderr.slice(0, 500)}`))
+      })
+
+      proc.on('error', (err) => reject(err))
+    })
+  }
+
+  private execCustom(bin: string, args: string[], timeout = 30000): Promise<string> {
+    const binPath = cachedResolve(bin) ?? bin
+    return new Promise((resolve, reject) => {
+      const proc = spawn(binPath, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
+        timeout,
+      })
+
+      let stdout = ''
+      let stderr = ''
+
+      proc.stdout?.on('data', (d: Buffer) => { stdout += d.toString() })
+      proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
+
+      proc.on('close', (code) => {
+        if (code === 0) resolve(stdout)
+        else reject(new Error(`${bin} exited with code ${code}: ${stderr.slice(0, 500)}`))
       })
 
       proc.on('error', (err) => reject(err))

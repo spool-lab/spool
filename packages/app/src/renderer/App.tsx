@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import type { FragmentResult, StatusInfo } from '@spool/core'
+import type { FragmentResult, SearchResult, StatusInfo } from '@spool/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import HomeView from './components/HomeView.js'
@@ -20,7 +20,7 @@ interface AgentInfo {
 
 export default function App() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<FragmentResult[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [view, setView] = useState<View>('search')
   const [homeMode, setHomeMode] = useState(true)
@@ -43,7 +43,8 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showSourcesPanel, setShowSourcesPanel] = useState(false)
   const [showCaptureModal, setShowCaptureModal] = useState(false)
-  const [captureCount, setCaptureCount] = useState<number | null>(null)
+  const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
+
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
@@ -79,14 +80,28 @@ export default function App() {
     return () => { offChunk(); offDone(); offToolCall?.() }
   }, [])
 
+  const refreshCaptureSources = useCallback(() => {
+    if (!window.spool?.opencli) return
+    Promise.all([
+      window.spool.opencli.listSources(),
+      window.spool.opencli.availablePlatforms(),
+    ]).then(([sources, platforms]) => {
+      setCaptureSources(
+        sources
+          .filter(s => s.syncCount > 0)
+          .map(s => ({
+            label: platforms.find(p => p.platform === s.platform && p.command === s.command)?.label ?? `${s.platform} ${s.command}`,
+            count: s.syncCount,
+          }))
+      )
+    }).catch(console.error)
+  }, [])
+
   useEffect(() => {
     if (!window.spool) return
     window.spool.getStatus().then(setStatus).catch(console.error)
-    // Load capture count
-    if (window.spool.opencli) {
-      window.spool.opencli.getCaptureCount().then(setCaptureCount).catch(console.error)
-    }
-  }, [syncStatus])
+    refreshCaptureSources()
+  }, [syncStatus, refreshCaptureSources])
 
   // Listen for ⌘K capture modal shortcut
   useEffect(() => {
@@ -218,12 +233,9 @@ export default function App() {
   }, [])
 
   const handleCaptured = useCallback(() => {
-    // Refresh capture count and re-search if active
-    if (window.spool?.opencli) {
-      window.spool.opencli.getCaptureCount().then(setCaptureCount).catch(console.error)
-    }
+    refreshCaptureSources()
     if (query.trim() && searchMode === 'fast') doSearch(query)
-  }, [query, searchMode, doSearch])
+  }, [query, searchMode, doSearch, refreshCaptureSources])
 
   const activeAgentName = availableAgents.find(a => a.id === aiAgent)?.name ?? aiAgent
   const hasAgents = availableAgents.length > 0
@@ -237,11 +249,11 @@ export default function App() {
             onChange={handleQueryChange}
             onSubmit={handleSubmit}
             onSelectSuggestion={handleSelectSuggestion}
-            suggestions={results}
+            suggestions={results.filter((r: any) => r.kind !== 'capture')}
             isSearching={isSearching}
             claudeCount={status?.claudeSessions ?? null}
             codexCount={status?.codexSessions ?? null}
-            captureCount={captureCount}
+            captureSources={captureSources}
             mode={searchMode}
             onModeChange={hasAgents ? handleModeChange : undefined}
             onConnectClick={handleConnectClick}
@@ -329,7 +341,7 @@ export default function App() {
       )}
       {showSourcesPanel && (
         <SourcesPanel
-          onClose={() => setShowSourcesPanel(false)}
+          onClose={() => { setShowSourcesPanel(false); refreshCaptureSources() }}
           claudeCount={status?.claudeSessions ?? null}
           codexCount={status?.codexSessions ?? null}
         />

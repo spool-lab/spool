@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import type { FragmentResult } from '@spool/core'
+import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
 import ContinueActions from './ContinueActions.js'
 
 interface Props {
-  results: FragmentResult[]
+  results: SearchResult[]
   query: string
   onOpenSession: (uuid: string) => void
 }
@@ -27,14 +27,21 @@ export default function FragmentResults({ results, query, onOpenSession }: Props
     )
   }
 
-  const sources = [...new Set(results.map(r => r.source))]
-  const filtered = activeFilter === 'all' ? results : results.filter(r => r.source === activeFilter)
+  // Derive source tabs: claude, codex, plus any capture platforms
+  const sourceKeys = [...new Set(results.map(r =>
+    r.kind === 'fragment' ? r.source : r.platform
+  ))]
+  const filtered = activeFilter === 'all'
+    ? results
+    : results.filter(r =>
+        r.kind === 'fragment' ? r.source === activeFilter : r.platform === activeFilter
+      )
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* AMD-8: filter tabs */}
+      {/* Filter tabs */}
       <div className="flex gap-0 border-b border-warm-border dark:border-dark-border px-4 flex-none">
-        {(['all', ...sources] as string[]).map(src => (
+        {(['all', ...sourceKeys] as string[]).map(src => (
           <button
             key={src}
             onClick={() => setActiveFilter(src)}
@@ -51,43 +58,96 @@ export default function FragmentResults({ results, query, onOpenSession }: Props
 
       <div className="flex-1 overflow-y-auto">
         <div className="divide-y divide-warm-border dark:divide-dark-border">
-          {filtered.map((result, i) => (
-            <FragmentRow key={`${result.sessionUuid}-${i}`} result={result} onOpenSession={onOpenSession} />
-          ))}
+          {filtered.map((result, i) =>
+            result.kind === 'capture'
+              ? <CaptureRow key={`cap-${result.captureId}`} result={result} />
+              : <FragmentRow key={`frag-${result.sessionUuid}-${i}`} result={result} onOpenSession={onOpenSession} />
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function FragmentRow({ result, onOpenSession }: { result: FragmentResult; onOpenSession: (uuid: string) => void }) {
+function FragmentRow({ result, onOpenSession }: { result: FragmentResult & { kind: 'fragment' }; onOpenSession: (uuid: string) => void }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatDate(result.startedAt)
   const project = result.project.split('/').pop() ?? result.project
 
   return (
     <div className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
-      {/* Source + project + date */}
       <div className="flex items-center gap-2 mb-1.5">
         <SourceBadge source={result.source} />
         <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">You discussed this · {project}</span>
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
       </div>
 
-      {/* Fragment snippet — monospace per DESIGN.md */}
       <p
         className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
         dangerouslySetInnerHTML={{ __html: snippet }}
       />
 
-      {/* Session title (subtle) */}
       <p className="text-xs text-warm-faint dark:text-dark-muted mt-1 truncate">
         {result.sessionTitle}
       </p>
 
-      {/* Continue actions */}
       <ContinueActions result={result} onOpenSession={onOpenSession} />
     </div>
+  )
+}
+
+function CaptureRow({ result }: { result: CaptureResult & { kind: 'capture' } }) {
+  const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
+  const date = formatDate(result.capturedAt)
+
+  return (
+    <a
+      href={result.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <PlatformBadge platform={result.platform} />
+        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
+          {result.author ? `You saved this · ${result.author}` : 'You saved this'}
+        </span>
+        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+      </div>
+
+      <p
+        className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
+        dangerouslySetInnerHTML={{ __html: snippet }}
+      />
+
+      <p className="text-xs text-warm-faint dark:text-dark-muted mt-1 truncate">
+        {result.title || result.url}
+      </p>
+    </a>
+  )
+}
+
+const PLATFORM_BADGE_COLORS: Record<string, string> = {
+  twitter: '#3A3A3A',
+  github: '#555555',
+  youtube: '#B22222',
+  reddit: '#FF4500',
+  hackernews: '#FF6600',
+  bilibili: '#FB7299',
+  weibo: '#E6162D',
+  xiaohongshu: '#FE2C55',
+  douban: '#007722',
+  linkedin: '#0A66C2',
+}
+
+function PlatformBadge({ platform }: { platform: string }) {
+  return (
+    <span
+      className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
+      style={{ background: PLATFORM_BADGE_COLORS[platform] ?? '#C85A00' }}
+    >
+      {platform}
+    </span>
   )
 }
 
