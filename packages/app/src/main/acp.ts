@@ -1,5 +1,4 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
-import * as readline from 'node:readline'
 import type { FragmentResult } from '@spool/core'
 
 export interface AgentInfo {
@@ -8,9 +7,22 @@ export interface AgentInfo {
   path: string
 }
 
+interface AcpSession {
+  proc: ChildProcess
+  conn: any // ClientSideConnection
+  sessionId: string | null
+  initialized: boolean
+}
+
+/**
+ * ACP Manager — connects to local agents via the Agent Client Protocol.
+ *
+ * For Claude Code, spawns `acp-extension-claude` as subprocess and communicates
+ * via JSON-RPC over stdio using the @agentclientprotocol/sdk.
+ */
 export class AcpManager {
   private detectedAgents: AgentInfo[] | null = null
-  private activeProcess: ChildProcess | null = null
+  private activeSession: AcpSession | null = null
 
   /** Detect which agent CLIs are installed on the machine */
   async detectAgents(): Promise<AgentInfo[]> {
@@ -51,94 +63,138 @@ export class AcpManager {
     const prompt = this.buildPrompt(userQuery, context)
 
     if (agentId === 'claude') {
-      return this.queryClaude(agent.path, prompt, onChunk)
+      return this.queryViaAcp(prompt, onChunk)
     } else {
       return this.queryCodex(agent.path, prompt, onChunk)
     }
   }
 
   /**
-   * Claude Code: use `claude -p --output-format stream-json --verbose --bare`
-   * Streams JSONL, each line is a JSON event. Text chunks come as assistant messages.
+   * Query via ACP protocol.
+   * Spawns acp-extension-claude, establishes ClientSideConnection,
+   * then does initialize → newSession → prompt with streaming sessionUpdate chunks.
    */
-  private queryClaude(
-    binPath: string,
+  private async queryViaAcp(
     prompt: string,
     onChunk: (text: string) => void,
   ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const proc = spawn(binPath, [
-        '-p', '--output-format', 'stream-json', '--verbose',
-      ], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
-      })
+    // Dynamically import the ESM-only ACP SDK
+    const acp = await import('@agentclientprotocol/sdk')
 
-      this.activeProcess = proc
+    // Resolve the acp-extension-claude binary
+    const agentBin = this.resolveAcpExtensionClaude()
 
-      let fullText = ''
-      let lastSeenText = '' // Track cumulative text to extract deltas
-
-      const rl = readline.createInterface({ input: proc.stdout! })
-      rl.on('line', (line) => {
-        try {
-          const event = JSON.parse(line)
-          if (event.type === 'assistant' && event.message?.content) {
-            // Each assistant event contains the full content so far
-            // Extract the text delta by comparing to what we've seen
-            for (const block of event.message.content) {
-              if (block.type === 'text' && typeof block.text === 'string') {
-                if (block.text.length > lastSeenText.length) {
-                  const delta = block.text.slice(lastSeenText.length)
-                  lastSeenText = block.text
-                  fullText = block.text
-                  onChunk(delta)
-                }
-              }
-            }
-          } else if (event.type === 'result' && typeof event.result === 'string') {
-            if (event.is_error) {
-              // Auth errors, etc. — reject
-              reject(new Error(event.result))
-              return
-            }
-            // Final result — use if we haven't streamed anything
-            if (!fullText) {
-              fullText = event.result
-              onChunk(event.result)
-            }
-          }
-        } catch {
-          // skip non-JSON lines
-        }
-      })
-
-      proc.stderr?.on('data', (d: Buffer) => {
-        console.error(`[claude] ${d.toString().trim()}`)
-      })
-
-      proc.stdin!.write(prompt)
-      proc.stdin!.end()
-
-      proc.on('close', (code) => {
-        this.activeProcess = null
-        if (code === 0 || fullText) {
-          resolve(fullText)
-        } else {
-          reject(new Error(`Claude exited with code ${code}`))
-        }
-      })
-
-      proc.on('error', (err) => {
-        this.activeProcess = null
-        reject(err)
-      })
+    // Spawn the ACP agent subprocess
+    const proc = spawn(process.execPath, [agentBin], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env },
     })
+
+    proc.stderr?.on('data', (d: Buffer) => {
+      console.error(`[acp-claude] ${d.toString().trim()}`)
+    })
+
+    // Convert Node streams to Web streams for the ACP SDK
+    const outputWritable = new WritableStream<Uint8Array>({
+      write(chunk) {
+        return new Promise((resolve, reject) => {
+          proc.stdin!.write(Buffer.from(chunk), (err) => {
+            if (err) reject(err)
+            else resolve()
+          })
+        })
+      },
+    })
+
+    const inputReadable = new ReadableStream<Uint8Array>({
+      start(controller) {
+        proc.stdout!.on('data', (chunk: Buffer) => {
+          controller.enqueue(new Uint8Array(chunk))
+        })
+        proc.stdout!.on('end', () => controller.close())
+        proc.stdout!.on('error', (err) => controller.error(err))
+      },
+    })
+
+    // Create the ACP stream and client connection
+    const stream = acp.ndJsonStream(outputWritable, inputReadable)
+
+    let fullText = ''
+
+    const conn = new acp.ClientSideConnection(() => ({
+      requestPermission: async () => ({
+        outcome: { outcome: 'selected' as const, optionId: 'allow' },
+      }),
+      sessionUpdate: async (notification: any) => {
+        const update = notification.update
+        if (update &&
+            'sessionUpdate' in update &&
+            update.sessionUpdate === 'agent_message_chunk') {
+          const content = update.content
+          if (content?.type === 'text' && content.text) {
+            fullText += content.text
+            onChunk(content.text)
+          }
+        }
+      },
+    }), stream)
+
+    this.activeSession = { proc, conn, sessionId: null, initialized: false }
+
+    try {
+      // Step 1: Initialize
+      await conn.initialize({
+        clientCapabilities: {},
+        protocolVersion: 1,
+      })
+
+      // Step 2: New session
+      const sessionResp = await conn.newSession({
+        cwd: process.cwd(),
+        mcpServers: [],
+      })
+      const sessionId = sessionResp.sessionId
+      this.activeSession.sessionId = sessionId
+
+      // Step 3: Prompt (this blocks until the agent finishes)
+      // ACP PromptRequest takes `prompt: ContentBlock[]`, not `messages`
+      await conn.prompt({
+        sessionId,
+        prompt: [{ type: 'text', text: prompt }],
+      })
+
+      return fullText
+    } catch (err) {
+      if (fullText) return fullText
+      throw err
+    } finally {
+      // Clean up the subprocess
+      this.killSession()
+    }
+  }
+
+  /**
+   * Resolve the path to the acp-extension-claude entry point.
+   * The package is ESM-only so require.resolve() won't work directly.
+   */
+  private resolveAcpExtensionClaude(): string {
+    const path = require('node:path')
+    const fs = require('node:fs')
+    // __dirname in dev = packages/app/out/main
+    // node_modules is at packages/app/node_modules (../../node_modules from __dirname)
+    const candidates = [
+      path.resolve(__dirname, '..', '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
+      path.resolve(__dirname, '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
+      path.resolve(__dirname, '..', '..', '..', 'node_modules', 'acp-extension-claude', 'dist', 'index.js'),
+    ]
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c
+    }
+    throw new Error('Could not find acp-extension-claude. Run: pnpm add acp-extension-claude')
   }
 
   /**
    * Codex CLI: use `codex exec --json <prompt>`
-   * Streams JSONL with item.completed events containing agent messages.
    */
   private queryCodex(
     binPath: string,
@@ -151,12 +207,13 @@ export class AcpManager {
         env: { ...process.env },
       })
 
-      this.activeProcess = proc
+      const session: AcpSession = { proc, conn: null, sessionId: null, initialized: false }
+      this.activeSession = session
 
       let fullText = ''
-
+      const readline = require('node:readline')
       const rl = readline.createInterface({ input: proc.stdout! })
-      rl.on('line', (line) => {
+      rl.on('line', (line: string) => {
         try {
           const event = JSON.parse(line)
           if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
@@ -175,7 +232,7 @@ export class AcpManager {
       proc.stdin!.end()
 
       proc.on('close', (code) => {
-        this.activeProcess = null
+        this.activeSession = null
         if (code === 0 || fullText) {
           resolve(fullText)
         } else {
@@ -184,21 +241,28 @@ export class AcpManager {
       })
 
       proc.on('error', (err) => {
-        this.activeProcess = null
+        this.activeSession = null
         reject(err)
       })
     })
   }
 
   cancel(): void {
-    if (this.activeProcess && this.activeProcess.exitCode === null) {
-      try { this.activeProcess.kill() } catch { /* */ }
-      this.activeProcess = null
-    }
+    this.killSession()
   }
 
   dispose(): void {
     this.cancel()
+  }
+
+  private killSession(): void {
+    if (this.activeSession) {
+      const { proc } = this.activeSession
+      if (proc && proc.exitCode === null) {
+        try { proc.kill() } catch { /* */ }
+      }
+      this.activeSession = null
+    }
   }
 
   private buildPrompt(userQuery: string, context: FragmentResult[]): string {

@@ -12,10 +12,12 @@
     "clean": "rm -rf out dist-electron"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.17.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
     "@spool/core": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
+    "acp-extension-claude": "^0.21.0",
     "better-sqlite3": "^11.10.0",
     "bindings": "^1.5.0",
     "file-uri-to-path": "^2.0.0",
