@@ -10,11 +10,13 @@ interface Props {
   isSearching: boolean
   claudeCount: number | null
   codexCount: number | null
+  captureCount: number | null
   mode: SearchMode
   onModeChange: (mode: SearchMode) => void
+  onConnectClick: () => void
 }
 
-export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount, mode, onModeChange }: Props) {
+export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount, captureCount, mode, onModeChange, onConnectClick }: Props) {
   const showSuggestions = query.trim().length > 0 && suggestions.length > 0
 
   return (
@@ -70,7 +72,7 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
           </div>
         )}
       </div>
-      <SourceChips claudeCount={claudeCount} codexCount={codexCount} />
+      <SourceChips claudeCount={claudeCount} codexCount={codexCount} captureCount={captureCount} onConnectClick={onConnectClick} />
     </div>
   )
 }
@@ -78,12 +80,17 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
 interface SourceChipsProps {
   claudeCount: number | null
   codexCount: number | null
+  captureCount: number | null
+  onConnectClick: () => void
 }
 
-function SourceChips({ claudeCount, codexCount }: SourceChipsProps) {
+function SourceChips({ claudeCount, codexCount, captureCount, onConnectClick }: SourceChipsProps) {
   const sources = [
     { id: 'claude', label: 'Claude Chats', color: '#6B5B8A', count: claudeCount },
     { id: 'codex',  label: 'Codex Chats',  color: '#1A6B3C', count: codexCount },
+    ...(captureCount != null && captureCount > 0
+      ? [{ id: 'opencli', label: 'Captures', color: '#C85A00', count: captureCount }]
+      : []),
   ]
 
   return (
@@ -103,13 +110,15 @@ function SourceChips({ claudeCount, codexCount }: SourceChipsProps) {
           </span>
         </div>
       ))}
-      <div
+      <button
+        onClick={onConnectClick}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
                    border border-dashed border-warm-border2 dark:border-dark-border
-                   text-xs text-warm-faint dark:text-dark-muted select-none"
+                   text-xs text-warm-faint dark:text-dark-muted select-none
+                   hover:text-accent dark:hover:text-accent-dark hover:border-accent/40 dark:hover:border-accent-dark/40 transition-colors cursor-pointer"
       >
         <span>+ Connect</span>
-      </div>
+      </button>
     </div>
   )
 }

@@ -1,6 +1,12 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, globalShortcut } from 'electron'
 import { join } from 'node:path'
-import { getDB, Syncer, SpoolWatcher, searchFragments, listRecentSessions, getSessionWithMessages, getStatus } from '@spool/core'
+import {
+  getDB, Syncer, SpoolWatcher,
+  searchFragments, searchAll, listRecentSessions, getSessionWithMessages, getStatus,
+  OpenCLIManager,
+  getOpenCLISourceId, listOpenCLISources, addOpenCLISource, removeOpenCLISource, getCaptureCount,
+  getSetupValue, setSetupValue,
+} from '@spool/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { execSync } from 'node:child_process'
@@ -14,6 +20,7 @@ let db: Database.Database
 let syncer: Syncer
 let watcher: SpoolWatcher
 let acpManager: AcpManager
+let opencliManager: OpenCLIManager
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -66,6 +73,9 @@ app.whenReady().then(() => {
 
   db = getDB()
   acpManager = new AcpManager()
+  opencliManager = new OpenCLIManager(db, (e) => {
+    mainWindow?.webContents.send('opencli:capture-progress', e)
+  })
   syncer = new Syncer(db, (e) => {
     mainWindow?.webContents.send('spool:sync-progress', e)
   })
@@ -100,6 +110,16 @@ app.whenReady().then(() => {
     syncer.syncAll()
   })
 
+  // Register ⌘K shortcut for Capture URL modal
+  app.on('browser-window-focus', () => {
+    globalShortcut.register('CommandOrControl+K', () => {
+      mainWindow?.webContents.send('spool:open-capture-modal')
+    })
+  })
+  app.on('browser-window-blur', () => {
+    globalShortcut.unregister('CommandOrControl+K')
+  })
+
   app.on('activate', () => {
     if (!mainWindow) {
       mainWindow = createWindow()
@@ -119,8 +139,10 @@ app.on('window-all-closed', (e) => {
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('spool:search', (_e, { query, limit = 10, source }: { query: string; limit?: number; source?: string }) => {
-  const src = source === 'claude' || source === 'codex' ? source : undefined
-  return searchFragments(db, query, { limit, ...(src !== undefined && { source: src }) })
+  if (source === 'claude' || source === 'codex') {
+    return searchFragments(db, query, { limit, source })
+  }
+  return searchAll(db, query, { limit })
 })
 
 ipcMain.handle('spool:list-sessions', (_e, { limit = 50 }: { limit?: number } = {}) => {
@@ -193,5 +215,83 @@ ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { quer
 
 ipcMain.handle('spool:ai-cancel', () => {
   acpManager.cancel()
+  return { ok: true }
+})
+
+// ── OpenCLI Handlers ──────────────────────────────────────────────────────
+
+ipcMain.handle('opencli:check-setup', async () => {
+  return opencliManager.checkSetup()
+})
+
+ipcMain.handle('opencli:install-cli', async () => {
+  return opencliManager.installCli()
+})
+
+ipcMain.handle('opencli:available-platforms', async () => {
+  return opencliManager.listAvailablePlatforms()
+})
+
+ipcMain.handle('opencli:add-source', (_e, { platform, command }: { platform: string; command: string }) => {
+  const sourceId = getOpenCLISourceId(db)
+  const id = addOpenCLISource(db, sourceId, platform, command)
+  return { ok: true, id }
+})
+
+ipcMain.handle('opencli:remove-source', (_e, { id }: { id: number }) => {
+  removeOpenCLISource(db, id)
+  return { ok: true }
+})
+
+ipcMain.handle('opencli:list-sources', () => {
+  return listOpenCLISources(db)
+})
+
+ipcMain.handle('opencli:sync-source', async (_e, { id, platform, command }: { id: number; platform: string; command: string }) => {
+  try {
+    const result = await opencliManager.syncSource(id, platform, command)
+    return { ok: true, count: result.added }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('opencli:sync-all-sources', async () => {
+  const sources = listOpenCLISources(db)
+  let totalAdded = 0
+  const errors: string[] = []
+
+  for (const src of sources) {
+    if (!src.enabled) continue
+    try {
+      const result = await opencliManager.syncSource(src.id, src.platform, src.command)
+      totalAdded += result.added
+    } catch (err) {
+      errors.push(`${src.platform}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  return { ok: errors.length === 0, count: totalAdded, errors }
+})
+
+ipcMain.handle('opencli:capture-url', async (_e, { url }: { url: string }) => {
+  try {
+    const item = await opencliManager.captureUrl(url)
+    return { ok: true, capture: item }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('opencli:get-capture-count', (_e, { platform }: { platform?: string } = {}) => {
+  return getCaptureCount(db, platform)
+})
+
+ipcMain.handle('opencli:get-setup-value', (_e, { key }: { key: string }) => {
+  return getSetupValue(db, key)
+})
+
+ipcMain.handle('opencli:set-setup-value', (_e, { key, value }: { key: string; value: string }) => {
+  setSetupValue(db, key, value)
   return { ok: true }
 })
