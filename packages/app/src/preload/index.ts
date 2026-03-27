@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FragmentResult, Session, Message, StatusInfo, SyncResult } from '@spool/core'
 
+export interface AgentInfo {
+  id: string
+  name: string
+  path: string
+}
+
 export type SpoolAPI = typeof api
 
 const api = {
@@ -24,6 +30,28 @@ const api = {
 
   copyFragment: (text: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:copy-fragment', { text }),
+
+  // AI / ACP
+  getAiAgents: (): Promise<AgentInfo[]> =>
+    ipcRenderer.invoke('spool:ai-agents'),
+
+  aiSearch: (query: string, agentId: string, context: FragmentResult[]): Promise<{ ok: boolean; fullText?: string; error?: string }> =>
+    ipcRenderer.invoke('spool:ai-search', { query, agentId, context }),
+
+  aiCancel: (agentId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:ai-cancel', { agentId }),
+
+  onAiChunk: (cb: (data: { text: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { text: string })
+    ipcRenderer.on('spool:ai-chunk', handler)
+    return () => ipcRenderer.removeListener('spool:ai-chunk', handler)
+  },
+
+  onAiDone: (cb: (data: { fullText: string; error?: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { fullText: string; error?: string })
+    ipcRenderer.on('spool:ai-done', handler)
+    return () => ipcRenderer.removeListener('spool:ai-done', handler)
+  },
 
   onSyncProgress: (cb: (e: { phase: string; count: number; total: number }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { phase: string; count: number; total: number })

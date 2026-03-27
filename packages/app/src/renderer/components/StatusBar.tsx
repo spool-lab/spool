@@ -1,8 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { StatusInfo } from '@spool/core'
+import type { SearchMode } from './SearchBar.js'
 
 interface Props {
   syncStatus: { phase: string; count: number; total: number } | null
+  searchMode?: SearchMode
+  aiAgent?: string
 }
 
 type Theme = 'system' | 'light' | 'dark'
@@ -27,7 +30,7 @@ const themeIcons: Record<Theme, ReactNode> = {
   ),
 }
 
-export default function StatusBar({ syncStatus }: Props) {
+export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent }: Props) {
   const [status, setStatus] = useState<StatusInfo | null>(null)
   const [theme, setTheme] = useState<Theme>('system')
 
@@ -49,13 +52,20 @@ export default function StatusBar({ syncStatus }: Props) {
     window.spool.setTheme(next)
   }
 
-  const statusText = getSyncStatusText(syncStatus, status)
+  const isAiMode = searchMode === 'ai'
+  const statusText = isAiMode
+    ? `✦ ACP · ${aiAgent ?? 'agent'} · local`
+    : getSyncStatusText(syncStatus, status)
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
     <div className="flex-none h-[30px] bg-warm-surface dark:bg-dark-surface border-t border-warm-border dark:border-dark-border flex items-center justify-between px-4">
       <div className="flex items-center gap-1.5">
-        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
+        {isAiMode ? (
+          <span className="w-1.5 h-1.5 rounded-full flex-none bg-accent dark:bg-accent-dark" />
+        ) : (
+          <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
+        )}
         <span className="text-[11px] font-mono text-warm-muted dark:text-dark-muted truncate">
           {statusText}
         </span>

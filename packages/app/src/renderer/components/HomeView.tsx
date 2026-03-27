@@ -1,5 +1,5 @@
 import type { FragmentResult } from '@spool/core'
-import SearchBar from './SearchBar.js'
+import SearchBar, { type SearchMode } from './SearchBar.js'
 
 interface Props {
   query: string
@@ -10,9 +10,11 @@ interface Props {
   isSearching: boolean
   claudeCount: number | null
   codexCount: number | null
+  mode: SearchMode
+  onModeChange: (mode: SearchMode) => void
 }
 
-export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount }: Props) {
+export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, claudeCount, codexCount, mode, onModeChange }: Props) {
   const showSuggestions = query.trim().length > 0 && suggestions.length > 0
 
   return (
@@ -30,6 +32,8 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
           onSubmit={onSubmit}
           isSearching={isSearching}
           variant="home"
+          mode={mode}
+          onModeChange={onModeChange}
         />
         {showSuggestions && (
           <div className="absolute top-full left-0 right-0 mt-1.5 rounded-2xl border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-lg overflow-hidden z-10">

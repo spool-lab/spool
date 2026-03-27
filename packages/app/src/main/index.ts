@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage } from 'ele
 import { join } from 'node:path'
 import { getDB, Syncer, SpoolWatcher, searchFragments, listRecentSessions, getSessionWithMessages, getStatus } from '@spool/core'
 import { setupTray } from './tray.js'
+import { AcpManager } from './acp.js'
 import { execSync } from 'node:child_process'
 import type Database from 'better-sqlite3'
 
@@ -12,6 +13,7 @@ let mainWindow: BrowserWindow | null = null
 let db: Database.Database
 let syncer: Syncer
 let watcher: SpoolWatcher
+let acpManager: AcpManager
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -63,6 +65,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(appMenu)
 
   db = getDB()
+  acpManager = new AcpManager()
   syncer = new Syncer(db, (e) => {
     mainWindow?.webContents.send('spool:sync-progress', e)
   })
@@ -139,11 +142,9 @@ ipcMain.handle('spool:sync-now', () => {
 ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source }: { sessionUuid: string; source: string }) => {
   try {
     if (source === 'claude') {
-      // Open Terminal and run claude --resume <uuid>
       const script = `tell application "Terminal" to do script "claude --resume ${sessionUuid}"`
       execSync(`osascript -e '${script}'`)
     } else {
-      // Codex doesn't support --resume yet; open a new session in the project
       const script = `tell application "Terminal" to activate`
       execSync(`osascript -e '${script}'`)
     }
@@ -168,3 +169,27 @@ ipcMain.handle('spool:set-theme', (_e, { theme }: { theme: 'system' | 'light' | 
   return { ok: true }
 })
 
+// ── AI / ACP Handlers ────────────────────────────────────────────────────────
+
+ipcMain.handle('spool:ai-agents', () => {
+  return acpManager.detectAgents()
+})
+
+ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { query: string; agentId: string; context: import('@spool/core').FragmentResult[] }) => {
+  try {
+    const fullText = await acpManager.query(agentId, query, context, (text) => {
+      mainWindow?.webContents.send('spool:ai-chunk', { text })
+    })
+    mainWindow?.webContents.send('spool:ai-done', { fullText })
+    return { ok: true, fullText }
+  } catch (err) {
+    const error = String(err instanceof Error ? err.message : err)
+    mainWindow?.webContents.send('spool:ai-done', { fullText: '', error })
+    return { ok: false, error }
+  }
+})
+
+ipcMain.handle('spool:ai-cancel', () => {
+  acpManager.cancel()
+  return { ok: true }
+})
