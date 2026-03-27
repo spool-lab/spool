@@ -32,8 +32,8 @@ export class Syncer {
   }
 
   syncAll(): SyncResult {
-    const claudeDir = join(homedir(), '.claude', 'projects')
-    const codexDir = join(homedir(), '.codex', 'sessions')
+    const claudeDir = process.env['SPOOL_CLAUDE_DIR'] ?? join(homedir(), '.claude', 'projects')
+    const codexDir = process.env['SPOOL_CODEX_DIR'] ?? join(homedir(), '.codex', 'sessions')
 
     const files: Array<{ path: string; source: 'claude' | 'codex' }> = []
 

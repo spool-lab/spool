@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync, statSync } from 'node:fs'
 
-export const SPOOL_DIR = join(homedir(), '.spool')
+export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
 
 let _db: Database.Database | null = null

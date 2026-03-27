@@ -32,7 +32,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
   const completedToolCalls = toolCalls ? [...toolCalls.values()].filter(tc => tc.status === 'completed' || tc.status === 'failed') : []
 
   return (
-    <div className="mx-4 mt-3 mb-1 bg-accent-bg dark:bg-[#2A1800] border border-warm-border2 dark:border-dark-border rounded-[10px] border-l-[3px] border-l-accent dark:border-l-accent-dark px-4 py-3.5 overflow-y-auto max-h-[60vh]">
+    <div data-testid="ai-answer-card" className="mx-4 mt-3 mb-1 bg-accent-bg dark:bg-[#2A1800] border border-warm-border2 dark:border-dark-border rounded-[10px] border-l-[3px] border-l-accent dark:border-l-accent-dark px-4 py-3.5 overflow-y-auto max-h-[60vh]">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-accent dark:text-accent-dark tracking-[0.05em] uppercase">
@@ -78,9 +78,9 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
 
       {/* Body */}
       {error ? (
-        <p className="text-[13px] text-red-600 dark:text-red-400 leading-relaxed">{error}</p>
+        <p data-testid="ai-error" className="text-[13px] text-red-600 dark:text-red-400 leading-relaxed">{error}</p>
       ) : answer ? (
-        <p className="text-[13px] text-warm-text dark:text-dark-text leading-[1.65] mb-2.5 whitespace-pre-wrap">
+        <p data-testid="ai-answer-text" className="text-[13px] text-warm-text dark:text-dark-text leading-[1.65] mb-2.5 whitespace-pre-wrap">
           {answer}
           {streaming && <span className="inline-block w-1.5 h-4 bg-accent dark:bg-accent-dark ml-0.5 animate-pulse align-text-bottom" />}
         </p>

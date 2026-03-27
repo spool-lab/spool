@@ -66,7 +66,7 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent }: 
         ) : (
           <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
         )}
-        <span className="text-[11px] font-mono text-warm-muted dark:text-dark-muted truncate">
+        <span data-testid="status-text" className="text-[11px] font-mono text-warm-muted dark:text-dark-muted truncate">
           {statusText}
         </span>
       </div>

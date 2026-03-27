@@ -9,7 +9,8 @@
     "build": "electron-vite build && electron-builder",
     "build:electron": "electron-vite build",
     "preview": "electron-vite preview",
-    "clean": "rm -rf out dist-electron"
+    "clean": "rm -rf out dist-electron",
+    "test:e2e": "npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.3",

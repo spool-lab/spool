@@ -342,6 +342,9 @@ export class AcpManager {
    * The package is ESM-only so require.resolve() won't work directly.
    */
   private resolveAcpExtension(name: string): string {
+    const override = process.env['SPOOL_ACP_AGENT_BIN']
+    if (override) return override
+
     const pkg = `acp-extension-${name}`
     const entryPoints = ['dist/index.js', `bin/${pkg}.js`]
     const roots = [

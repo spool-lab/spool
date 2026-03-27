@@ -70,6 +70,7 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
           ].join(' ')}
           autoComplete="off"
           spellCheck={false}
+          data-testid="search-input"
         />
         {/* Mode toggle pill — inside search bar, right side */}
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -109,6 +110,7 @@ function ModePill({ mode, onModeChange, compact }: { mode: SearchMode; onModeCha
         {!compact && <span>Fast</span>}
       </button>
       <button
+        data-testid="mode-agent"
         onClick={() => onModeChange('ai')}
         className={[
           'flex items-center gap-1 rounded-[16px] text-[11px] font-medium cursor-pointer border-none transition-all duration-[120ms]',

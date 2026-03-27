@@ -16,9 +16,11 @@ export class SpoolWatcher {
   constructor(private syncer: Syncer) {}
 
   start(): void {
+    const claudeBase = process.env['SPOOL_CLAUDE_DIR'] ?? join(homedir(), '.claude', 'projects')
+    const codexBase = process.env['SPOOL_CODEX_DIR'] ?? join(homedir(), '.codex', 'sessions')
     const patterns = [
-      join(homedir(), '.claude', 'projects', '**', '*.jsonl'),
-      join(homedir(), '.codex', 'sessions', '**', '*.jsonl'),
+      join(claudeBase, '**', '*.jsonl'),
+      join(codexBase, '**', '*.jsonl'),
     ]
 
     this.watcher = chokidar.watch(patterns, {

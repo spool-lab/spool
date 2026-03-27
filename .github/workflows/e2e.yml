@@ -1,0 +1,52 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core
+        run: pnpm --filter @spool/core build
+
+      - name: Rebuild native modules for Electron
+        run: cd packages/app && npx @electron/rebuild -f -w better-sqlite3
+
+      - name: Build Electron app
+        run: pnpm --filter @spool/app build:electron
+
+      - name: Run E2E tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum pnpm --filter @spool/app test:e2e
+
+      - name: Run E2E tests (macOS)
+        if: runner.os == 'macOS'
+        run: pnpm --filter @spool/app test:e2e
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results-${{ matrix.os }}
+          path: packages/app/test-results/
+          retention-days: 7

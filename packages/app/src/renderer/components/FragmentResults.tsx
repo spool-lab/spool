@@ -66,7 +66,7 @@ function FragmentRow({ result, onOpenSession }: { result: FragmentResult; onOpen
   const project = result.project.split('/').pop() ?? result.project
 
   return (
-    <div className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
+    <div data-testid="fragment-row" className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
       {/* Source + project + date */}
       <div className="flex items-center gap-2 mb-1.5">
         <SourceBadge source={result.source} />
