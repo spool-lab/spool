@@ -45,8 +45,8 @@ export default function SearchBar({ query, onChange, onBack, isSearching }: Prop
           type="text"
           value={query}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search your thinking..."
-          className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30 placeholder:text-neutral-400"
+          placeholder="Search my thinking…"
+          className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-full pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#C85A00]/30 dark:focus:ring-[#F07020]/30 placeholder:text-neutral-400"
           autoComplete="off"
           spellCheck={false}
         />
