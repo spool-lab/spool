@@ -7,7 +7,6 @@ out/
 packages/*/dist/
 packages/*/out/
 packages/app/out/
-packages/cli/bin/
 
 # Electron build
 dist-electron/
