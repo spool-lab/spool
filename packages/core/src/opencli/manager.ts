@@ -1,7 +1,9 @@
 import { spawn, execSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import type Database from 'better-sqlite3'
 import type { OpenCLISetupStatus, PlatformInfo, CapturedItem } from '../types.js'
 import { cachedResolve, clearResolveCache } from '../util/resolve-bin.js'
@@ -164,45 +166,67 @@ export class OpenCLIManager {
   async captureUrl(url: string): Promise<CapturedItem> {
     this.onProgress?.({ phase: 'fetching', message: `Capturing ${url}...` })
 
-    const stdout = await this.exec(['generate', url], 30000)
-    const trimmed = stdout.trim()
     const platform = detectPlatform(url)
 
-    let item: CapturedItem
+    // Use `opencli web read` which is the correct command for capturing URLs.
+    // `generate` is for creating CLI definitions, not fetching page content.
+    const outDir = mkdtempSync(join(tmpdir(), 'spool-capture-'))
+    try {
+      const stdout = await this.exec(
+        ['web', 'read', '--url', url, '--output', outDir, '--download-images', 'false', '-f', 'json'],
+        30000,
+      )
 
-    if (trimmed) {
+      // Parse metadata from JSON stdout
+      let title = url
+      let author: string | null = null
       try {
-        const parsed = JSON.parse(trimmed)
-        const data = Array.isArray(parsed) ? parsed[0] : parsed
-        item = parseOpenCLIItem(data as Record<string, unknown>, platform, url)
+        const parsed = JSON.parse(stdout.trim())
+        const meta = Array.isArray(parsed) ? parsed[0] : parsed
+        if (meta?.title) title = meta.title as string
+        if (meta?.author && meta.author !== '-') author = meta.author as string
       } catch {
-        // If JSON parsing fails, treat stdout as content text
-        item = {
-          url,
-          title: url,
-          contentText: trimmed,
-          author: null,
-          platform,
-          platformId: null,
-          contentType: 'page',
-          thumbnailUrl: null,
-          metadata: {},
-          capturedAt: new Date().toISOString(),
-          rawJson: null,
-        }
+        // Metadata parsing failed — continue with defaults
       }
-    } else {
-      throw new Error(`OpenCLI returned empty output for ${url}`)
+
+      // Read the markdown content from the output directory
+      let contentText = ''
+      try {
+        const entries = readdirSync(outDir, { recursive: true }) as string[]
+        const mdFile = entries.find((f) => typeof f === 'string' && f.endsWith('.md'))
+        if (mdFile) {
+          contentText = readFileSync(join(outDir, mdFile), 'utf-8')
+        }
+      } catch {
+        // If reading fails, we still have metadata
+      }
+
+      const item: CapturedItem = {
+        url,
+        title,
+        contentText: contentText || title,
+        author,
+        platform,
+        platformId: null,
+        contentType: 'page',
+        thumbnailUrl: null,
+        metadata: {},
+        capturedAt: new Date().toISOString(),
+        rawJson: null,
+      }
+
+      this.onProgress?.({ phase: 'indexing', message: 'Indexing capture...' })
+
+      const sourceId = getOpenCLISourceId(this.db)
+      insertCapture(this.db, sourceId, null, item)
+
+      this.onProgress?.({ phase: 'done', message: 'Captured and indexed' })
+
+      return item
+    } finally {
+      // Clean up temp directory
+      try { rmSync(outDir, { recursive: true, force: true }) } catch { /* ignore */ }
     }
-
-    this.onProgress?.({ phase: 'indexing', message: 'Indexing capture...' })
-
-    const sourceId = getOpenCLISourceId(this.db)
-    insertCapture(this.db, sourceId, null, item)
-
-    this.onProgress?.({ phase: 'done', message: 'Captured and indexed' })
-
-    return item
   }
 
   // ── Internal ───────────────────────────────────────────────────────────
