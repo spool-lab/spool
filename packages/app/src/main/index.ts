@@ -197,6 +197,19 @@ ipcMain.handle('spool:ai-agents', () => {
   return acpManager.detectAgents()
 })
 
+ipcMain.handle('spool:ai-builtin-agents', () => {
+  return acpManager.getBuiltinAgents()
+})
+
+ipcMain.handle('spool:ai-get-config', () => {
+  return acpManager.getAgentsConfig()
+})
+
+ipcMain.handle('spool:ai-set-config', (_e, { config }: { config: import('./acp.js').AgentsConfig }) => {
+  acpManager.saveAgentsConfig(config)
+  return { ok: true }
+})
+
 ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { query: string; agentId: string; context: import('@spool/core').FragmentResult[] }) => {
   try {
     const fullText = await acpManager.query(agentId, query, context, (text) => {

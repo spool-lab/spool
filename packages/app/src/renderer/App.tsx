@@ -17,6 +17,8 @@ interface AgentInfo {
   id: string
   name: string
   path: string
+  status: 'ready' | 'not_found' | 'not_running'
+  acpMode: 'extension' | 'native' | 'websocket'
 }
 
 export default function App() {
@@ -50,16 +52,24 @@ export default function App() {
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
-  // Detect available ACP agents on mount
-  useEffect(() => {
+  // Load agents + config, apply configured default
+  const refreshAgents = useCallback(() => {
     if (!window.spool?.getAiAgents) return
-    window.spool.getAiAgents().then((agents) => {
-      setAvailableAgents(agents)
-      if (agents.length > 0 && !agents.find(a => a.id === aiAgent)) {
-        setAiAgent(agents[0].id)
-      }
+    Promise.all([
+      window.spool.getAiAgents(),
+      window.spool.getAgentsConfig(),
+    ]).then(([agents, config]) => {
+      const ready = agents.filter(a => a.status === 'ready')
+      setAvailableAgents(ready)
+      const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
+        ? config.defaultAgent
+        : ready[0]?.id
+      if (defaultId) setAiAgent(defaultId)
     }).catch(console.error)
   }, [])
+
+  // Detect available ACP agents on mount
+  useEffect(() => { refreshAgents() }, [])
 
   // Listen for AI streaming chunks and tool calls
   useEffect(() => {
@@ -357,7 +367,7 @@ export default function App() {
         />
       )}
       {showSettings && (
-        <SettingsPanel onClose={() => setShowSettings(false)} />
+        <SettingsPanel onClose={() => { setShowSettings(false); refreshAgents() }} />
       )}
     </div>
   )

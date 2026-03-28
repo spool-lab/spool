@@ -5,6 +5,26 @@ export interface AgentInfo {
   id: string
   name: string
   path: string
+  status: 'ready' | 'not_found' | 'not_running'
+  acpMode: 'extension' | 'native' | 'websocket'
+}
+
+export interface BuiltinAgent {
+  name: string
+  bin: string
+  acpMode: 'extension' | 'native' | 'websocket'
+}
+
+export interface AgentsConfig {
+  defaultAgent?: string
+  customAgents?: Record<string, {
+    name?: string
+    bin: string
+    acpMode: 'extension' | 'native' | 'websocket'
+    acpArgs?: string[]
+    wsEndpoint?: string
+    healthCheck?: string
+  }>
 }
 
 export type SpoolAPI = typeof api
@@ -34,6 +54,15 @@ const api = {
   // AI / ACP
   getAiAgents: (): Promise<AgentInfo[]> =>
     ipcRenderer.invoke('spool:ai-agents'),
+
+  getBuiltinAgents: (): Promise<Record<string, BuiltinAgent>> =>
+    ipcRenderer.invoke('spool:ai-builtin-agents'),
+
+  getAgentsConfig: (): Promise<AgentsConfig> =>
+    ipcRenderer.invoke('spool:ai-get-config'),
+
+  setAgentsConfig: (config: AgentsConfig): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:ai-set-config', { config }),
 
   aiSearch: (query: string, agentId: string, context: FragmentResult[]): Promise<{ ok: boolean; fullText?: string; error?: string }> =>
     ipcRenderer.invoke('spool:ai-search', { query, agentId, context }),

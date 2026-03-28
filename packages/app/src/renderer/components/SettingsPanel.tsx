@@ -4,24 +4,59 @@ interface AgentInfo {
   id: string
   name: string
   path: string
+  status: 'ready' | 'not_found' | 'not_running'
+  acpMode: 'extension' | 'native' | 'websocket'
+}
+
+interface AgentsConfig {
+  defaultAgent?: string
 }
 
 interface Props {
   onClose: () => void
 }
 
+const MODE_LABELS: Record<string, string> = {
+  extension: 'ACP Extension',
+  native: 'ACP Native',
+  websocket: 'WebSocket',
+}
+
 export default function SettingsPanel({ onClose }: Props) {
   const [agents, setAgents] = useState<AgentInfo[]>([])
+  const [config, setConfig] = useState<AgentsConfig>({})
   const [dbPath] = useState('~/.spool/spool.db')
 
   useEffect(() => {
-    if (!window.spool?.getAiAgents) return
-    window.spool.getAiAgents().then(setAgents).catch(console.error)
+    if (!window.spool) return
+    Promise.all([
+      window.spool.getAiAgents(),
+      window.spool.getAgentsConfig(),
+    ]).then(([a, c]) => {
+      setAgents(a)
+      setConfig(c)
+    }).catch(console.error)
   }, [])
+
+  // The selected default: explicit config > first ready agent
+  const readyAgents = agents.filter(a => a.status === 'ready')
+  const selectedId = config.defaultAgent && readyAgents.find(a => a.id === config.defaultAgent)
+    ? config.defaultAgent
+    : readyAgents[0]?.id ?? ''
+
+  const selectAgent = async (id: string) => {
+    const next: AgentsConfig = { ...config, defaultAgent: id }
+    setConfig(next)
+    try {
+      await window.spool.setAgentsConfig(next)
+    } catch (err) {
+      console.error('Failed to save agent config:', err)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[460px] max-h-[80vh] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex flex-col">
+      <div className="w-[500px] max-h-[80vh] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-warm-border dark:border-dark-border">
           <h2 className="text-base font-semibold text-warm-text dark:text-dark-text">Settings</h2>
@@ -33,35 +68,67 @@ export default function SettingsPanel({ onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {/* Coding Agents */}
+          {/* Default Coding Agent */}
           <div className="mb-6">
             <h3 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase mb-3">
-              Coding Agents
+              Default Coding Agent
             </h3>
-            {agents.length === 0 ? (
-              <p className="text-xs text-warm-muted dark:text-dark-muted">
-                No agents detected. Install{' '}
-                <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener noreferrer" className="text-accent dark:text-accent-dark hover:underline">Claude Code</a>
-                {' '}or{' '}
-                <a href="https://github.com/openai/codex" target="_blank" rel="noopener noreferrer" className="text-accent dark:text-accent-dark hover:underline">Codex CLI</a>
-                {' '}to use Agent mode.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {agents.map(agent => (
-                  <div key={agent.id} className="flex items-center gap-3 px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
-                    <span className="w-2 h-2 rounded-full flex-none bg-green-500" />
+            <div className="space-y-1.5">
+              {agents.map(agent => {
+                const isReady = agent.status === 'ready'
+                const isSelected = agent.id === selectedId
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => isReady && selectAgent(agent.id)}
+                    disabled={!isReady}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-[8px] text-left transition-colors ${
+                      isSelected
+                        ? 'bg-accent-bg dark:bg-[#2A1800] border-accent/30 dark:border-accent-dark/30'
+                        : isReady
+                          ? 'bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2'
+                          : 'bg-warm-bg dark:bg-dark-bg border-warm-border/50 dark:border-dark-border/50 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    {/* Radio dot */}
+                    <span className={`w-4 h-4 rounded-full border-2 flex-none flex items-center justify-center ${
+                      isSelected
+                        ? 'border-accent dark:border-accent-dark'
+                        : 'border-warm-border2 dark:border-dark-border2'
+                    }`}>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-accent dark:bg-accent-dark" />
+                      )}
+                    </span>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-warm-text dark:text-dark-text">{agent.name}</span>
-                      <span className="block text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate">{agent.path}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium ${
+                          isReady ? 'text-warm-text dark:text-dark-text' : 'text-warm-faint dark:text-dark-muted'
+                        }`}>{agent.name}</span>
+                        <span className="text-[9px] font-mono text-warm-faint dark:text-dark-muted px-1.5 py-0.5 bg-warm-surface2 dark:bg-dark-surface2 rounded">
+                          {MODE_LABELS[agent.acpMode] ?? agent.acpMode}
+                        </span>
+                      </div>
+                      <span className="block text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate">
+                        {isReady ? agent.path : `${agent.id} — not found in PATH`}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-green-500 font-medium flex-none">ready</span>
-                  </div>
-                ))}
-              </div>
-            )}
+
+                    {/* Status */}
+                    <span className={`text-[10px] font-medium flex-none ${
+                      isReady ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'
+                    }`}>
+                      {isReady ? 'ready' : 'not found'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
             <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
-              Spool detects installed agents automatically. Agent mode uses ACP to query your local data.
+              Select which agent to use in AI mode. Only installed agents can be selected.
+              Add custom agents in <span className="font-mono">~/.spool/agents.json</span>.
             </p>
           </div>
 
@@ -77,7 +144,7 @@ export default function SettingsPanel({ onClose }: Props) {
               </div>
             </div>
             <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
-              All data stays local. Sessions are indexed from ~/.claude and ~/.codex.
+              All data stays local. Sessions are indexed from agent history directories.
             </p>
           </div>
 

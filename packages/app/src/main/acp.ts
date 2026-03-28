@@ -1,13 +1,17 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import WebSocketImpl from 'ws'
 import { cachedResolve, type FragmentResult } from '@spool/core'
 
 export interface AgentInfo {
   id: string
   name: string
   path: string
+  status: 'ready' | 'not_found' | 'not_running'
+  acpMode: AcpMode
 }
 
 export interface ToolCallEvent {
@@ -15,6 +19,21 @@ export interface ToolCallEvent {
   title: string
   status: string
   kind?: string
+}
+
+/** User-facing config stored in ~/.spool/agents.json */
+export interface AgentsConfig {
+  /** Which agent to use by default in AI mode */
+  defaultAgent?: string
+  /** Custom agent definitions (extend beyond builtins) */
+  customAgents?: Record<string, {
+    name?: string
+    bin: string
+    acpMode: AcpMode
+    acpArgs?: string[]
+    wsEndpoint?: string
+    healthCheck?: string
+  }>
 }
 
 interface AcpSession {
@@ -32,8 +51,10 @@ interface SessionNotification { update?: { sessionUpdate?: string; content?: { t
 /**
  * ACP Manager — connects to local agents via the Agent Client Protocol.
  *
- * For Claude Code, spawns `acp-extension-claude` as subprocess and communicates
- * via JSON-RPC over stdio using the @agentclientprotocol/sdk.
+ * Supports three connection modes:
+ *   - extension: via acp-extension-{name} npm packages (Claude Code, Codex CLI)
+ *   - native:    CLI itself is ACP server, spawn `{bin} acp` (Kimi, OpenCode)
+ *   - websocket: HTTP + WebSocket API, non-ACP (Alma)
  */
 
 /**
@@ -59,16 +80,23 @@ function getLoginShellEnv(): Record<string, string> {
   return {}
 }
 
+type AcpMode = 'extension' | 'native' | 'websocket'
+
 interface AgentConfig {
   name: string
   bin: string
+  acpMode: AcpMode
+  acpArgs?: string[]          // native mode: args to start ACP server (default: ['acp'])
+  wsEndpoint?: string         // websocket mode: WebSocket URL
+  healthCheck?: string        // websocket mode: HTTP health check URL
   envSetup?: () => Record<string, string>
 }
 
-const AGENT_CONFIGS: Record<string, AgentConfig> = {
+const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
   claude: {
     name: 'Claude Code',
     bin: 'claude',
+    acpMode: 'extension',
     envSetup: () => {
       const claudePath = cachedResolve('claude')
       return claudePath ? { CLAUDE_CODE_EXECUTABLE: claudePath } : {}
@@ -77,25 +105,117 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
   codex: {
     name: 'Codex CLI',
     bin: 'codex',
+    acpMode: 'extension',
   },
+  kimi: {
+    name: 'Kimi Code',
+    bin: 'kimi',
+    acpMode: 'native',
+    acpArgs: ['acp'],
+  },
+  opencode: {
+    name: 'OpenCode',
+    bin: 'opencode',
+    acpMode: 'native',
+    acpArgs: ['acp'],
+  },
+  alma: {
+    name: 'Alma',
+    bin: 'alma',
+    acpMode: 'websocket',
+    wsEndpoint: 'ws://localhost:23001/ws/threads',
+    healthCheck: 'http://localhost:23001/api/health',
+  },
+}
+
+const AGENTS_CONFIG_PATH = join(homedir(), '.spool', 'agents.json')
+
+function loadAgentsConfig(): AgentsConfig | null {
+  try {
+    return JSON.parse(readFileSync(AGENTS_CONFIG_PATH, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function saveAgentsConfig(config: AgentsConfig): void {
+  const dir = join(homedir(), '.spool')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(AGENTS_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8')
+}
+
+/** Merge builtin + custom agent configs */
+function getEffectiveConfigs(): Record<string, AgentConfig> {
+  const userConfig = loadAgentsConfig()
+  const result: Record<string, AgentConfig> = {}
+
+  // Start with builtins
+  for (const [id, config] of Object.entries(BUILTIN_AGENT_CONFIGS)) {
+    result[id] = { ...config }
+  }
+
+  // Add custom agents from user config
+  if (userConfig?.customAgents) {
+    for (const [id, def] of Object.entries(userConfig.customAgents)) {
+      if (!result[id] && def.bin && def.acpMode) {
+        const custom: AgentConfig = {
+          name: def.name ?? id,
+          bin: def.bin,
+          acpMode: def.acpMode,
+        }
+        if (def.acpArgs) custom.acpArgs = def.acpArgs
+        if (def.wsEndpoint) custom.wsEndpoint = def.wsEndpoint
+        if (def.healthCheck) custom.healthCheck = def.healthCheck
+        result[id] = custom
+      }
+    }
+  }
+
+  return result
 }
 
 export class AcpManager {
   private detectedAgents: AgentInfo[] | null = null
   private activeSession: AcpSession | null = null
+  private activeWs: { close: () => void } | null = null
 
-  /** Detect which agent CLIs are installed on the machine */
+  /** Detect all agent CLIs installed on the machine */
   async detectAgents(): Promise<AgentInfo[]> {
-    if (this.detectedAgents) return this.detectedAgents
-
+    const configs = getEffectiveConfigs()
     const agents: AgentInfo[] = []
-    for (const [id, config] of Object.entries(AGENT_CONFIGS)) {
+
+    for (const [id, config] of Object.entries(configs)) {
       const p = cachedResolve(config.bin)
-      if (p) agents.push({ id, name: config.name, path: p })
+      agents.push({
+        id,
+        name: config.name,
+        path: p ?? '',
+        status: p ? 'ready' : 'not_found',
+        acpMode: config.acpMode,
+      })
     }
 
     this.detectedAgents = agents
     return agents
+  }
+
+  /** Get/save user config */
+  getAgentsConfig(): AgentsConfig {
+    return loadAgentsConfig() ?? {}
+  }
+
+  saveAgentsConfig(config: AgentsConfig): void {
+    saveAgentsConfig(config)
+    this.detectedAgents = null // invalidate cache
+  }
+
+  /** Get builtin agent definitions (for UI display) */
+  getBuiltinAgents(): Record<string, { name: string; bin: string; acpMode: AcpMode }> {
+    const result: Record<string, { name: string; bin: string; acpMode: AcpMode }> = {}
+    for (const [id, config] of Object.entries(BUILTIN_AGENT_CONFIGS)) {
+      result[id] = { name: config.name, bin: config.bin, acpMode: config.acpMode }
+    }
+    return result
   }
 
   async query(
@@ -112,18 +232,28 @@ export class AcpManager {
     // Cancel any running query
     this.cancel()
 
+    const configs = getEffectiveConfigs()
+    const config = configs[agentId]
+    if (!config) throw new Error(`No config for agent "${agentId}"`)
+
     const prompt = this.buildPrompt(userQuery)
 
-    return this.queryViaAcp(agentId, prompt, onChunk, onToolCall)
+    if (config.acpMode === 'websocket') {
+      return this.queryViaWebSocket(config, prompt, onChunk, onToolCall)
+    }
+    return this.queryViaAcp(agentId, config, prompt, onChunk, onToolCall)
   }
 
   /**
    * Query via ACP protocol.
-   * Spawns acp-extension-claude, establishes ClientSideConnection,
-   * then does initialize → newSession → prompt with streaming sessionUpdate chunks.
+   * For 'extension' mode: spawns acp-extension-{name} package.
+   * For 'native' mode: spawns `{bin} acp` directly (kimi, opencode).
+   * Establishes ClientSideConnection, then does initialize → newSession → prompt
+   * with streaming sessionUpdate chunks.
    */
   private async queryViaAcp(
     agentId: string,
+    config: AgentConfig,
     prompt: string,
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
@@ -131,33 +261,41 @@ export class AcpManager {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
 
-    // Resolve the acp-extension binary for this agent
-    const { path: agentBin, native } = this.resolveAcpExtension(agentId)
-
-    const config = AGENT_CONFIGS[agentId]
     const shellEnv = getLoginShellEnv()
     const agentEnv = {
       ...process.env as Record<string, string>,
       ...shellEnv,
-      ...config?.envSetup?.() ?? {},
+      ...config.envSetup?.() ?? {},
     }
 
-    // Native extensions (codex) run directly; JS extensions (claude) need
-    // system Node.js — not Electron's binary — because the extension passes
-    // process.execPath to claude-agent-sdk as the Node executable.
     let proc: ChildProcess
-    if (native) {
-      proc = spawn(agentBin, [], {
+
+    if (config.acpMode === 'native') {
+      // Native ACP: the CLI itself is the ACP server
+      const binPath = cachedResolve(config.bin)
+      if (!binPath) throw new Error(`Could not find ${config.bin}. Ensure it is installed and in PATH.`)
+      const acpArgs = config.acpArgs ?? ['acp']
+      proc = spawn(binPath, acpArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: agentEnv,
       })
     } else {
-      const nodePath = cachedResolve('node')
-      if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
-      proc = spawn(nodePath, [agentBin], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: agentEnv,
-      })
+      // Extension mode: resolve acp-extension-{name} npm package
+      const { path: agentBin, native } = this.resolveAcpExtension(agentId)
+
+      if (native) {
+        proc = spawn(agentBin, [], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: agentEnv,
+        })
+      } else {
+        const nodePath = cachedResolve('node')
+        if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
+        proc = spawn(nodePath, [agentBin], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: agentEnv,
+        })
+      }
     }
 
     proc.stderr?.on('data', (d: Buffer) => {
@@ -371,8 +509,198 @@ export class AcpManager {
     throw new Error(`Could not find ${pkg}. Run: pnpm add ${pkg}`)
   }
 
+  /**
+   * Query via Alma's WebSocket API (non-ACP).
+   * Creates a temporary thread, connects to WS, sends generate_response,
+   * streams message_delta events back as chunks/tool calls.
+   */
+  private async queryViaWebSocket(
+    config: AgentConfig,
+    prompt: string,
+    onChunk: (text: string) => void,
+    onToolCall?: (event: ToolCallEvent) => void,
+  ): Promise<string> {
+    const baseUrl = config.wsEndpoint?.replace(/^ws/, 'http').replace(/\/ws\/.*$/, '') ?? 'http://localhost:23001'
+    const wsUrl = config.wsEndpoint ?? 'ws://localhost:23001/ws/threads'
+
+    // Health check
+    try {
+      const resp = await fetch(config.healthCheck ?? `${baseUrl}/api/health`)
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    } catch {
+      throw new Error(`${config.name} is not running. Please start the ${config.name} app first.`)
+    }
+
+    // Resolve a usable model: read default from settings, then verify its provider is enabled.
+    // If the default provider is disabled, fall back to the first enabled provider's first model.
+    let model: string | undefined
+    try {
+      const [settingsResp, providersResp] = await Promise.all([
+        fetch(`${baseUrl}/api/settings`),
+        fetch(`${baseUrl}/api/providers`),
+      ])
+      const settings = settingsResp.ok ? await settingsResp.json() as Record<string, unknown> : null
+      const providersRaw = providersResp.ok ? await providersResp.json() as unknown : null
+      const providers: Array<{ id: string; enabled: boolean }> = Array.isArray(providersRaw) ? providersRaw : ((providersRaw as Record<string, unknown>)?.data as Array<{ id: string; enabled: boolean }>) ?? []
+
+      const defaultModel = (settings?.chat as Record<string, unknown>)?.defaultModel as string | undefined
+      const enabledProviders = providers.filter(p => p.enabled !== false)
+
+      if (defaultModel) {
+        const colonIdx = defaultModel.indexOf(':')
+        const providerId = colonIdx > 0 ? defaultModel.substring(0, colonIdx) : ''
+        if (enabledProviders.find(p => p.id === providerId)) {
+          model = defaultModel
+        }
+      }
+
+      // Fall back to first enabled provider
+      if (!model && enabledProviders.length > 0) {
+        const provider = enabledProviders[0]
+        try {
+          const modelsResp = await fetch(`${baseUrl}/api/providers/${provider.id}/models`)
+          if (modelsResp.ok) {
+            const modelsData = await modelsResp.json() as unknown
+            const modelsList = (modelsData as Record<string, unknown>)?.data ?? modelsData
+            const firstModel = Array.isArray(modelsList) ? (typeof modelsList[0] === 'string' ? modelsList[0] : (modelsList[0] as Record<string, unknown>)?.id) : undefined
+            if (firstModel) model = `${provider.id}:${firstModel}`
+          }
+        } catch {}
+      }
+    } catch {}
+    if (!model) throw new Error(`No enabled provider found in ${config.name}. Enable a provider with: alma providers`)
+
+    // Create temporary thread
+    const title = prompt.slice(0, 50).replace(/\n/g, ' ') || 'spool query'
+    const threadResp = await fetch(`${baseUrl}/api/threads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: `[spool] ${title}` }),
+    })
+    if (!threadResp.ok) throw new Error(`Failed to create thread: HTTP ${threadResp.status}`)
+    const thread = await threadResp.json() as { id: string }
+    const threadId = thread.id
+
+    return new Promise<string>((resolvePromise, rejectPromise) => {
+      let fullText = ''
+      let settled = false
+
+      const cleanup = () => {
+        // Delete temporary thread (fire-and-forget)
+        fetch(`${baseUrl}/api/threads/${threadId}`, { method: 'DELETE' }).catch(() => {})
+      }
+
+      const ws = new WebSocketImpl(wsUrl)
+      this.activeWs = { close: () => { try { ws.close() } catch {} } }
+
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          ws.close()
+          cleanup()
+          if (fullText) resolvePromise(fullText)
+          else rejectPromise(new Error(`${config.name} query timed out (5 min)`))
+        }
+      }, 5 * 60 * 1000)
+
+      ws.on('open', () => {
+        ws.send(JSON.stringify({
+          type: 'generate_response',
+          data: {
+            threadId,
+            model,
+            userMessage: {
+              role: 'user',
+              parts: [{ type: 'text', text: prompt }],
+            },
+          },
+        }))
+      })
+
+      ws.on('error', (err) => {
+        if (!settled) {
+          settled = true
+          clearTimeout(timeout)
+          cleanup()
+          rejectPromise(new Error(`${config.name} WebSocket error: ${err.message ?? 'connection failed'}`))
+        }
+      })
+
+      ws.on('close', () => {
+        if (!settled) {
+          settled = true
+          clearTimeout(timeout)
+          cleanup()
+          resolvePromise(fullText)
+        }
+      })
+
+      ws.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data.toString())
+          const { type, data: payload } = msg
+
+          if (type === 'message_delta' && payload?.threadId === threadId) {
+            if (Array.isArray(payload.deltas)) {
+              for (const delta of payload.deltas) {
+                if (delta.type === 'text_append' && (!delta.partType || delta.partType === 'text')) {
+                  // Filter out <think>...</think> blocks
+                  const text = delta.text?.replace(/<think>[\s\S]*?<\/think>/g, '') ?? ''
+                  if (text) {
+                    fullText += text
+                    onChunk(text)
+                  }
+                } else if (delta.type === 'tool_call_start' || (delta.type === 'part_add' && delta.part?.type?.startsWith('tool-'))) {
+                  // Alma uses part_add with type "tool-Task" etc., others use tool_call_start
+                  const toolType = delta.part?.type ?? delta.name ?? 'Tool call'
+                  const toolId = delta.part?.toolCallId ?? delta.partIndex?.toString() ?? `tool-${Date.now()}`
+                  onToolCall?.({
+                    toolCallId: toolId,
+                    title: toolType.replace(/^tool-/, ''),
+                    status: 'in_progress',
+                    kind: toolType,
+                  })
+                } else if (delta.type === 'tool_call_done' || delta.type === 'tool_output_set') {
+                  const toolId = delta.partIndex?.toString() ?? `tool-${Date.now()}`
+                  const failed = delta.state === 'output-error'
+                  onToolCall?.({
+                    toolCallId: toolId,
+                    title: delta.name ?? 'Tool call',
+                    status: failed ? 'failed' : 'completed',
+                    kind: delta.name,
+                  })
+                }
+              }
+            }
+          } else if ((type === 'generation_done' || type === 'generation_completed') && payload?.threadId === threadId) {
+            if (!settled) {
+              settled = true
+              clearTimeout(timeout)
+              ws.close()
+              cleanup()
+              resolvePromise(fullText)
+            }
+          } else if (type === 'generation_error' && payload?.threadId === threadId) {
+            if (!settled) {
+              settled = true
+              clearTimeout(timeout)
+              ws.close()
+              cleanup()
+              if (fullText) resolvePromise(fullText)
+              else rejectPromise(new Error(payload.error ?? `${config.name} generation error`))
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      })
+    })
+  }
+
   cancel(): void {
     this.killSession()
+    if (this.activeWs) {
+      this.activeWs.close()
+      this.activeWs = null
+    }
   }
 
   dispose(): void {
