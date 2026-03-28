@@ -112,6 +112,9 @@ importers:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.15
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)
 
   packages/core:
     dependencies:
@@ -1277,7 +1280,6 @@ packages:
 
   acp-extension-codex-darwin-arm64@0.10.0:
     resolution: {integrity: sha512-YkRkWG+osG+mf8QgaYqteKHIuzqiU4XD3nzQAT+XjfVvh7xGOnBJGV5e3U3qlf0WJuKiBUDARpugy9CGB4ZjVQ==}
-    cpu: [arm64]
     os: [darwin]
     hasBin: true
 
