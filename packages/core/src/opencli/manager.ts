@@ -164,7 +164,7 @@ export class OpenCLIManager {
   async captureUrl(url: string): Promise<CapturedItem> {
     this.onProgress?.({ phase: 'fetching', message: `Capturing ${url}...` })
 
-    const stdout = await this.exec(['generate', url, '-f', 'json'], 30000)
+    const stdout = await this.exec(['generate', url], 30000)
     const trimmed = stdout.trim()
     const platform = detectPlatform(url)
 
