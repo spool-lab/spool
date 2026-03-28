@@ -40,7 +40,8 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 function formatSyncTime(iso: string | null): string {
   if (!iso) return 'never synced'
-  const diff = Date.now() - new Date(iso).getTime()
+  const utcIso = iso.endsWith('Z') ? iso : iso + 'Z'
+  const diff = Date.now() - new Date(utcIso).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`
