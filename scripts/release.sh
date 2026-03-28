@@ -80,9 +80,8 @@ git push && git push --tags
 
 # ── Create GitHub release ──
 green "Creating GitHub release $TAG..."
-gh release create "$TAG" "$FINAL_DMG" \
-  --title "Spool $NEW_VERSION" \
-  --notes "$(cat <<EOF
+NOTES_FILE=$(mktemp)
+cat > "$NOTES_FILE" <<NOTES_EOF
 ## What's new
 
 $NOTES
@@ -91,7 +90,12 @@ $NOTES
 
 Download **$DMG_NAME** and drag Spool to your Applications folder.
 Requires macOS on Apple Silicon (M1+).
-EOF
-)"
+NOTES_EOF
+
+gh release create "$TAG" "$FINAL_DMG" \
+  --title "Spool $NEW_VERSION" \
+  --notes-file "$NOTES_FILE"
+
+rm -f "$NOTES_FILE"
 
 green "Done! https://github.com/spool-lab/spool/releases/tag/$TAG"
