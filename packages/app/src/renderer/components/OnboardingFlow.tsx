@@ -16,23 +16,36 @@ export default function OnboardingFlow({ onClose, onComplete }: Props) {
   const [installError, setInstallError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [bridgeError, setBridgeError] = useState<string | null>(null)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
 
   const checkStatus = useCallback(async () => {
     if (!window.spool?.opencli) return
     setChecking(true)
     setBridgeError(null)
+    setVerifyError(null)
     try {
       const status = await window.spool.opencli.checkSetup()
       setCliInstalled(status.cliInstalled)
       setBridgeReady(status.browserBridgeReady)
       if (status.cliInstalled && step === 'install') setStep('bridge')
-      if (status.browserBridgeReady && step === 'bridge') {
-        setStep('done')
-      } else if (step === 'bridge' && !status.browserBridgeReady) {
-        setBridgeError('Browser Bridge not detected. Make sure the Chrome extension is installed and Chrome is running.')
+      else if (!status.cliInstalled && step === 'install') {
+        setVerifyError('OpenCLI not found. Install it first, then click Verify.')
       }
-    } catch {
       if (step === 'bridge') {
+        if (!status.browserBridgeReady) {
+          setBridgeError('Browser Bridge not detected. Make sure the Chrome extension is installed and Chrome is running.')
+        } else if (!status.connectivityOk) {
+          setBridgeError(status.connectivityError
+            ? `Bridge connected but connectivity check failed: ${status.connectivityError}`
+            : 'Bridge connected but connectivity check failed. Try restarting Chrome and the OpenCLI daemon.')
+        } else {
+          setStep('done')
+        }
+      }
+    } catch (err) {
+      if (step === 'install') {
+        setVerifyError(`Verification failed: ${err instanceof Error ? err.message : String(err)}`)
+      } else if (step === 'bridge') {
         setBridgeError('Could not check bridge status. Make sure OpenCLI is installed correctly.')
       }
     } finally {
@@ -133,6 +146,9 @@ export default function OnboardingFlow({ onClose, onComplete }: Props) {
               </div>
               {installError && (
                 <p className="text-xs text-red-500 mb-3">{installError}</p>
+              )}
+              {verifyError && !installError && (
+                <p className="text-xs text-red-500 mb-3">{verifyError}</p>
               )}
               <div className="flex justify-between items-center">
                 <button

@@ -97,7 +97,10 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
     setSyncing(src.id)
     setSyncError(null)
     try {
-      await window.spool.opencli.syncSource(src.id, src.platform, src.command)
+      const result = await window.spool.opencli.syncSource(src.id, src.platform, src.command)
+      if (!result.ok) {
+        setSyncError(`${src.platform} ${src.command}: ${result.error ?? 'Sync failed'}`)
+      }
       await loadSources()
     } catch (err) {
       setSyncError(`${src.platform} ${src.command}: ${err instanceof Error ? err.message : String(err)}`)

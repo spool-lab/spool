@@ -45,3 +45,8 @@ export function cachedResolve(name: string, extras: string[] = []): string | nul
   }
   return resolvedPaths[name] ?? null
 }
+
+/** Clear a cached resolve entry (e.g. after installing a new binary). */
+export function clearResolveCache(name: string): void {
+  delete resolvedPaths[name]
+}

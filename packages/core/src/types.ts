@@ -111,6 +111,8 @@ export interface OpenCLISetupStatus {
   cliInstalled: boolean
   cliVersion: string | null
   browserBridgeReady: boolean
+  connectivityOk: boolean
+  connectivityError: string | null
   chromeRunning: boolean
 }
 
