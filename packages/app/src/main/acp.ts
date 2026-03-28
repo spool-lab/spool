@@ -1,9 +1,8 @@
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import type { FragmentResult } from '@spool/core'
+import { cachedResolve, type FragmentResult } from '@spool/core'
 
 export interface AgentInfo {
   id: string
@@ -36,47 +35,6 @@ interface SessionNotification { update?: { sessionUpdate?: string; content?: { t
  * For Claude Code, spawns `acp-extension-claude` as subprocess and communicates
  * via JSON-RPC over stdio using the @agentclientprotocol/sdk.
  */
-/**
- * Resolve a binary path that works in both dev (terminal-launched) and
- * production (GUI-launched, minimal PATH) contexts on macOS.
- *
- * Strategy: try `which` first (works in dev), then check common locations
- * including nvm/fnm/Homebrew paths. Results are cached for the process lifetime.
- */
-function resolveSystemBinary(name: string, extraSearchPaths: string[] = []): string | null {
-  // Try shell lookup first — works when launched from terminal
-  try {
-    const p = execSync(`which ${name}`, { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
-    if (p) return p
-  } catch {}
-
-  // Try login shell — picks up nvm/fnm/etc even in GUI context
-  try {
-    const p = execSync(`bash -lc "which ${name}"`, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
-    if (p) return p
-  } catch {}
-
-  const home = homedir()
-  const searchPaths = [
-    ...extraSearchPaths,
-    `/usr/local/bin/${name}`,
-    `/opt/homebrew/bin/${name}`,
-    `${home}/.local/bin/${name}`,
-    `${home}/.nvm/current/bin/${name}`,
-  ]
-  for (const p of searchPaths) {
-    if (existsSync(p)) return p
-  }
-  return null
-}
-
-const resolvedPaths: Record<string, string | null> = {}
-function cachedResolve(name: string, extras: string[] = []): string | null {
-  if (!(name in resolvedPaths)) {
-    resolvedPaths[name] = resolveSystemBinary(name, extras)
-  }
-  return resolvedPaths[name]
-}
 
 /**
  * Get the full environment from the user's login shell.
@@ -174,14 +132,8 @@ export class AcpManager {
     const acp = await import('@agentclientprotocol/sdk')
 
     // Resolve the acp-extension binary for this agent
-    const agentBin = this.resolveAcpExtension(agentId)
+    const { path: agentBin, native } = this.resolveAcpExtension(agentId)
 
-    // Spawn the ACP agent subprocess.
-    // Must use system Node.js — not Electron's binary — because the extension
-    // passes process.execPath to claude-agent-sdk as the Node executable.
-    // Also set CLAUDE_CODE_EXECUTABLE so the SDK finds the real CLI.
-    const nodePath = cachedResolve('node')
-    if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
     const config = AGENT_CONFIGS[agentId]
     const shellEnv = getLoginShellEnv()
     const agentEnv = {
@@ -190,10 +142,23 @@ export class AcpManager {
       ...config?.envSetup?.() ?? {},
     }
 
-    const proc = spawn(nodePath, [agentBin], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: agentEnv,
-    })
+    // Native extensions (codex) run directly; JS extensions (claude) need
+    // system Node.js — not Electron's binary — because the extension passes
+    // process.execPath to claude-agent-sdk as the Node executable.
+    let proc: ChildProcess
+    if (native) {
+      proc = spawn(agentBin, [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: agentEnv,
+      })
+    } else {
+      const nodePath = cachedResolve('node')
+      if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
+      proc = spawn(nodePath, [agentBin], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: agentEnv,
+      })
+    }
 
     proc.stderr?.on('data', (d: Buffer) => {
       console.error(`[acp-${agentId}] ${d.toString().trim()}`)
@@ -364,28 +329,42 @@ export class AcpManager {
   }
 
   /**
-   * Resolve the path to the acp-extension-claude entry point.
-   * The package is ESM-only so require.resolve() won't work directly.
+   * Resolve the ACP extension entry point for a given agent.
+   *
+   * acp-extension-claude is a pure JS package (dist/index.js) → run with Node.
+   * acp-extension-codex is a native binary wrapper → resolve the platform-specific
+   * binary directly (acp-extension-codex-darwin-arm64/bin/acp-extension-codex).
    */
-  private resolveAcpExtension(name: string): string {
+  private resolveAcpExtension(name: string): { path: string; native: boolean } {
     const override = process.env['SPOOL_ACP_AGENT_BIN']
-    if (override) return override
+    if (override) return { path: override, native: false }
 
     const pkg = `acp-extension-${name}`
-    const entryPoints = ['dist/index.js', `bin/${pkg}.js`]
     const roots = [
-      resolve(__dirname, '..', '..', 'node_modules', pkg),
-      resolve(__dirname, '..', 'node_modules', pkg),
-      resolve(__dirname, '..', '..', '..', 'node_modules', pkg),
+      resolve(__dirname, '..', '..', 'node_modules'),
+      resolve(__dirname, '..', 'node_modules'),
+      resolve(__dirname, '..', '..', '..', 'node_modules'),
     ]
+
+    // For codex, resolve the platform-specific native binary directly
+    if (name === 'codex') {
+      const platformPkg = `acp-extension-codex-${process.platform}-${process.arch}`
+      const binaryName = process.platform === 'win32' ? 'acp-extension-codex.exe' : 'acp-extension-codex'
+      for (const root of roots) {
+        const candidate = join(root, platformPkg, 'bin', binaryName)
+        if (existsSync(candidate)) {
+          return { path: candidate.replace('app.asar', 'app.asar.unpacked'), native: true }
+        }
+      }
+    }
+
+    // JS entry points (claude and fallback)
+    const entryPoints = ['dist/index.js', `bin/${pkg}.js`]
     for (const root of roots) {
       for (const entry of entryPoints) {
-        const candidate = join(root, entry)
+        const candidate = join(root, pkg, entry)
         if (existsSync(candidate)) {
-          // In packaged Electron apps, existsSync works with app.asar paths
-          // via Electron's patched fs, but spawning a subprocess with system
-          // Node requires the real unpacked path on disk.
-          return candidate.replace('app.asar', 'app.asar.unpacked')
+          return { path: candidate.replace('app.asar', 'app.asar.unpacked'), native: false }
         }
       }
     }
