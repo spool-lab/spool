@@ -52,21 +52,25 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
   autoUpdater.on('error', (err) => {
     console.error('[updater] Error:', err.message)
+    // Clear any downloading state so the UI doesn't get stuck
+    getMainWindow()?.webContents.send('spool:update-status', { status: 'error' })
   })
 
-  // First check after 10s delay
-  setTimeout(() => {
+  // First check after 10s delay, then every CHECK_INTERVAL.
+  // Track last check time to avoid duplicate checks after macOS sleep/wake.
+  let lastCheckAt = 0
+
+  const doCheck = () => {
+    const now = Date.now()
+    if (now - lastCheckAt < CHECK_INTERVAL * 0.9) return // debounce
+    lastCheckAt = now
     autoUpdater.checkForUpdates().catch((err) => {
       console.error('[updater] Check failed:', err.message)
     })
-  }, 10_000)
+  }
 
-  // Periodic checks
-  setInterval(() => {
-    autoUpdater.checkForUpdates().catch((err) => {
-      console.error('[updater] Periodic check failed:', err.message)
-    })
-  }, CHECK_INTERVAL)
+  setTimeout(doCheck, 10_000)
+  setInterval(doCheck, CHECK_INTERVAL)
 }
 
 /** User approved — start downloading the update */

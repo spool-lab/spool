@@ -55,9 +55,29 @@ FINAL_DMG="packages/app/dist/$DMG_NAME"
 mv "$DMG" "$FINAL_DMG"
 green "DMG: $FINAL_DMG ($(du -h "$FINAL_DMG" | cut -f1))"
 
+# ── Find ZIP + latest-mac.yml (required for auto-update) ──
+ZIP=$(find packages/app/dist -name "*.zip" | head -1)
+ZIP_NAME="Spool-${NEW_VERSION}-arm64-mac.zip"
+FINAL_ZIP="packages/app/dist/$ZIP_NAME"
+if [[ -n "$ZIP" ]]; then
+  mv "$ZIP" "$FINAL_ZIP"
+  green "ZIP: $FINAL_ZIP ($(du -h "$FINAL_ZIP" | cut -f1))"
+else
+  red "Warning: No ZIP found — auto-update won't work for this release"
+fi
+
+YML=$(find packages/app/dist -name "latest-mac.yml" | head -1)
+if [[ -n "$YML" ]]; then
+  green "YML: $YML"
+else
+  red "Warning: No latest-mac.yml found — auto-update won't work for this release"
+fi
+
 # ── Clean junk from dist ──
 find packages/app/dist -maxdepth 1 -mindepth 1 \
   -not -name "$DMG_NAME" \
+  -not -name "$ZIP_NAME" \
+  -not -name "latest-mac.yml" \
   -not -name "mac-arm64" \
   -exec rm -rf {} + 2>/dev/null || true
 
@@ -94,7 +114,11 @@ curl -fsSL https://spool.pro/install.sh | bash
 Requires macOS on Apple Silicon (M1+).
 NOTES_EOF
 
-gh release create "$TAG" "$FINAL_DMG" \
+RELEASE_ASSETS="$FINAL_DMG"
+[[ -f "$FINAL_ZIP" ]] && RELEASE_ASSETS="$RELEASE_ASSETS $FINAL_ZIP"
+[[ -n "$YML" && -f "$YML" ]] && RELEASE_ASSETS="$RELEASE_ASSETS $YML"
+
+gh release create "$TAG" $RELEASE_ASSETS \
   --title "Spool $NEW_VERSION" \
   --notes-file "$NOTES_FILE"
 

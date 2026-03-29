@@ -33,7 +33,7 @@ const themeIcons: Record<Theme, ReactNode> = {
 }
 
 interface UpdateStatus {
-  status: 'available' | 'downloading' | 'ready'
+  status: 'available' | 'downloading' | 'ready' | 'error'
   version?: string
   percent?: number
 }
@@ -55,7 +55,11 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, on
 
   useEffect(() => {
     if (!window.spool?.onUpdateStatus) return () => {}
-    return window.spool.onUpdateStatus(setUpdateStatus)
+    return window.spool.onUpdateStatus((data) => {
+      // On error, clear the update state so UI doesn't get stuck on "Updating…"
+      if (data.status === 'error') setUpdateStatus(null)
+      else setUpdateStatus(data)
+    })
   }, [])
 
   const cycleTheme = () => {

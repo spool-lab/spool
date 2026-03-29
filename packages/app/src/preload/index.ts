@@ -159,8 +159,8 @@ const api = {
   },
 
   // Auto-update
-  onUpdateStatus: (cb: (data: { status: 'available' | 'downloading' | 'ready'; version?: string; percent?: number }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { status: 'available' | 'downloading' | 'ready'; version?: string; percent?: number })
+  onUpdateStatus: (cb: (data: { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number })
     ipcRenderer.on('spool:update-status', handler)
     return () => ipcRenderer.removeListener('spool:update-status', handler)
   },

@@ -37,14 +37,27 @@ jobs:
         id: version
         run: echo "version=$(jq -r .version packages/app/package.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Find DMG
-        id: dmg
+      - name: Find build artifacts
+        id: artifacts
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # DMG
           DMG=$(find packages/app/dist -name "*.dmg" ! -name "*.blockmap" | head -1)
-          FINAL="packages/app/dist/Spool-${{ steps.version.outputs.version }}-arm64.dmg"
-          mv "$DMG" "$FINAL"
-          echo "path=$FINAL" >> "$GITHUB_OUTPUT"
-          echo "name=Spool-${{ steps.version.outputs.version }}-arm64.dmg" >> "$GITHUB_OUTPUT"
+          DMG_FINAL="packages/app/dist/Spool-${VERSION}-arm64.dmg"
+          mv "$DMG" "$DMG_FINAL"
+          echo "dmg_path=$DMG_FINAL" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=Spool-${VERSION}-arm64.dmg" >> "$GITHUB_OUTPUT"
+
+          # ZIP (required by electron-updater for macOS auto-update)
+          ZIP=$(find packages/app/dist -name "*.zip" | head -1)
+          ZIP_FINAL="packages/app/dist/Spool-${VERSION}-arm64-mac.zip"
+          mv "$ZIP" "$ZIP_FINAL"
+          echo "zip_path=$ZIP_FINAL" >> "$GITHUB_OUTPUT"
+
+          # latest-mac.yml (electron-updater metadata)
+          YML=$(find packages/app/dist -name "latest-mac.yml" | head -1)
+          echo "yml_path=$YML" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: notes
@@ -66,11 +79,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
-          # Upload asset to existing release, or create one if missing
+          ASSETS="${{ steps.artifacts.outputs.dmg_path }} ${{ steps.artifacts.outputs.zip_path }} ${{ steps.artifacts.outputs.yml_path }}"
+          # Upload assets to existing release, or create one if missing
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${{ steps.dmg.outputs.path }}" --clobber
+            gh release upload "$TAG" $ASSETS --clobber
           else
-            gh release create "$TAG" "${{ steps.dmg.outputs.path }}" \
+            gh release create "$TAG" $ASSETS \
               --title "Spool ${{ steps.version.outputs.version }}" \
               --notes "## What's new
 
