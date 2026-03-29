@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
 import ContinueActions from './ContinueActions.js'
 
-interface Props {
+type Props = {
   results: SearchResult[]
   query: string
   onOpenSession: (uuid: string) => void
@@ -78,7 +78,10 @@ function FragmentRow({ result, onOpenSession }: { result: FragmentResult & { kin
     <div data-testid="fragment-row" className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
       <div className="flex items-center gap-2 mb-1.5">
         <SourceBadge source={result.source} />
-        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">You discussed this · {project}</span>
+        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
+          You discussed this · {project}
+          {result.profileLabel && <span> · {result.profileLabel}</span>}
+        </span>
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
       </div>
 

@@ -1,7 +1,7 @@
 import chokidar, { type FSWatcher } from 'chokidar'
 import { join } from 'node:path'
-import { homedir } from 'node:os'
 import type { Syncer } from './syncer.js'
+import { detectSessionSource, getSessionRoots } from './source-paths.js'
 // No native module dependencies — uses node:sqlite via @spool/core
 
 export type WatcherEvent = 'new-sessions'
@@ -12,16 +12,19 @@ export class SpoolWatcher {
   private listeners: WatcherEventCallback[] = []
   private pendingNew = 0
   private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private sourceRoots: Record<'claude' | 'codex', string[]> = {
+    claude: [],
+    codex: [],
+  }
 
   constructor(private syncer: Syncer) {}
 
   start(): void {
-    const claudeBase = process.env['SPOOL_CLAUDE_DIR'] ?? join(homedir(), '.claude', 'projects')
-    const codexBase = process.env['SPOOL_CODEX_DIR'] ?? join(homedir(), '.codex', 'sessions')
-    const patterns = [
-      join(claudeBase, '**', '*.jsonl'),
-      join(codexBase, '**', '*.jsonl'),
-    ]
+    this.sourceRoots = {
+      claude: getSessionRoots('claude'),
+      codex: getSessionRoots('codex'),
+    }
+    const patterns = [...this.sourceRoots.claude, ...this.sourceRoots.codex].map(root => join(root, '**', '*.jsonl'))
 
     this.watcher = chokidar.watch(patterns, {
       persistent: true,
@@ -48,7 +51,8 @@ export class SpoolWatcher {
   }
 
   private handleFile(filePath: string): void {
-    const source = filePath.includes('/.claude/') ? 'claude' : 'codex'
+    const source = detectSessionSource(filePath, this.sourceRoots)
+    if (!source) return
     const result = this.syncer.syncFile(filePath, source)
 
     if (result === 'added' || result === 'updated') {

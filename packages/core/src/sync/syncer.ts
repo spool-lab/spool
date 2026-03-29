@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import type Database from 'better-sqlite3'
 import { parseClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
 import { parseCodexSession } from '../parsers/codex.js'
+import { getSessionRoots } from './source-paths.js'
 import {
   getSourceId,
   getOrCreateProject,
@@ -32,13 +33,15 @@ export class Syncer {
   }
 
   syncAll(): SyncResult {
-    const claudeDir = process.env['SPOOL_CLAUDE_DIR'] ?? join(homedir(), '.claude', 'projects')
-    const codexDir = process.env['SPOOL_CODEX_DIR'] ?? join(homedir(), '.codex', 'sessions')
-
+    const seenPaths = new Set<string>()
     const files: Array<{ path: string; source: 'claude' | 'codex' }> = []
 
-    try { files.push(...collectJSONL(claudeDir, 'claude')) } catch { /* dir may not exist */ }
-    try { files.push(...collectJSONL(codexDir, 'codex')) } catch { /* dir may not exist */ }
+    for (const dir of getSessionRoots('claude')) {
+      try { addUniqueFiles(files, seenPaths, collectJSONL(dir, 'claude')) } catch { /* dir may not exist */ }
+    }
+    for (const dir of getSessionRoots('codex')) {
+      try { addUniqueFiles(files, seenPaths, collectJSONL(dir, 'codex')) } catch { /* dir may not exist */ }
+    }
 
     this.onProgress?.({ phase: 'scanning', count: 0, total: files.length })
 
@@ -123,6 +126,18 @@ export class Syncer {
       } catch { /* ignore log errors */ }
       return 'error'
     }
+  }
+}
+
+function addUniqueFiles(
+  files: Array<{ path: string; source: 'claude' | 'codex' }>,
+  seenPaths: Set<string>,
+  candidates: Array<{ path: string; source: 'claude' | 'codex' }>,
+): void {
+  for (const candidate of candidates) {
+    if (seenPaths.has(candidate.path)) continue
+    seenPaths.add(candidate.path)
+    files.push(candidate)
   }
 }
 

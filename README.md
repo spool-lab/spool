@@ -28,7 +28,7 @@ pnpm build
 
 Spool indexes your AI conversations and bookmarks into a single local search box.
 
-- **AI sessions** — watches `~/.claude/` and `~/.codex/` in real time
+- **AI sessions** — watches Claude/Codex session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects` and `~/.codex-profiles/*/sessions`
 - **Bookmarks & stars** — pulls from 50+ platforms via [OpenCLI](https://github.com/jackwener/opencli)
 - **URL capture** — save any URL with `Cmd+K`
 - **Agent search** — a `/spool` skill inside Claude Code feeds matching fragments back into your conversation

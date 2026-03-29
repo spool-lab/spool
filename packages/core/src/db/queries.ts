@@ -229,6 +229,7 @@ export function searchFragments(
       m.timestamp   AS messageTimestamp,
       sess.id       AS sessionId,
       sess.session_uuid AS sessionUuid,
+      sess.file_path AS filePath,
       sess.title    AS sessionTitle,
       sess.started_at AS startedAt,
       p.display_path AS project,
@@ -245,18 +246,23 @@ export function searchFragments(
   `
 
   return (db.prepare(sql).all(...params) as Array<Record<string, unknown>>).map(
-    (row, i) => ({
-      rank: i + 1,
-      sessionId: row['sessionId'] as number,
-      sessionUuid: row['sessionUuid'] as string,
-      sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
-      source: row['source'] as 'claude' | 'codex',
-      project: row['project'] as string,
-      startedAt: row['startedAt'] as string,
-      snippet: row['snippet'] as string,
-      messageRole: row['messageRole'] as string,
-      messageTimestamp: row['messageTimestamp'] as string,
-    }),
+    (row, i) => {
+      const profileLabel = getProfileLabelFromFilePath(row['filePath'] as string)
+
+      return {
+        rank: i + 1,
+        sessionId: row['sessionId'] as number,
+        sessionUuid: row['sessionUuid'] as string,
+        sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
+        source: row['source'] as 'claude' | 'codex',
+        ...(profileLabel ? { profileLabel } : {}),
+        project: row['project'] as string,
+        startedAt: row['startedAt'] as string,
+        snippet: row['snippet'] as string,
+        messageRole: row['messageRole'] as string,
+        messageTimestamp: row['messageTimestamp'] as string,
+      }
+    },
   )
 }
 
@@ -303,6 +309,11 @@ function rowToSession(r: Record<string, unknown>): Session {
     projectDisplayPath: r['projectDisplayPath'] as string,
     projectDisplayName: r['projectDisplayName'] as string,
   }
+}
+
+function getProfileLabelFromFilePath(filePath: string): string | undefined {
+  const match = filePath.match(/\/\.(?:claude|codex)-profiles\/([^/]+)\//)
+  return match?.[1]
 }
 
 // ── OpenCLI / Captures ──────────────────────────────────────────────────────
