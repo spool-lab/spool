@@ -343,9 +343,12 @@ export class AcpManager {
     }
 
     const conn = new acp.ClientSideConnection(() => ({
-      requestPermission: async () => ({
-        outcome: { outcome: 'selected' as const, optionId: 'allow' },
-      }),
+      requestPermission: async (params: { options?: Array<{ optionId: string; kind?: string }> }) => {
+        // Auto-approve: pick the first allow/approve option from the agent's list
+        const options = params.options ?? []
+        const allowOption = options.find(o => o.kind?.startsWith('allow')) ?? options[0]
+        return { outcome: { outcome: 'selected' as const, optionId: allowOption?.optionId ?? 'allow' } }
+      },
       extMethod: async () => ({}),
       createTerminal: async (params: TerminalParams) => {
         const id = `term-${++terminalCounter}`
