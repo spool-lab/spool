@@ -10,6 +10,7 @@ import OnboardingFlow from './components/OnboardingFlow.js'
 import SourcesPanel from './components/SourcesPanel.js'
 import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
+import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 
 type View = 'search' | 'session'
 
@@ -48,6 +49,7 @@ export default function App() {
   const [showCaptureModal, setShowCaptureModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
+  const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
 
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
@@ -61,6 +63,7 @@ export default function App() {
     ]).then(([agents, config]) => {
       const ready = agents.filter(a => a.status === 'ready')
       setAvailableAgents(ready)
+      setDefaultSearchSort(config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -328,7 +331,12 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="flex-1 min-h-0">
-                      <FragmentResults results={results} query={query} onOpenSession={handleOpenSession} />
+                      <FragmentResults
+                        results={results}
+                        query={query}
+                        onOpenSession={handleOpenSession}
+                        defaultSortOrder={defaultSearchSort}
+                      />
                     </div>
                   )}
                 </div>

@@ -25,6 +25,8 @@ export interface ToolCallEvent {
 export interface AgentsConfig {
   /** Which agent to use by default in AI mode */
   defaultAgent?: string
+  /** Which sort order to use by default in search results */
+  defaultSearchSort?: 'relevance' | 'newest' | 'oldest'
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, OpenCLISetupStatus, OpenCLISource, PlatformInfo, CapturedItem } from '@spool/core'
+import type { SearchSortOrder } from '../shared/searchSort.js'
 
 export interface AgentInfo {
   id: string
@@ -17,6 +18,7 @@ export interface BuiltinAgent {
 
 export interface AgentsConfig {
   defaultAgent?: string
+  defaultSearchSort?: SearchSortOrder
   customAgents?: Record<string, {
     name?: string
     bin: string

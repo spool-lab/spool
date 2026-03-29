@@ -1,24 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
 import ContinueActions from './ContinueActions.js'
+import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 
 type Props = {
   results: SearchResult[]
   query: string
   onOpenSession: (uuid: string) => void
+  defaultSortOrder: SearchSortOrder
 }
 
-type SortOrder = 'relevance' | 'newest' | 'oldest'
-
-const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
-  { value: 'relevance', label: 'Relevance' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-]
-
-export default function FragmentResults({ results, query, onOpenSession }: Props) {
+export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder }: Props) {
   const [activeFilter, setActiveFilter] = useState('all')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('relevance')
+  const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
+
+  useEffect(() => {
+    setSortOrder(defaultSortOrder)
+  }, [defaultSortOrder])
 
   if (results.length === 0) {
     return (
@@ -69,11 +67,11 @@ export default function FragmentResults({ results, query, onOpenSession }: Props
         <div className="relative flex-none">
           <select
             value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value as SortOrder)}
+            onChange={(event) => setSortOrder(event.target.value as SearchSortOrder)}
             aria-label="Sort results"
             className="appearance-none h-8 rounded-full border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface pl-3 pr-9 text-xs font-medium text-warm-text dark:text-dark-text outline-none transition-colors hover:border-accent/50 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 focus:border-accent"
           >
-            {SORT_OPTIONS.map(option => (
+            {SEARCH_SORT_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -211,7 +209,7 @@ function formatDate(iso: string): string {
   }
 }
 
-function sortResults(results: SearchResult[], sortOrder: SortOrder): SearchResult[] {
+function sortResults(results: SearchResult[], sortOrder: SearchSortOrder): SearchResult[] {
   if (sortOrder === 'relevance') return results
 
   const sorted = [...results]

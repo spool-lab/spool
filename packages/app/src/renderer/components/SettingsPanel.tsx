@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 
 interface AgentInfo {
   id: string
@@ -10,6 +11,7 @@ interface AgentInfo {
 
 interface AgentsConfig {
   defaultAgent?: string
+  defaultSearchSort?: SearchSortOrder
 }
 
 interface Props {
@@ -46,6 +48,16 @@ export default function SettingsPanel({ onClose }: Props) {
 
   const selectAgent = async (id: string) => {
     const next: AgentsConfig = { ...config, defaultAgent: id }
+    setConfig(next)
+    try {
+      await window.spool.setAgentsConfig(next)
+    } catch (err) {
+      console.error('Failed to save agent config:', err)
+    }
+  }
+
+  const selectDefaultSearchSort = async (defaultSearchSort: SearchSortOrder) => {
+    const next: AgentsConfig = { ...config, defaultSearchSort }
     setConfig(next)
     try {
       await window.spool.setAgentsConfig(next)
@@ -145,6 +157,43 @@ export default function SettingsPanel({ onClose }: Props) {
             </div>
             <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
               All data stays local. Sessions are indexed from agent history directories.
+            </p>
+          </div>
+
+          {/* Search */}
+          <div className="mb-6">
+            <h3 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase mb-3">
+              Search
+            </h3>
+            <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-warm-muted dark:text-dark-muted">Default sort</span>
+                <div className="relative flex-none">
+                  <select
+                    value={config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER}
+                    onChange={(event) => selectDefaultSearchSort(event.target.value as SearchSortOrder)}
+                    aria-label="Default search sort"
+                    className="appearance-none h-8 rounded-full border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg pl-3 pr-9 text-xs font-medium text-warm-text dark:text-dark-text outline-none transition-colors hover:border-accent/50 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 focus:border-accent"
+                  >
+                    {SEARCH_SORT_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 12 12"
+                    className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-warm-muted dark:text-dark-muted"
+                    fill="none"
+                  >
+                    <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
+              Choose which sort order new search results should use by default.
             </p>
           </div>
 
