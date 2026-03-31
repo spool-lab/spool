@@ -1,4 +1,4 @@
-import { statSync, readdirSync } from 'node:fs'
+import { statSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type Database from 'better-sqlite3'
@@ -26,6 +26,7 @@ export type SyncEventCallback = (event: SyncProgressEvent) => void
 export class Syncer {
   private db: Database.Database
   private onProgress: SyncEventCallback | undefined
+  private codexTitleIndex: Map<string, string> = new Map()
 
   constructor(db: Database.Database, onProgress?: SyncEventCallback) {
     this.db = db
@@ -46,6 +47,7 @@ export class Syncer {
     this.onProgress?.({ phase: 'scanning', count: 0, total: files.length })
 
     const knownMtimes = getAllSessionMtimes(this.db)
+    this.codexTitleIndex = loadCodexSessionIndex()
 
     let added = 0
     let updated = 0
@@ -63,8 +65,22 @@ export class Syncer {
       this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, files.length), total: files.length })
     }
 
+    this.applyCodexTitles()
+
     this.onProgress?.({ phase: 'done', count: files.length, total: files.length })
     return { added, updated, errors }
+  }
+
+  private applyCodexTitles(): void {
+    if (this.codexTitleIndex.size === 0) return
+    const stmt = this.db.prepare(
+      'UPDATE sessions SET title = ? WHERE session_uuid = ? AND title != ?',
+    )
+    this.db.transaction(() => {
+      for (const [uuid, title] of this.codexTitleIndex) {
+        stmt.run(title, uuid, title)
+      }
+    })()
   }
 
   syncFile(filePath: string, source: 'claude' | 'codex', knownMtimes?: Map<string, string>): 'added' | 'updated' | 'skipped' | 'error' {
@@ -80,6 +96,11 @@ export class Syncer {
         : parseCodexSession(filePath)
 
       if (!parsed) return 'skipped'
+
+      if (source === 'codex') {
+        const codexTitle = this.codexTitleIndex.get(parsed.sessionUuid)
+        if (codexTitle) parsed.title = codexTitle
+      }
 
       const sourceId = getSourceId(this.db, source)
       const { slug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
@@ -173,6 +194,21 @@ function walkDir(
       results.push({ path: fullPath, source })
     }
   }
+}
+
+function loadCodexSessionIndex(): Map<string, string> {
+  const titles = new Map<string, string>()
+  try {
+    const raw = readFileSync(join(homedir(), '.codex', 'session_index.jsonl'), 'utf8')
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const rec = JSON.parse(line) as { id?: string; thread_name?: string }
+        if (rec.id && rec.thread_name) titles.set(rec.id, rec.thread_name)
+      } catch { /* skip malformed lines */ }
+    }
+  } catch { /* file may not exist */ }
+  return titles
 }
 
 function resolveProject(

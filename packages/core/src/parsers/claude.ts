@@ -21,6 +21,7 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
   let sessionUuid = ''
   let cwd = ''
   let model = ''
+  let customTitle = ''
 
   const SKIP_TYPES = new Set([
     'file-history-snapshot',
@@ -42,6 +43,12 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
 
     if (!sessionUuid && record['sessionId']) sessionUuid = record['sessionId'] as string
     if (!cwd && record['cwd']) cwd = record['cwd'] as string
+
+    if (type === 'custom-title') {
+      const ct = record['customTitle'] as string | undefined
+      if (ct) customTitle = ct
+      continue
+    }
 
     if (type === 'assistant') {
       const msg = record['message'] as Record<string, unknown> | undefined
@@ -100,9 +107,10 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
   }
 
   const firstUserMsg = messages.find(m => m.role === 'user' && m.contentText.length > 0 && !m.isSidechain)
-  const title = firstUserMsg
-    ? firstUserMsg.contentText.replace(/<[^>]+>/g, '').trim().slice(0, 120)
-    : '(no title)'
+  const title = customTitle
+    || (firstUserMsg
+      ? firstUserMsg.contentText.replace(/<[^>]+>/g, '').trim().slice(0, 120)
+      : '(no title)')
 
   const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort()
 
