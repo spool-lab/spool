@@ -18,7 +18,8 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "electron",
-      "esbuild"
+      "esbuild",
+      "acp-extension-codex-linux-x64"
     ]
   }
 }

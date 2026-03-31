@@ -20,11 +20,13 @@
  * terminal choice doesn't change mid-session.
  */
 
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import { existsSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { shell } from 'electron'
+
+const IS_LINUX = process.platform === 'linux'
 
 /**
  * Terminal identifiers. These double as the display names shown in settings
@@ -167,9 +169,19 @@ function resolve(preference?: string): SupportedTerminal {
  * @param cwd  Working directory to open the terminal in (optional).
  */
 export function openTerminal(command: string | null, preference?: string, cwd?: string): void {
-  const terminal = resolve(preference)
-  // Expand ~ to absolute path (Warp launch configs require absolute paths)
   const resolvedCwd = cwd?.replace(/^~/, homedir())
+
+  if (IS_LINUX) {
+    if (!command) return
+    // xdg-terminal-exec is the freedesktop standard for launching the user's
+    // preferred terminal emulator. Pass the command via sh -c so it works
+    // regardless of which terminal is configured.
+    const args = ['sh', '-c', withCwd(command, resolvedCwd)]
+    spawn('xdg-terminal-exec', args, { stdio: 'ignore', detached: true }).unref()
+    return
+  }
+
+  const terminal = resolve(preference)
 
   if (!command) {
     execSync(`osascript -e 'tell application "${terminal}" to activate'`)
