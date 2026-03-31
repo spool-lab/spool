@@ -44,6 +44,11 @@ function createWindow(): BrowserWindow {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  win.on('closed', () => {
+    mainWindow = null
+    app.dock?.hide()
+  })
+
   return win
 }
 
@@ -96,21 +101,17 @@ app.whenReady().then(() => {
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)
 
-  // Background mode — hide from dock when window is closed
-  mainWindow.on('closed', () => {
-    mainWindow = null
-    app.dock?.hide()
-  })
 
-  setupTray(() => {
-    if (mainWindow) {
+  function showOrCreateWindow() {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show()
-      app.dock?.show()
     } else {
       mainWindow = createWindow()
-      app.dock?.show()
     }
-  }, () => {
+    app.dock?.show()
+  }
+
+  setupTray(showOrCreateWindow, () => {
     syncer.syncAll()
   })
 
@@ -124,14 +125,7 @@ app.whenReady().then(() => {
     globalShortcut.unregister('CommandOrControl+K')
   })
 
-  app.on('activate', () => {
-    if (!mainWindow) {
-      mainWindow = createWindow()
-      app.dock?.show()
-    } else {
-      mainWindow.show()
-    }
-  })
+  app.on('activate', showOrCreateWindow)
 })
 
 app.on('window-all-closed', (e) => {
