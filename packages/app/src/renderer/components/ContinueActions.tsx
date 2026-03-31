@@ -20,7 +20,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
 
   async function handleResume() {
     setResuming(true)
-    await window.spool.resumeCLI(result.sessionUuid, result.source)
+    await window.spool.resumeCLI(result.sessionUuid, result.source, result.cwd)
     setTimeout(() => setResuming(false), 1000)
   }
 

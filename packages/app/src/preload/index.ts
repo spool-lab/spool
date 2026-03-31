@@ -19,6 +19,7 @@ export interface BuiltinAgent {
 export interface AgentsConfig {
   defaultAgent?: string
   defaultSearchSort?: SearchSortOrder
+  terminal?: string
   customAgents?: Record<string, {
     name?: string
     bin: string
@@ -47,8 +48,8 @@ const api = {
   syncNow: (): Promise<SyncResult> =>
     ipcRenderer.invoke('spool:sync-now'),
 
-  resumeCLI: (sessionUuid: string, source: string): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('spool:resume-cli', { sessionUuid, source }),
+  resumeCLI: (sessionUuid: string, source: string, cwd?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('spool:resume-cli', { sessionUuid, source, cwd }),
 
   copyFragment: (text: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:copy-fragment', { text }),
