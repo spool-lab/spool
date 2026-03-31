@@ -10,7 +10,7 @@ import {
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
-import { execSync } from 'node:child_process'
+import { openTerminal } from './terminal.js'
 import type Database from 'better-sqlite3'
 
 // macOS menu bar shows the first menu's label as the app name
@@ -159,17 +159,14 @@ ipcMain.handle('spool:sync-now', () => {
   return syncer.syncAll()
 })
 
-ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source }: { sessionUuid: string; source: string }) => {
+ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
   try {
-    if (source === 'claude') {
-      const script = `tell application "Terminal" to do script "claude --resume ${sessionUuid}"`
-      execSync(`osascript -e '${script}'`)
-    } else {
-      const script = `tell application "Terminal" to activate`
-      execSync(`osascript -e '${script}'`)
-    }
+    const command = source === 'claude' ? `claude --resume ${sessionUuid}` : null
+    const terminal = acpManager.getAgentsConfig().terminal
+    openTerminal(command, terminal, cwd)
     return { ok: true }
   } catch (err) {
+    console.error('[spool:resume-cli]', err)
     return { ok: false, error: String(err) }
   }
 })

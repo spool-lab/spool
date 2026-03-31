@@ -232,6 +232,7 @@ export function searchFragments(
       sess.file_path AS filePath,
       sess.title    AS sessionTitle,
       sess.started_at AS startedAt,
+      sess.cwd      AS cwd,
       p.display_path AS project,
       src2.name     AS source,
       snippet(messages_fts, -1, '<mark>', '</mark>', '…', 20) AS snippet
@@ -256,6 +257,7 @@ export function searchFragments(
         sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
         source: row['source'] as 'claude' | 'codex',
         ...(profileLabel ? { profileLabel } : {}),
+        ...(row['cwd'] ? { cwd: row['cwd'] as string } : {}),
         project: row['project'] as string,
         startedAt: row['startedAt'] as string,
         snippet: row['snippet'] as string,

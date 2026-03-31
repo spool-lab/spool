@@ -61,6 +61,7 @@ export interface FragmentResult {
   sessionTitle: string
   source: Source
   profileLabel?: string
+  cwd?: string
   project: string
   startedAt: string
   snippet: string

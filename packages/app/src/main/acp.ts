@@ -27,6 +27,8 @@ export interface AgentsConfig {
   defaultAgent?: string
   /** Which sort order to use by default in search results */
   defaultSearchSort?: 'relevance' | 'newest' | 'oldest'
+  /** Preferred terminal app for session resume (e.g. "iTerm2", "Warp"). Auto-detected if unset. */
+  terminal?: string
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string
