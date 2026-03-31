@@ -21,9 +21,9 @@ command -v curl >/dev/null || err "curl is required."
 # ── Find latest release DMG ──
 info "Finding latest release..."
 DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep -o '"browser_download_url":\s*"[^"]*arm64\.dmg"' \
+  | grep -oE '"browser_download_url":[[:space:]]*"[^"]*arm64\.dmg"' \
   | head -1 \
-  | sed 's/"browser_download_url":\s*"//;s/"//')
+  | sed -E 's/"browser_download_url":[[:space:]]*"//;s/"//')
 
 [[ -n "$DOWNLOAD_URL" ]] || err "Could not find DMG in latest release."
 
