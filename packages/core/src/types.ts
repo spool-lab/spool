@@ -65,6 +65,7 @@ export interface FragmentResult {
   project: string
   startedAt: string
   snippet: string
+  messageId: number
   messageRole: string
   messageTimestamp: string
 }

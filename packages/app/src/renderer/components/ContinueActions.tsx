@@ -3,7 +3,7 @@ import type { FragmentResult } from '@spool/core'
 
 type Props = {
   result: FragmentResult
-  onOpenSession: (uuid: string) => void
+  onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
 }
 
@@ -61,7 +61,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
         </ActionButton>
       )}
 
-      <ActionButton onClick={() => onOpenSession(result.sessionUuid)} title="View full session">
+      <ActionButton onClick={() => onOpenSession(result.sessionUuid, result.messageId)} title="View full session">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M1.5 6.5C1.5 6.5 3.5 2.5 6.5 2.5C9.5 2.5 11.5 6.5 11.5 6.5C11.5 6.5 9.5 10.5 6.5 10.5C3.5 10.5 1.5 6.5 1.5 6.5Z" stroke="currentColor" strokeWidth="1.2"/>
           <circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>

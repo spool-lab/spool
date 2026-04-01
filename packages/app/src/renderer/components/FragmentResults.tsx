@@ -6,7 +6,7 @@ import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSo
 type Props = {
   results: SearchResult[]
   query: string
-  onOpenSession: (uuid: string) => void
+  onOpenSession: (uuid: string, messageId?: number) => void
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
 }
@@ -108,7 +108,7 @@ function FragmentRow({
   onCopySessionId,
 }: {
   result: FragmentResult & { kind: 'fragment' }
-  onOpenSession: (uuid: string) => void
+  onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
@@ -117,23 +117,28 @@ function FragmentRow({
 
   return (
     <div data-testid="fragment-row" className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
-      <div className="flex items-center gap-2 mb-1.5">
-        <SourceBadge source={result.source} />
-        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-          You discussed this · {project}
-          {result.profileLabel && <span> · {result.profileLabel}</span>}
-        </span>
-        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+      <div
+        className="cursor-pointer"
+        onClick={() => onOpenSession(result.sessionUuid, result.messageId)}
+      >
+        <div className="flex items-center gap-2 mb-1.5">
+          <SourceBadge source={result.source} />
+          <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
+            You discussed this · {project}
+            {result.profileLabel && <span> · {result.profileLabel}</span>}
+          </span>
+          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+        </div>
+
+        <p
+          className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark"
+          dangerouslySetInnerHTML={{ __html: snippet }}
+        />
+
+        <p className="text-xs text-warm-faint dark:text-dark-muted mt-1 truncate">
+          {result.sessionTitle}
+        </p>
       </div>
-
-      <p
-        className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
-        dangerouslySetInnerHTML={{ __html: snippet }}
-      />
-
-      <p className="text-xs text-warm-faint dark:text-dark-muted mt-1 truncate">
-        {result.sessionTitle}
-      </p>
 
       <ContinueActions result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
     </div>

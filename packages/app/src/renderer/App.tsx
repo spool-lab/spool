@@ -26,6 +26,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
+  const [targetMessageId, setTargetMessageId] = useState<number | null>(null)
   const [view, setView] = useState<View>('search')
   const [homeMode, setHomeMode] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
@@ -232,12 +233,14 @@ export default function App() {
     setView('session')
   }, [])
 
-  const handleOpenSession = useCallback((uuid: string) => {
-    setSelectedSession(uuid); setView('session')
+  const handleOpenSession = useCallback((uuid: string, messageId?: number) => {
+    setSelectedSession(uuid)
+    setTargetMessageId(messageId ?? null)
+    setView('session')
   }, [])
 
   const handleBack = useCallback(() => {
-    setView('search'); setSelectedSession(null)
+    setView('search'); setSelectedSession(null); setTargetMessageId(null)
   }, [])
 
   const handleConnectClick = useCallback(async () => {
@@ -317,7 +320,7 @@ export default function App() {
 
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === 'session' && selectedSession ? (
-                <SessionDetail sessionUuid={selectedSession} onCopySessionId={handleCopySessionId} />
+                <SessionDetail sessionUuid={selectedSession} targetMessageId={targetMessageId} onCopySessionId={handleCopySessionId} />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
                   {/* AI answer card — shown above results in AI mode */}

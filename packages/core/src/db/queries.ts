@@ -225,6 +225,7 @@ export function searchFragments(
   const sql = `
     SELECT
       rank,
+      m.id          AS messageId,
       m.role        AS messageRole,
       m.timestamp   AS messageTimestamp,
       sess.id       AS sessionId,
@@ -261,6 +262,7 @@ export function searchFragments(
         project: row['project'] as string,
         startedAt: row['startedAt'] as string,
         snippet: row['snippet'] as string,
+        messageId: row['messageId'] as number,
         messageRole: row['messageRole'] as string,
         messageTimestamp: row['messageTimestamp'] as string,
       }
