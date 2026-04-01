@@ -180,5 +180,39 @@ function runMigrations(db: Database.Database): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- ── Universal Sync Engine tables ───────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS sync_cursors (
+      id                  INTEGER PRIMARY KEY,
+      opencli_src_id      INTEGER NOT NULL UNIQUE REFERENCES opencli_sources(id) ON DELETE CASCADE,
+      forward_cursor      TEXT,
+      backward_cursor     TEXT,
+      backfill_complete   INTEGER NOT NULL DEFAULT 0,
+      last_forward_sync   TEXT,
+      last_backfill_sync  TEXT,
+      consecutive_errors  INTEGER NOT NULL DEFAULT 0,
+      total_pages_fetched INTEGER NOT NULL DEFAULT 0,
+      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_runs (
+      id              INTEGER PRIMARY KEY,
+      opencli_src_id  INTEGER NOT NULL REFERENCES opencli_sources(id) ON DELETE CASCADE,
+      direction       TEXT NOT NULL CHECK (direction IN ('forward', 'backfill')),
+      status          TEXT NOT NULL CHECK (status IN ('running', 'success', 'error', 'partial')),
+      items_fetched   INTEGER NOT NULL DEFAULT 0,
+      items_added     INTEGER NOT NULL DEFAULT 0,
+      items_updated   INTEGER NOT NULL DEFAULT 0,
+      cursor_before   TEXT,
+      cursor_after    TEXT,
+      error_message   TEXT,
+      started_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      finished_at     TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sync_runs_source  ON sync_runs(opencli_src_id);
+    CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
   `)
 }

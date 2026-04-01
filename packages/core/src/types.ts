@@ -142,3 +142,86 @@ export interface CapturedItem {
 export type SearchResult =
   | (FragmentResult & { kind: 'fragment' })
   | (CaptureResult & { kind: 'capture' })
+
+// ── Universal Sync Types ────────────────────────────────────────────────────
+
+/**
+ * Sync mode determines how a source is synchronized.
+ * - bidirectional: Full cursor support with backfill + forward sync (bookmarks, stars, saves)
+ * - snapshot: No pagination, fetch current state each time (trending, hot, feeds)
+ * - append_only: Only forward sync, no backfill (notifications, history)
+ */
+export type SyncMode = 'bidirectional' | 'snapshot' | 'append_only'
+
+/**
+ * Tracks bidirectional sync progress for a single source.
+ * Persisted in the database, survives app restarts.
+ */
+export interface SyncCursor {
+  id: number
+  opencliSrcId: number
+  forwardCursor: string | null
+  backwardCursor: string | null
+  backfillComplete: boolean
+  lastForwardSync: string | null
+  lastBackfillSync: string | null
+  consecutiveErrors: number
+  totalPagesFetched: number
+}
+
+/**
+ * Record of a single sync operation (one page fetch).
+ */
+export interface SyncRun {
+  id: number
+  opencliSrcId: number
+  direction: 'forward' | 'backfill'
+  status: 'running' | 'success' | 'error' | 'partial'
+  itemsFetched: number
+  itemsAdded: number
+  itemsUpdated: number
+  cursorBefore: string | null
+  cursorAfter: string | null
+  errorMessage: string | null
+  startedAt: string
+  finishedAt: string | null
+}
+
+/** Result of a single sync operation */
+export interface SyncRunResult {
+  direction: 'forward' | 'backfill'
+  status: 'success' | 'error' | 'partial'
+  itemsFetched: number
+  itemsAdded: number
+  itemsUpdated: number
+  cursorAfter: string | null
+  backfillComplete?: boolean
+  errorMessage?: string
+}
+
+/** Aggregate sync status for a source */
+export interface SyncSourceStatus {
+  opencliSrcId: number
+  platform: string
+  command: string
+  syncMode: SyncMode
+  cursor: SyncCursor | null
+  isRunning: boolean
+  recentRuns: SyncRun[]
+}
+
+/** Pagination configuration for a sync strategy */
+export interface SyncPagination {
+  cursorField: string
+  order: 'newest_first' | 'oldest_first'
+  pageSize: number
+  cursorArg?: string
+  limitArg?: string
+}
+
+/** Scheduling configuration for a sync strategy */
+export interface SyncScheduling {
+  pollInterval: number
+  backfillInterval: number
+  maxConsecutiveErrors: number
+}

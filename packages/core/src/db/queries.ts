@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, OpenCLISource, SearchResult, Source } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, OpenCLISource, SearchResult, Source, SyncCursor, SyncRun } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
 
 export function getOrCreateProject(
@@ -551,4 +551,172 @@ export function getSetupValue(db: Database.Database, key: string): string | null
 
 export function setSetupValue(db: Database.Database, key: string, value: string): void {
   db.prepare('INSERT OR REPLACE INTO opencli_setup (key, value) VALUES (?, ?)').run(key, value)
+}
+
+// ── Sync Cursor CRUD ────────────────────────────────────────────────────────
+
+export function getOrCreateSyncCursor(db: Database.Database, opencliSrcId: number): SyncCursor {
+  const existing = db.prepare(`
+    SELECT id, opencli_src_id AS opencliSrcId,
+           forward_cursor AS forwardCursor, backward_cursor AS backwardCursor,
+           backfill_complete AS backfillComplete,
+           last_forward_sync AS lastForwardSync, last_backfill_sync AS lastBackfillSync,
+           consecutive_errors AS consecutiveErrors, total_pages_fetched AS totalPagesFetched
+    FROM sync_cursors WHERE opencli_src_id = ?
+  `).get(opencliSrcId) as Record<string, unknown> | undefined
+
+  if (existing) {
+    return {
+      id: existing['id'] as number,
+      opencliSrcId: existing['opencliSrcId'] as number,
+      forwardCursor: existing['forwardCursor'] as string | null,
+      backwardCursor: existing['backwardCursor'] as string | null,
+      backfillComplete: Boolean(existing['backfillComplete']),
+      lastForwardSync: existing['lastForwardSync'] as string | null,
+      lastBackfillSync: existing['lastBackfillSync'] as string | null,
+      consecutiveErrors: existing['consecutiveErrors'] as number,
+      totalPagesFetched: existing['totalPagesFetched'] as number,
+    }
+  }
+
+  const result = db.prepare(`
+    INSERT INTO sync_cursors (opencli_src_id) VALUES (?)
+  `).run(opencliSrcId)
+
+  return {
+    id: Number(result.lastInsertRowid),
+    opencliSrcId,
+    forwardCursor: null,
+    backwardCursor: null,
+    backfillComplete: false,
+    lastForwardSync: null,
+    lastBackfillSync: null,
+    consecutiveErrors: 0,
+    totalPagesFetched: 0,
+  }
+}
+
+export function updateForwardCursor(
+  db: Database.Database,
+  opencliSrcId: number,
+  cursor: string,
+): void {
+  db.prepare(`
+    UPDATE sync_cursors
+    SET forward_cursor = ?, last_forward_sync = datetime('now'),
+        consecutive_errors = 0, updated_at = datetime('now')
+    WHERE opencli_src_id = ?
+  `).run(cursor, opencliSrcId)
+}
+
+export function updateBackwardCursor(
+  db: Database.Database,
+  opencliSrcId: number,
+  cursor: string | null,
+  complete: boolean,
+): void {
+  db.prepare(`
+    UPDATE sync_cursors
+    SET backward_cursor = ?, backfill_complete = ?, last_backfill_sync = datetime('now'),
+        total_pages_fetched = total_pages_fetched + 1, updated_at = datetime('now')
+    WHERE opencli_src_id = ?
+  `).run(cursor, complete ? 1 : 0, opencliSrcId)
+}
+
+export function incrementSyncErrors(db: Database.Database, opencliSrcId: number): number {
+  db.prepare(`
+    UPDATE sync_cursors
+    SET consecutive_errors = consecutive_errors + 1, updated_at = datetime('now')
+    WHERE opencli_src_id = ?
+  `).run(opencliSrcId)
+
+  const row = db.prepare(`
+    SELECT consecutive_errors FROM sync_cursors WHERE opencli_src_id = ?
+  `).get(opencliSrcId) as { consecutive_errors: number } | undefined
+  return row?.consecutive_errors ?? 0
+}
+
+export function resetSyncCursor(db: Database.Database, opencliSrcId: number): void {
+  db.prepare(`
+    UPDATE sync_cursors
+    SET forward_cursor = NULL, backward_cursor = NULL, backfill_complete = 0,
+        consecutive_errors = 0, total_pages_fetched = 0, updated_at = datetime('now')
+    WHERE opencli_src_id = ?
+  `).run(opencliSrcId)
+}
+
+// ── Sync Run Logging ────────────────────────────────────────────────────────
+
+export function insertSyncRun(
+  db: Database.Database,
+  opencliSrcId: number,
+  direction: 'forward' | 'backfill',
+  cursorBefore: string | null,
+): number {
+  const result = db.prepare(`
+    INSERT INTO sync_runs (opencli_src_id, direction, status, cursor_before)
+    VALUES (?, ?, 'running', ?)
+  `).run(opencliSrcId, direction, cursorBefore)
+  return Number(result.lastInsertRowid)
+}
+
+export function completeSyncRun(
+  db: Database.Database,
+  runId: number,
+  status: 'success' | 'error' | 'partial',
+  opts: {
+    itemsFetched?: number
+    itemsAdded?: number
+    itemsUpdated?: number
+    cursorAfter?: string | null
+    errorMessage?: string | null
+  },
+): void {
+  db.prepare(`
+    UPDATE sync_runs
+    SET status = ?, items_fetched = ?, items_added = ?, items_updated = ?,
+        cursor_after = ?, error_message = ?, finished_at = datetime('now')
+    WHERE id = ?
+  `).run(
+    status,
+    opts.itemsFetched ?? 0,
+    opts.itemsAdded ?? 0,
+    opts.itemsUpdated ?? 0,
+    opts.cursorAfter ?? null,
+    opts.errorMessage ?? null,
+    runId,
+  )
+}
+
+export function getRecentSyncRuns(
+  db: Database.Database,
+  opencliSrcId: number,
+  limit = 10,
+): SyncRun[] {
+  const rows = db.prepare(`
+    SELECT id, opencli_src_id AS opencliSrcId, direction, status,
+           items_fetched AS itemsFetched, items_added AS itemsAdded,
+           items_updated AS itemsUpdated, cursor_before AS cursorBefore,
+           cursor_after AS cursorAfter, error_message AS errorMessage,
+           started_at AS startedAt, finished_at AS finishedAt
+    FROM sync_runs
+    WHERE opencli_src_id = ?
+    ORDER BY started_at DESC
+    LIMIT ?
+  `).all(opencliSrcId, limit) as Array<Record<string, unknown>>
+
+  return rows.map(r => ({
+    id: r['id'] as number,
+    opencliSrcId: r['opencliSrcId'] as number,
+    direction: r['direction'] as 'forward' | 'backfill',
+    status: r['status'] as 'running' | 'success' | 'error' | 'partial',
+    itemsFetched: r['itemsFetched'] as number,
+    itemsAdded: r['itemsAdded'] as number,
+    itemsUpdated: r['itemsUpdated'] as number,
+    cursorBefore: r['cursorBefore'] as string | null,
+    cursorAfter: r['cursorAfter'] as string | null,
+    errorMessage: r['errorMessage'] as string | null,
+    startedAt: r['startedAt'] as string,
+    finishedAt: r['finishedAt'] as string | null,
+  }))
 }
