@@ -20,7 +20,7 @@
  * terminal choice doesn't change mid-session.
  */
 
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import { existsSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -167,9 +167,25 @@ function resolve(preference?: string): SupportedTerminal {
  * @param cwd  Working directory to open the terminal in (optional).
  */
 export function openTerminal(command: string | null, preference?: string, cwd?: string): void {
-  const terminal = resolve(preference)
-  // Expand ~ to absolute path (Warp launch configs require absolute paths)
+  // Expand ~ to absolute path
   const resolvedCwd = cwd?.replace(/^~/, homedir())
+
+  // Linux: use xdg-terminal-exec (freedesktop standard for launching the user's preferred terminal)
+  if (process.platform !== 'darwin') {
+    if (command) {
+      spawn('xdg-terminal-exec', ['sh', '-c', command], {
+        stdio: 'ignore', detached: true, ...(resolvedCwd && { cwd: resolvedCwd }),
+      }).unref()
+    } else {
+      spawn('xdg-terminal-exec', [], {
+        stdio: 'ignore', detached: true, ...(resolvedCwd && { cwd: resolvedCwd }),
+      }).unref()
+    }
+    return
+  }
+
+  // macOS: detect and use the user's preferred terminal app
+  const terminal = resolve(preference)
 
   if (!command) {
     execSync(`osascript -e 'tell application "${terminal}" to activate'`)
