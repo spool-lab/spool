@@ -131,7 +131,8 @@ function FragmentRow({
         </div>
 
         <p
-          className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark"
+          className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
+          onClick={(e) => e.stopPropagation()}
           dangerouslySetInnerHTML={{ __html: snippet }}
         />
 

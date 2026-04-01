@@ -12,7 +12,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
-  const [highlightedId, setHighlightedId] = useState<number | null>(null)
+  const [showHighlight, setShowHighlight] = useState(false)
   const targetRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -28,9 +28,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   useEffect(() => {
     if (!loading && targetMessageId && targetRef.current) {
-      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setHighlightedId(targetMessageId)
-      const timer = setTimeout(() => setHighlightedId(null), 2000)
+      targetRef.current.scrollIntoView({ behavior: 'instant', block: 'center' })
+      setShowHighlight(true)
+      const timer = setTimeout(() => setShowHighlight(false), 2000)
       return () => clearTimeout(timer)
     }
   }, [loading, targetMessageId])
@@ -89,11 +89,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           <div
             key={msg.id}
             ref={msg.id === targetMessageId ? targetRef : undefined}
-            className={`transition-colors duration-700 ${
-              msg.id === highlightedId
-                ? 'bg-accent/10 dark:bg-accent-dark/10'
-                : ''
-            }`}
+            className={msg.id === targetMessageId
+              ? `transition-colors duration-700 ${showHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''}`
+              : undefined}
           >
             <MessageBubble message={msg} />
           </div>
