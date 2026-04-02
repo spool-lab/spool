@@ -53,8 +53,12 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+let activeSyncPromise: Promise<{ added: number; updated: number; errors: number }> | null = null
+
 function runSyncWorker(): Promise<{ added: number; updated: number; errors: number }> {
-  return new Promise((resolve, reject) => {
+  if (activeSyncPromise) return activeSyncPromise
+
+  activeSyncPromise = new Promise<{ added: number; updated: number; errors: number }>((resolve, reject) => {
     const workerPath = join(__dirname, 'sync-worker.js')
     const worker = new Worker(workerPath)
     worker.on('message', (msg: SyncWorkerMessage) => {
@@ -70,7 +74,11 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
     worker.on('exit', (code) => {
       if (code !== 0) reject(new Error(`Sync worker exited with code ${code}`))
     })
+  }).finally(() => {
+    activeSyncPromise = null
   })
+
+  return activeSyncPromise
 }
 
 app.whenReady().then(() => {

@@ -149,6 +149,7 @@ function getSyncStatusText(
   if (syncStatus) {
     if (syncStatus.phase === 'scanning') return `Scanning for sessions…`
     if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total}…`
+    if (syncStatus.phase === 'indexing') return `Building search index…`
     if (syncStatus.phase === 'done') return `Synced · ${status?.totalSessions ?? '…'} sessions`
   }
   if (!status) return 'Loading…'
