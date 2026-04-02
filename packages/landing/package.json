@@ -1,12 +1,20 @@
 {
   "name": "@spool/landing",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "npx serve public -l 3001",
-    "build": "cp -r public dist",
+    "dev": "astro dev --port 3001",
+    "build": "astro build",
+    "preview": "astro preview --port 3001",
     "deploy": "wrangler pages deploy dist --project-name spool-landing",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist .astro"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.3.0",
+    "@astrojs/starlight": "^0.37.0",
+    "astro": "^5.18.0",
+    "sharp": "^0.33.0"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
