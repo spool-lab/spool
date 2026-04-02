@@ -23,8 +23,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: pnpm install --filter @spool/landing...
+
       - name: Build
-        run: cp -r packages/landing/public packages/landing/dist
+        run: pnpm --filter @spool/landing build
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
