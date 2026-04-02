@@ -37,7 +37,7 @@ curl -fSL --progress-bar "$DOWNLOAD_URL" -o "$DMG_PATH"
 
 # ── Mount & copy ──
 info "Installing to ${INSTALL_DIR}..."
-MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -quiet | tail -1 | awk '{print $NF}')
+MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -quiet | tail -1 | sed 's/.*	//')
 
 # Remove old version if exists
 if [[ -d "${INSTALL_DIR}/${APP_NAME}" ]]; then

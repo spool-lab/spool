@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, globalShortcut } from 'electron'
 import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
   searchFragments, searchAll, listRecentSessions, getSessionWithMessages, getStatus,
@@ -12,6 +13,7 @@ import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
 import type Database from 'better-sqlite3'
+import type { SyncWorkerMessage } from './sync-worker.js'
 
 // macOS menu bar shows the first menu's label as the app name
 app.setName('Spool')
@@ -51,6 +53,26 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function runSyncWorker(): Promise<{ added: number; updated: number; errors: number }> {
+  return new Promise((resolve, reject) => {
+    const workerPath = join(__dirname, 'sync-worker.js')
+    const worker = new Worker(workerPath)
+    worker.on('message', (msg: SyncWorkerMessage) => {
+      if (msg.type === 'progress') {
+        mainWindow?.webContents.send('spool:sync-progress', msg.data)
+      } else if (msg.type === 'done') {
+        resolve(msg.result)
+      } else if (msg.type === 'error') {
+        reject(new Error(msg.error))
+      }
+    })
+    worker.on('error', reject)
+    worker.on('exit', (code) => {
+      if (code !== 0) reject(new Error(`Sync worker exited with code ${code}`))
+    })
+  })
+}
+
 app.whenReady().then(() => {
   // Set dock icon (dev mode doesn't pick up build config)
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
@@ -81,18 +103,17 @@ app.whenReady().then(() => {
   opencliManager = new OpenCLIManager(db, (e) => {
     mainWindow?.webContents.send('opencli:capture-progress', e)
   })
-  syncer = new Syncer(db, (e) => {
-    mainWindow?.webContents.send('spool:sync-progress', e)
-  })
+  syncer = new Syncer(db)
   watcher = new SpoolWatcher(syncer)
   watcher.on('new-sessions', (_event, data) => {
     mainWindow?.webContents.send('spool:new-sessions', data)
   })
 
-  // Initial sync in background
-  setImmediate(() => {
-    syncer.syncAll()
+  // Initial sync in worker thread (non-blocking)
+  runSyncWorker().then(() => {
     watcher.start()
+  }).catch((err) => {
+    console.error('[sync-worker] failed:', err)
   })
 
   mainWindow = createWindow()
@@ -111,7 +132,7 @@ app.whenReady().then(() => {
   }
 
   setupTray(showOrCreateWindow, () => {
-    syncer.syncAll()
+    runSyncWorker()
   })
 
   // Register ⌘K shortcut for Capture URL modal
@@ -155,7 +176,7 @@ ipcMain.handle('spool:get-status', () => {
 })
 
 ipcMain.handle('spool:sync-now', () => {
-  return syncer.syncAll()
+  return runSyncWorker()
 })
 
 ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {

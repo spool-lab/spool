@@ -16,7 +16,7 @@ import {
 import type { SyncResult } from '../types.js'
 
 export interface SyncProgressEvent {
-  phase: 'scanning' | 'syncing' | 'done'
+  phase: 'scanning' | 'syncing' | 'indexing' | 'done'
   count: number
   total: number
 }
@@ -49,23 +49,59 @@ export class Syncer {
     const knownMtimes = getAllSessionMtimes(this.db)
     this.codexTitleIndex = loadCodexSessionIndex()
 
+    // Count how many files actually need syncing (no mtime match)
+    const needsSync = files.filter(f => {
+      const existing = knownMtimes.get(f.path)
+      if (!existing) return true
+      try { return existing !== getMtime(f.path) } catch { return false }
+    })
+    const isBulk = needsSync.length > 100
+
+    // For bulk syncs (e.g. first launch), drop FTS triggers and rebuild at the end.
+    // FTS5 segment merges on per-row triggers cause significant write amplification;
+    // a single rebuild after all inserts is ~3x faster.
+    if (isBulk) {
+      this.db.exec('DROP TRIGGER IF EXISTS messages_fts_insert')
+      this.db.exec('DROP TRIGGER IF EXISTS messages_fts_delete')
+    }
+
     let added = 0
     let updated = 0
     let errors = 0
 
-    const BATCH = 20
-    for (let i = 0; i < files.length; i += BATCH) {
-      const batch = files.slice(i, i + BATCH)
-      for (const file of batch) {
-        const result = this.syncFile(file.path, file.source, knownMtimes)
-        if (result === 'added') added++
-        else if (result === 'updated') updated++
-        else if (result === 'error') errors++
+    try {
+      const BATCH = 20
+      for (let i = 0; i < files.length; i += BATCH) {
+        const batch = files.slice(i, i + BATCH)
+        for (const file of batch) {
+          const result = this.syncFile(file.path, file.source, knownMtimes)
+          if (result === 'added') added++
+          else if (result === 'updated') updated++
+          else if (result === 'error') errors++
+        }
+        this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, files.length), total: files.length })
       }
-      this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, files.length), total: files.length })
-    }
 
-    this.applyCodexTitles()
+      this.applyCodexTitles()
+    } finally {
+      if (isBulk) {
+        this.onProgress?.({ phase: 'indexing', count: 0, total: 0 })
+        this.db.exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
+        this.db.exec(`
+          CREATE TRIGGER IF NOT EXISTS messages_fts_insert
+          AFTER INSERT ON messages BEGIN
+            INSERT INTO messages_fts(rowid, content_text) VALUES(NEW.id, NEW.content_text);
+          END
+        `)
+        this.db.exec(`
+          CREATE TRIGGER IF NOT EXISTS messages_fts_delete
+          AFTER DELETE ON messages BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, content_text)
+              VALUES('delete', OLD.id, OLD.content_text);
+          END
+        `)
+      }
+    }
 
     this.onProgress?.({ phase: 'done', count: files.length, total: files.length })
     return { added, updated, errors }

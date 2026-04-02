@@ -28,7 +28,10 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['@spool/core'] }), nativeExternalPlugin()],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          'sync-worker': resolve(__dirname, 'src/main/sync-worker.ts'),
+        },
       },
     },
     resolve: { alias: coreAlias },
