@@ -6,7 +6,9 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build && electron-builder --mac --arm64",
+    "build": "electron-vite build && electron-builder --publish never",
+    "build:mac": "electron-vite build && electron-builder --mac --arm64",
+    "build:linux": "electron-vite build && electron-builder --linux",
     "build:electron": "electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
@@ -21,7 +23,6 @@
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
     "acp-extension-codex": "^0.10.0",
-    "acp-extension-codex-darwin-arm64": "^0.10.0",
     "better-sqlite3": "^11.10.0",
     "bindings": "^1.5.0",
     "electron-updater": "^6.8.3",
@@ -48,6 +49,7 @@
       "node_modules/acp-extension-claude/**",
       "node_modules/acp-extension-codex/**",
       "node_modules/acp-extension-codex-darwin-arm64/**",
+      "node_modules/acp-extension-codex-linux-x64/**",
       "node_modules/acp-extension-core/**",
       "node_modules/@agentclientprotocol/**",
       "node_modules/@anthropic-ai/claude-agent-sdk/**",
@@ -72,6 +74,18 @@
         }
       ]
     },
+    "linux": {
+      "category": "Development",
+      "icon": "resources/icon.png",
+      "target": [
+        {
+          "target": "AppImage"
+        },
+        {
+          "target": "tar.gz"
+        }
+      ]
+    },
     "dmg": {
       "title": "Spool",
       "iconSize": 80,
@@ -88,6 +102,10 @@
         }
       ]
     }
+  },
+  "optionalDependencies": {
+    "acp-extension-codex-darwin-arm64": "^0.10.0",
+    "acp-extension-codex-linux-x64": "^0.10.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
