@@ -11,8 +11,13 @@ export const statusCommand = new Command('status')
       console.log(`Size:         ${formatBytes(s.dbSizeBytes)}`)
       console.log(`Sessions:     ${s.totalSessions} total  (claude: ${s.claudeSessions}, codex: ${s.codexSessions})`)
       console.log(`Last synced:  ${s.lastSyncedAt ? formatDate(s.lastSyncedAt) : 'never'}`)
-    } catch {
-      console.log('No index found. Run `spool sync` to create it.')
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('SQLITE_CANTOPEN')) {
+        console.log('No index found. Run `spool sync` to create it.')
+      } else {
+        console.error('Failed to read index:', err instanceof Error ? err.message : err)
+        process.exitCode = 1
+      }
     }
   })
 
