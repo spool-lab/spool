@@ -37,7 +37,9 @@ curl -fSL --progress-bar "$DOWNLOAD_URL" -o "$DMG_PATH"
 
 # ── Mount & copy ──
 info "Installing to ${INSTALL_DIR}..."
-MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -quiet | tail -1 | sed 's/.*	//')
+MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse | tail -1 | sed 's/.*	//')
+[[ -n "$MOUNT_POINT" ]] || err "Failed to resolve mount point."
+[[ -d "${MOUNT_POINT}/${APP_NAME}" ]] || err "Mounted DMG does not contain ${APP_NAME}."
 
 # Remove old version if exists
 if [[ -d "${INSTALL_DIR}/${APP_NAME}" ]]; then
@@ -47,7 +49,7 @@ fi
 cp -R "${MOUNT_POINT}/${APP_NAME}" "${INSTALL_DIR}/"
 
 # Unmount
-hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+hdiutil detach "$MOUNT_POINT" >/dev/null 2>&1 || true
 
 # ── Cleanup ──
 rm -rf "$TMPDIR_INSTALL"
