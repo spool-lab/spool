@@ -10,6 +10,7 @@ import OnboardingFlow from './components/OnboardingFlow.js'
 import SourcesPanel from './components/SourcesPanel.js'
 import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
+import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 
 type View = 'search' | 'session'
@@ -52,7 +53,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
-  const [resumeToastSource, setResumeToastSource] = useState<'claude' | 'codex' | null>(null)
+  const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
 
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
@@ -264,9 +265,11 @@ export default function App() {
   }, [query, searchMode, doSearch, refreshCaptureSources])
 
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
-    setResumeToastSource(source === 'claude' ? 'claude' : 'codex')
+    const command = getSessionResumeCommandPrefix(source)
+    if (!command) return
+    setResumeToastCommand(command)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setResumeToastSource(null), 3200)
+    toastTimer.current = setTimeout(() => setResumeToastCommand(null), 3200)
   }, [])
 
   const activeAgentInfo = availableAgents.find(a => a.id === aiAgent)
@@ -376,8 +379,8 @@ export default function App() {
         onSettingsClick={() => setShowSettings(true)}
       />
 
-      {resumeToastSource && (
-        <ResumeToast source={resumeToastSource} />
+      {resumeToastCommand && (
+        <ResumeToast command={resumeToastCommand} />
       )}
 
       {/* Modals */}
@@ -407,8 +410,7 @@ export default function App() {
   )
 }
 
-function ResumeToast({ source }: { source: 'claude' | 'codex' }) {
-  const command = source === 'claude' ? 'claude -r' : 'codex resume'
+function ResumeToast({ command }: { command: string }) {
   const suffix = 'then paste the id to resume this session'
 
   return (

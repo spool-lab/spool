@@ -64,3 +64,19 @@ test('search for non-existent keyword shows no results', async () => {
   await expect(window.locator('text=No results')).toBeVisible({ timeout: 5000 })
   await expect(window.locator('[data-testid="fragment-row"]')).toHaveCount(0)
 })
+
+test('codex search results expose resume-related actions', async () => {
+  const { window } = ctx
+
+  await search(window, 'BASSOON_CANARY_77')
+
+  const row = window.locator('[data-testid="fragment-row"]').first()
+  await expect(row).toBeVisible({ timeout: 5000 })
+  await expect(row.locator('text=codex')).toBeVisible()
+
+  const copyCommand = row.getByRole('button', { name: 'Copy Command' })
+  await expect(copyCommand).toBeVisible()
+
+  const resumeInCli = row.getByRole('button', { name: 'Resume in CLI' })
+  await expect(resumeInCli).toBeVisible()
+})

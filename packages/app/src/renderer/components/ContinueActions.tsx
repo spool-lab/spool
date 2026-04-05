@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FragmentResult } from '@spool/core'
+import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 
 type Props = {
   result: FragmentResult
@@ -9,7 +10,9 @@ type Props = {
 
 export default function ContinueActions({ result, onOpenSession, onCopySessionId }: Props) {
   const [copied, setCopied] = useState(false)
+  const [commandCopied, setCommandCopied] = useState(false)
   const [resuming, setResuming] = useState(false)
+  const resumeCommand = getSessionResumeCommand(result.source, result.sessionUuid)
 
   async function handleCopy() {
     await navigator.clipboard.writeText(result.sessionUuid)
@@ -22,6 +25,13 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
     setResuming(true)
     await window.spool.resumeCLI(result.sessionUuid, result.source, result.cwd)
     setTimeout(() => setResuming(false), 1000)
+  }
+
+  async function handleCopyCommand() {
+    if (!resumeCommand) return
+    await navigator.clipboard.writeText(resumeCommand)
+    setCommandCopied(true)
+    setTimeout(() => setCommandCopied(false), 1500)
   }
 
   return (
@@ -40,7 +50,31 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
         Copy Session ID
       </ActionButton>
 
-      {result.source === 'claude' && (
+      {resumeCommand && (
+        <ActionButton onClick={handleCopyCommand} title="Copy the full CLI resume command">
+          {commandCopied ? (
+            <>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M2 7L5 10L11 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Copied Command
+            </>
+          ) : (
+            <>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M2 3.5H11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M2 6.5H8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M2 9.5H6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M9.5 9.5L11.5 11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <path d="M11.5 9.5L9.5 11.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Copy Command
+            </>
+          )}
+        </ActionButton>
+      )}
+
+      {resumeCommand && (
         <ActionButton onClick={handleResume} title="Resume this session in Terminal">
           {resuming ? (
             <>

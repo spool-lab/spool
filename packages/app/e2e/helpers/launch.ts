@@ -18,13 +18,15 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-e2e-'))
 
   const claudeDir = join(tmpDir, 'claude', 'projects')
+  const codexDir = join(tmpDir, 'codex', 'sessions')
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
+  cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
     SPOOL_DATA_DIR: join(tmpDir, 'data'),
     SPOOL_CLAUDE_DIR: claudeDir,
-    SPOOL_CODEX_DIR: join(tmpDir, 'codex', 'sessions'),
+    SPOOL_CODEX_DIR: codexDir,
     ELECTRON_DISABLE_GPU: '1',
   }
 

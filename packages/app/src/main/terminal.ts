@@ -67,7 +67,11 @@ function autoDetect(): SupportedTerminal {
 
 /** Prepend `cd '<cwd>' &&` to a command if cwd is provided. */
 function withCwd(cmd: string, cwd?: string): string {
-  return cwd ? `cd '${cwd}' && ${cmd}` : cmd
+  return cwd ? `cd ${shellQuote(cwd)} && ${cmd}` : cmd
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
 /**

@@ -12,6 +12,8 @@ import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
+import { getSessionResumeCommand } from '../shared/resumeCommand.js'
+import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -189,9 +191,21 @@ ipcMain.handle('spool:sync-now', () => {
 
 ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
   try {
-    const command = source === 'claude' ? `claude --resume ${sessionUuid}` : null
+    const command = getSessionResumeCommand(source, sessionUuid)
+    if (!command) {
+      return { ok: false, error: `Session source "${source}" cannot be resumed from the CLI.` }
+    }
+    const session = getSessionWithMessages(db, sessionUuid)?.session
+    const resumeCwd = session
+      ? resolveResumeWorkingDirectory(session)
+      : resolveResumeWorkingDirectory({
+          source: source as 'claude' | 'codex',
+          cwd: cwd ?? null,
+          projectDisplayPath: '',
+          filePath: '',
+        })
     const terminal = acpManager.getAgentsConfig().terminal
-    openTerminal(command, terminal, cwd)
+    openTerminal(command, terminal, resumeCwd)
     return { ok: true }
   } catch (err) {
     console.error('[spool:resume-cli]', err)
