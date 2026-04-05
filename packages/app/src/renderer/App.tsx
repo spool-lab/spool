@@ -105,20 +105,42 @@ export default function App() {
   }, [])
 
   const refreshCaptureSources = useCallback(() => {
-    if (!window.spool?.opencli) return
-    Promise.all([
-      window.spool.opencli.listSources(),
-      window.spool.opencli.availablePlatforms(),
-    ]).then(([sources, platforms]) => {
-      setCaptureSources(
-        sources
-          .filter(s => s.syncCount > 0)
-          .map(s => ({
-            label: platforms.find(p => p.platform === s.platform && p.command === s.command)?.label ?? `${s.platform} ${s.command}`,
-            count: s.syncCount,
-          }))
+    const promises: Promise<Array<{ label: string; count: number }>>[] = []
+
+    // OpenCLI sources
+    if (window.spool?.opencli) {
+      promises.push(
+        Promise.all([
+          window.spool.opencli.listSources(),
+          window.spool.opencli.availablePlatforms(),
+        ]).then(([sources, platforms]) =>
+          sources
+            .filter(s => s.syncCount > 0)
+            .map(s => ({
+              label: platforms.find(p => p.platform === s.platform && p.command === s.command)?.label ?? `${s.platform} ${s.command}`,
+              count: s.syncCount,
+            }))
+        )
       )
-    }).catch(console.error)
+    }
+
+    // Native connectors
+    if (window.spool?.connectors) {
+      promises.push(
+        window.spool.connectors.list().then(async connectors => {
+          const results: Array<{ label: string; count: number }> = []
+          for (const c of connectors) {
+            const count = await window.spool.connectors.getCaptureCount(c.id)
+            if (count > 0) results.push({ label: c.label, count })
+          }
+          return results
+        })
+      )
+    }
+
+    Promise.all(promises)
+      .then(results => setCaptureSources(results.flat()))
+      .catch(console.error)
   }, [])
 
   useEffect(() => {

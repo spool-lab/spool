@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { OpenCLISource, PlatformInfo } from '@spool/core'
+import type { OpenCLISource, PlatformInfo, ConnectorStatus } from '@spool/core'
 
 interface Props {
   onClose: () => void
@@ -54,8 +54,12 @@ function formatSyncTime(iso: string | null): string {
 export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props) {
   const [sources, setSources] = useState<OpenCLISource[]>([])
   const [platforms, setPlatforms] = useState<PlatformInfo[]>([])
+  const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
+  const [connectorCounts, setConnectorCounts] = useState<Record<string, number>>({})
   const [showPicker, setShowPicker] = useState(false)
   const [syncing, setSyncing] = useState<number | null>(null)
+  const [syncingConnector, setSyncingConnector] = useState<string | null>(null)
+  const [syncProgress, setSyncProgress] = useState<Record<string, { page: number; added: number; phase: string }>>({})
   const [syncError, setSyncError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
@@ -71,7 +75,48 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
     setPlatforms(list)
   }, [])
 
-  useEffect(() => { loadSources(); loadPlatforms() }, [loadSources, loadPlatforms])
+  const loadConnectors = useCallback(async () => {
+    if (!window.spool?.connectors) return
+    const list = await window.spool.connectors.list()
+    setConnectors(list)
+    // Load real capture counts from DB
+    const counts: Record<string, number> = {}
+    for (const c of list) {
+      counts[c.id] = await window.spool.connectors.getCaptureCount(c.id)
+    }
+    setConnectorCounts(counts)
+  }, [])
+
+  useEffect(() => { loadSources(); loadPlatforms(); loadConnectors() }, [loadSources, loadPlatforms, loadConnectors])
+
+  // Listen for connector sync events to update status
+  useEffect(() => {
+    if (!window.spool?.connectors) return () => {}
+    const off = window.spool.connectors.onEvent((event) => {
+      if (event.type === 'sync-start') {
+        setSyncingConnector(event.connectorId ?? null)
+        setSyncProgress(prev => {
+          const next = { ...prev }
+          if (event.connectorId) next[event.connectorId] = { page: 0, added: 0, phase: 'starting' }
+          return next
+        })
+      } else if (event.type === 'sync-progress') {
+        const p = event.progress as { connectorId: string; phase: string; page: number; added: number } | undefined
+        if (p) {
+          setSyncProgress(prev => ({ ...prev, [p.connectorId]: { page: p.page, added: p.added, phase: p.phase } }))
+        }
+      } else if (event.type === 'sync-complete' || event.type === 'sync-error') {
+        setSyncingConnector(null)
+        setSyncProgress(prev => {
+          const next = { ...prev }
+          if (event.connectorId) delete next[event.connectorId]
+          return next
+        })
+        loadConnectors()
+      }
+    })
+    return off
+  }, [loadConnectors])
 
   /** Resolve a friendly label for a connected source */
   const sourceLabel = useCallback((src: OpenCLISource) => {
@@ -91,6 +136,19 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
     if (!window.spool?.opencli) return
     await window.spool.opencli.removeSource(id)
     await loadSources()
+  }
+
+  const handleConnectorSync = async (connectorId: string) => {
+    if (!window.spool?.connectors) return
+    setSyncingConnector(connectorId)
+    setSyncError(null)
+    try {
+      await window.spool.connectors.syncNow(connectorId)
+      // Status updates come via events
+    } catch (err) {
+      setSyncError(`${connectorId}: ${err instanceof Error ? err.message : String(err)}`)
+      setSyncingConnector(null)
+    }
   }
 
   const handleSync = async (src: OpenCLISource) => {
@@ -132,6 +190,73 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
             <BuiltInSource name="Claude Code" color={PLATFORM_COLORS['claude']!} count={claudeCount} />
             <BuiltInSource name="Codex CLI" color={PLATFORM_COLORS['codex']!} count={codexCount} />
           </div>
+
+          {/* Native Connectors */}
+          {connectors.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase mb-2">
+                Connectors
+              </h3>
+              {connectors.map(c => {
+                const isSyncing = syncingConnector === c.id || c.syncing
+                const progress = syncProgress[c.id]
+                return (
+                  <div key={c.id} className="py-2.5 group">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-2 h-2 rounded-full flex-none"
+                        style={{ background: c.color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-warm-text dark:text-dark-text">
+                          {c.label}
+                        </span>
+                        <span className="text-xs text-warm-faint dark:text-dark-muted ml-2">
+                          {isSyncing && progress
+                            ? `page ${progress.page} · ${progress.added} new`
+                            : (connectorCounts[c.id] ?? 0) > 0
+                              ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
+                              : c.state.lastErrorCode
+                                ? c.state.lastErrorMessage ?? 'Error'
+                                : 'Not synced yet'}
+                        </span>
+                      </div>
+                      {!isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
+                        <span className="text-[10px] text-amber-500 font-medium">needs login</span>
+                      )}
+                      <button
+                        onClick={() => handleConnectorSync(c.id)}
+                        disabled={isSyncing}
+                        className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {isSyncing ? 'Syncing...' : 'Sync'}
+                      </button>
+                    </div>
+                    {isSyncing && progress && (
+                      <div className="ml-5 mt-1">
+                        <div className="h-1 rounded-full bg-warm-border dark:bg-dark-border overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-accent dark:bg-accent-dark transition-all duration-300"
+                            style={{ width: `${Math.min((progress.page / 50) * 100, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-warm-faint dark:text-dark-muted mt-0.5 block">
+                          {progress.phase === 'forward' ? 'Fetching new items' : 'Backfilling history'}...
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {connectors.some(c => c.state.lastErrorCode) && (
+                <div className="mt-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-[6px]">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {connectors.find(c => c.state.lastErrorCode)?.state.lastErrorMessage}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Sync Error */}
           {syncError && (
