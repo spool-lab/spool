@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, OpenCLISetupStatus, OpenCLISource, PlatformInfo, CapturedItem } from '@spool/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, OpenCLISetupStatus, OpenCLISource, PlatformInfo, CapturedItem, ConnectorStatus, AuthStatus, SchedulerStatus } from '@spool/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 
 export interface AgentInfo {
@@ -159,6 +159,31 @@ const api = {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { phase: string; message: string })
       ipcRenderer.on('opencli:capture-progress', handler)
       return () => ipcRenderer.removeListener('opencli:capture-progress', handler)
+    },
+  },
+
+  // ── Connectors ──
+
+  connectors: {
+    list: (): Promise<ConnectorStatus[]> =>
+      ipcRenderer.invoke('connector:list'),
+
+    checkAuth: (id: string): Promise<AuthStatus> =>
+      ipcRenderer.invoke('connector:check-auth', { id }),
+
+    syncNow: (id: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('connector:sync-now', { id }),
+
+    getStatus: (): Promise<SchedulerStatus> =>
+      ipcRenderer.invoke('connector:get-status'),
+
+    getCaptureCount: (connectorId: string): Promise<number> =>
+      ipcRenderer.invoke('connector:get-capture-count', { connectorId }),
+
+    onEvent: (cb: (event: { type: string; connectorId?: string; progress?: unknown; result?: unknown; code?: string; message?: string }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as any)
+      ipcRenderer.on('connector:event', handler)
+      return () => ipcRenderer.removeListener('connector:event', handler)
     },
   },
 

@@ -180,5 +180,23 @@ function runMigrations(db: Database.Database): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- ── Connector sync state ────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS connector_sync_state (
+      connector_id        TEXT PRIMARY KEY,
+      head_cursor         TEXT,
+      head_item_id        TEXT,
+      tail_cursor         TEXT,
+      tail_complete       INTEGER NOT NULL DEFAULT 0,
+      last_forward_sync_at  TEXT,
+      last_backfill_sync_at TEXT,
+      total_synced        INTEGER NOT NULL DEFAULT 0,
+      consecutive_errors  INTEGER NOT NULL DEFAULT 0,
+      enabled             INTEGER NOT NULL DEFAULT 1,
+      config_json         TEXT NOT NULL DEFAULT '{}',
+      last_error_code     TEXT,
+      last_error_message  TEXT
+    );
   `)
 }

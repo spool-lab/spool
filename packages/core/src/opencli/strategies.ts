@@ -31,32 +31,7 @@ export interface SyncStrategy {
  * returns a collection of items suitable for indexing.
  */
 export const SYNC_STRATEGIES: SyncStrategy[] = [
-  // ── Twitter / X ────────────────────────────────────────────────
-  {
-    platform: 'twitter',
-    command: 'bookmarks',
-    args: ['--limit', '100'],
-    label: 'X Bookmarks',
-    description: 'Your saved tweets on X',
-  },
-  {
-    platform: 'twitter',
-    command: 'timeline',
-    label: 'X Timeline',
-    description: 'Your home timeline on X',
-  },
-  {
-    platform: 'twitter',
-    command: 'notifications',
-    label: 'X Notifications',
-    description: 'Your recent notifications on X',
-  },
-  {
-    platform: 'twitter',
-    command: 'following',
-    label: 'X Following',
-    description: 'Accounts you follow on X',
-  },
+  // Twitter / X: removed — handled natively by TwitterBookmarksConnector
 
   // ── Hacker News ────────────────────────────────────────────────
   {
