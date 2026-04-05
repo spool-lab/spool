@@ -273,9 +273,9 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   concurrency: 1,
   pageDelayMs: 600,
   forwardMaxPages: 50,
-  backfillMaxPages: 10,
+  backfillMaxPages: 50,
   retryBackoffMs: [60_000, 300_000, 1_800_000, 7_200_000],
-  maxMinutesPerRun: 5,
+  maxMinutesPerRun: 10,
 }
 
 export type SyncJobPriority = 100 | 80 | 60 | 40 | 20

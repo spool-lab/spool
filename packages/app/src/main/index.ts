@@ -370,7 +370,7 @@ ipcMain.handle('connector:check-auth', async (_e, { id }: { id: string }): Promi
 })
 
 ipcMain.handle('connector:sync-now', (_e, { id }: { id: string }) => {
-  syncScheduler.triggerNow(id)
+  syncScheduler.triggerNow(id, 'both')
   return { ok: true }
 })
 

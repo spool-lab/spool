@@ -215,7 +215,7 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
                           {isSyncing && progress
                             ? `page ${progress.page} · ${progress.added} new`
                             : (connectorCounts[c.id] ?? 0) > 0
-                              ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}`
+                              ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
                               : c.state.lastErrorCode
                                 ? c.state.lastErrorMessage ?? 'Error'
                                 : 'Not synced yet'}
