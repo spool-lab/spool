@@ -49,9 +49,12 @@ packages/
 
 ```bash
 pnpm install
+pnpm exec electron-rebuild -f -w better-sqlite3   # rebuild native modules for Electron
 pnpm dev          # starts app + landing in dev mode
 pnpm test         # runs all tests
 ```
+
+> **Note:** The `electron-rebuild` step is required whenever you run `pnpm install` or switch Node.js versions. Without it, the Electron app will crash at launch with a `NODE_MODULE_VERSION` mismatch error from `better-sqlite3`.
 
 ## Release
 
