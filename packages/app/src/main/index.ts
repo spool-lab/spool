@@ -7,7 +7,9 @@ import {
   OpenCLIManager,
   getOpenCLISourceId, listOpenCLISources, addOpenCLISource, removeOpenCLISource, getCaptureCount,
   getSetupValue, setSetupValue,
+  ConnectorRegistry, SyncEngine, SyncScheduler, TwitterBookmarksConnector,
 } from '@spool/core'
+import type { ConnectorStatus, AuthStatus } from '@spool/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -26,6 +28,8 @@ let syncer: Syncer
 let watcher: SpoolWatcher
 let acpManager: AcpManager
 let opencliManager: OpenCLIManager
+let connectorRegistry: ConnectorRegistry
+let syncScheduler: SyncScheduler
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -118,6 +122,16 @@ app.whenReady().then(() => {
   watcher.on('new-sessions', (_event, data) => {
     mainWindow?.webContents.send('spool:new-sessions', data)
   })
+
+  // ── Connector framework ──────────────────────────────────────────────
+  connectorRegistry = new ConnectorRegistry()
+  connectorRegistry.register(new TwitterBookmarksConnector())
+
+  syncScheduler = new SyncScheduler(db, connectorRegistry)
+  syncScheduler.on((event) => {
+    mainWindow?.webContents.send('connector:event', event)
+  })
+  syncScheduler.start()
 
   // Initial sync in worker thread (non-blocking)
   runSyncWorker().then(() => {
@@ -356,4 +370,32 @@ ipcMain.handle('opencli:get-setup-value', (_e, { key }: { key: string }) => {
 ipcMain.handle('opencli:set-setup-value', (_e, { key, value }: { key: string; value: string }) => {
   setSetupValue(db, key, value)
   return { ok: true }
+})
+
+// ── Connector Handlers ──────────────────────────────────────────────────
+
+ipcMain.handle('connector:list', (): ConnectorStatus[] => {
+  return syncScheduler.getStatus().connectors
+})
+
+ipcMain.handle('connector:check-auth', async (_e, { id }: { id: string }): Promise<AuthStatus> => {
+  const connector = connectorRegistry.get(id)
+  return connector.checkAuth()
+})
+
+ipcMain.handle('connector:sync-now', (_e, { id }: { id: string }) => {
+  syncScheduler.triggerNow(id)
+  return { ok: true }
+})
+
+ipcMain.handle('connector:get-status', () => {
+  return syncScheduler.getStatus()
+})
+
+ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorId: string }) => {
+  const connector = connectorRegistry.get(connectorId)
+  const row = db.prepare(
+    "SELECT COUNT(*) as cnt FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
+  ).get(connector.platform, connectorId) as { cnt: number }
+  return row.cnt
 })
