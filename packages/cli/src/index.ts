@@ -6,6 +6,7 @@ import { statusCommand } from './commands/status.js'
 import { showCommand } from './commands/show.js'
 import { captureCommand } from './commands/capture.js'
 import { sourcesCommand } from './commands/sources.js'
+import { connectorSyncCommand } from './commands/connector-sync.js'
 
 program
   .name('spool')
@@ -19,5 +20,6 @@ program.addCommand(statusCommand)
 program.addCommand(showCommand)
 program.addCommand(captureCommand)
 program.addCommand(sourcesCommand)
+program.addCommand(connectorSyncCommand)
 
 program.parse()

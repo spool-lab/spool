@@ -208,13 +208,9 @@ export interface SyncState {
 export interface SyncOptions {
   /** Which direction to sync. Default: 'both'. */
   direction?: 'forward' | 'backfill' | 'both'
-  /** Max pages for forward sync. Default: 50. */
-  forwardMaxPages?: number
-  /** Max pages for backfill. Default: 10. */
-  backfillMaxPages?: number
   /** Delay between page requests in ms. Default: 600. */
   delayMs?: number
-  /** Max runtime in minutes. Default: 5. */
+  /** Max runtime in minutes. 0 = unlimited. Default: 0 (no limit). */
   maxMinutes?: number
   /** Consecutive pages with 0 new items before stopping forward sync. Default: 3. */
   stalePageLimit?: number
@@ -257,13 +253,13 @@ export interface ScheduleConfig {
   concurrency: number
   /** Default delay between pages. Default: 600ms. */
   pageDelayMs: number
-  /** Max pages per forward sync. Default: 50. */
-  forwardMaxPages: number
-  /** Max pages per backfill cycle. Default: 10. */
-  backfillMaxPages: number
   /** Retry backoff sequence in ms. */
   retryBackoffMs: number[]
-  /** Max time for a single sync run in minutes. Default: 5. */
+  /**
+   * Max time for a single scheduled sync run in minutes.
+   * Only applies to scheduler-initiated syncs.
+   * 0 = unlimited (used by CLI full sync). Default: 10.
+   */
   maxMinutesPerRun: number
 }
 
@@ -271,9 +267,7 @@ export const DEFAULT_SCHEDULE: ScheduleConfig = {
   forwardIntervalMs: 15 * 60_000,
   backfillIntervalMs: 60 * 60_000,
   concurrency: 1,
-  pageDelayMs: 600,
-  forwardMaxPages: 50,
-  backfillMaxPages: 50,
+  pageDelayMs: 1200,
   retryBackoffMs: [60_000, 300_000, 1_800_000, 7_200_000],
   maxMinutesPerRun: 10,
 }

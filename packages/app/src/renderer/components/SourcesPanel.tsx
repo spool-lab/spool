@@ -233,14 +233,9 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
                       </button>
                     </div>
                     {isSyncing && progress && (
-                      <div className="ml-5 mt-1">
-                        <div className="h-1 rounded-full bg-warm-border dark:bg-dark-border overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-accent dark:bg-accent-dark transition-all duration-300"
-                            style={{ width: `${Math.min((progress.page / 50) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-warm-faint dark:text-dark-muted mt-0.5 block">
+                      <div className="ml-5 mt-1 flex items-center gap-2">
+                        <div className="h-1 w-3 rounded-full bg-accent dark:bg-accent-dark animate-pulse" />
+                        <span className="text-[10px] text-warm-faint dark:text-dark-muted">
                           {progress.phase === 'forward' ? 'Fetching new items' : 'Backfilling history'}...
                         </span>
                       </div>

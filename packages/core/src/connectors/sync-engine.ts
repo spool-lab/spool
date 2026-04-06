@@ -235,6 +235,112 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Fetch pages in a loop until a stop condition is met.
+   * Handles errors gracefully: saves progress and returns instead of throwing.
+   */
+  private async fetchLoop(
+    connector: Connector,
+    state: SyncState,
+    opts: SyncOptions & { phase: 'forward' | 'backfill' },
+    sourceId: number,
+    startCursor: string | null,
+    startedAt: number,
+  ): Promise<{ added: number; pages: number; stopReason: string; error?: { code: string; message: string } }> {
+    const delayMs = opts.delayMs ?? 1200
+    const maxMinutes = opts.maxMinutes ?? 0
+    const stalePageLimit = opts.stalePageLimit ?? 3
+    const checkpointEvery = 25
+
+    let cursor = startCursor
+    let added = 0
+    let pages = 0
+    let stalePages = 0
+
+    for (let page = 0; ; page++) {
+      if (maxMinutes > 0 && this.isTimedOut(startedAt, maxMinutes)) {
+        return { added, pages, stopReason: 'timeout' }
+      }
+      if (opts.signal?.aborted) {
+        return { added, pages, stopReason: 'cancelled' }
+      }
+
+      let result
+      try {
+        result = await connector.fetchPage(cursor)
+      } catch (err) {
+        // Save progress before returning — don't throw, don't lose work
+        console.error(`[sync-engine] ${connector.id} ${opts.phase} page ${page + 1} error:`, err instanceof Error ? err.message : err)
+        saveSyncState(this.db, state)
+        return {
+          added, pages,
+          stopReason: `error: ${err instanceof SyncError ? err.code : 'CONNECTOR_ERROR'}`,
+          error: {
+            code: err instanceof SyncError ? err.code : 'CONNECTOR_ERROR',
+            message: err instanceof Error ? err.message : String(err),
+          },
+        }
+      }
+      pages++
+
+      if (result.items.length === 0 && !result.nextCursor) {
+        if (opts.phase === 'backfill') state.tailComplete = true
+        return { added, pages, stopReason: opts.phase === 'backfill' ? 'backfill_complete' : 'end_of_data' }
+      }
+
+      // Tag items with connectorId
+      for (const item of result.items) {
+        (item.metadata as Record<string, unknown>)['connectorId'] = connector.id
+      }
+
+      const { newCount } = this.db.transaction(() =>
+        upsertItems(this.db, sourceId, result.items),
+      )()
+      added += newCount
+
+      // Track head (forward) or tail (backfill)
+      if (opts.phase === 'forward') {
+        const firstItem = result.items[0]
+        if (firstItem && firstItem.platformId) state.headItemId = firstItem.platformId
+      }
+
+      opts.onProgress?.({
+        connectorId: connector.id,
+        phase: opts.phase,
+        page: page + 1,
+        fetched: result.items.length,
+        added,
+        running: true,
+      })
+
+      // Stale page detection: stop when we keep seeing only known data
+      if (newCount === 0) stalePages++
+      else stalePages = 0
+      if (stalePages >= stalePageLimit) {
+        if (opts.phase === 'backfill') state.tailComplete = true
+        return { added, pages, stopReason: opts.phase === 'forward' ? 'caught_up' : 'backfill_complete' }
+      }
+
+      if (!result.nextCursor) {
+        if (opts.phase === 'backfill') state.tailComplete = true
+        return { added, pages, stopReason: opts.phase === 'backfill' ? 'backfill_complete' : 'end_of_data' }
+      }
+
+      cursor = result.nextCursor
+
+      // Update cursor in state for resume
+      if (opts.phase === 'forward') state.tailCursor = cursor
+      else state.tailCursor = cursor
+
+      // Checkpoint periodically (crash safety)
+      if (pages % checkpointEvery === 0) {
+        saveSyncState(this.db, state)
+      }
+
+      await this.delay(delayMs)
+    }
+  }
+
   private async syncPersistent(
     connector: Connector,
     state: SyncState,
@@ -242,152 +348,31 @@ export class SyncEngine {
     startedAt: number,
   ): Promise<ConnectorSyncResult> {
     const direction = opts.direction ?? 'both'
-    const delayMs = opts.delayMs ?? 600
-    const maxMinutes = opts.maxMinutes ?? 5
-    const stalePageLimit = opts.stalePageLimit ?? 3
     const sourceId = getSourceId(this.db)
 
     let totalAdded = 0
     let totalPages = 0
     let stopReason = 'complete'
+    let lastError: { code: string; message: string } | undefined
 
     // ── Phase 1: Forward sync ───────────────────────────────────────
     if (direction === 'forward' || direction === 'both') {
-      const forwardMax = opts.forwardMaxPages ?? 50
-      let cursor: string | null = null // start from newest
-      let stalePages = 0
-
-      for (let page = 0; page < forwardMax; page++) {
-        if (this.isTimedOut(startedAt, maxMinutes)) {
-          stopReason = 'timeout'
-          break
-        }
-        if (opts.signal?.aborted) {
-          stopReason = 'cancelled'
-          break
-        }
-
-        let result
-        try {
-          result = await connector.fetchPage(cursor)
-        } catch (err) {
-          console.error(`[sync-engine] ${connector.id} forward page ${page + 1} fetch error:`, err)
-          throw err
-        }
-        totalPages++
-        console.log(`[sync-engine] ${connector.id} forward page ${page + 1}: ${result.items.length} items, cursor=${result.nextCursor ? 'yes' : 'no'}`)
-
-        if (result.items.length === 0 && !result.nextCursor) {
-          stopReason = 'end_of_data'
-          break
-        }
-
-        // Tag items with connectorId in metadata
-        for (const item of result.items) {
-          (item.metadata as Record<string, unknown>)['connectorId'] = connector.id
-        }
-
-        const { newCount } = this.db.transaction(() =>
-          upsertItems(this.db, sourceId, result.items),
-        )()
-        totalAdded += newCount
-
-        // Update head to track the newest item we've seen
-        const firstItem = result.items[0]
-        if (firstItem && firstItem.platformId) {
-          state.headItemId = firstItem.platformId
-        }
-
-        opts.onProgress?.({
-          connectorId: connector.id,
-          phase: 'forward',
-          page: page + 1,
-          fetched: result.items.length,
-          added: totalAdded,
-          running: true,
-        })
-
-        // Stop conditions
-        if (newCount === 0) stalePages++
-        else stalePages = 0
-
-        if (stalePages >= stalePageLimit) {
-          stopReason = 'caught_up'
-          break
-        }
-        if (!result.nextCursor) {
-          stopReason = 'end_of_data'
-          break
-        }
-
-        cursor = result.nextCursor
-
-        // After forward phase, record tail cursor so backfill continues from here
-        state.tailCursor = cursor
-
-        if (page < forwardMax - 1) await this.delay(delayMs)
-      }
-
+      const fwd = await this.fetchLoop(connector, state, { ...opts, phase: 'forward' }, sourceId, null, startedAt)
+      totalAdded += fwd.added
+      totalPages += fwd.pages
+      stopReason = fwd.stopReason
+      if (fwd.error) lastError = fwd.error
       state.lastForwardSyncAt = new Date().toISOString()
     }
 
-    // ── Phase 2: Backfill ───────────────────────────────────────────
-    if (!state.tailComplete && (direction === 'backfill' || direction === 'both')) {
-      const backfillMax = opts.backfillMaxPages ?? 10
-      let cursor = state.tailCursor
-
-      for (let page = 0; page < backfillMax; page++) {
-        if (this.isTimedOut(startedAt, maxMinutes)) {
-          stopReason = 'timeout'
-          break
-        }
-        if (opts.signal?.aborted) {
-          stopReason = 'cancelled'
-          break
-        }
-
-        const result = await connector.fetchPage(cursor)
-        totalPages++
-
-        if (result.items.length === 0 && !result.nextCursor) {
-          state.tailComplete = true
-          stopReason = 'backfill_complete'
-          break
-        }
-
-        for (const item of result.items) {
-          (item.metadata as Record<string, unknown>)['connectorId'] = connector.id
-        }
-
-        const { newCount } = this.db.transaction(() =>
-          upsertItems(this.db, sourceId, result.items),
-        )()
-        totalAdded += newCount
-
-        opts.onProgress?.({
-          connectorId: connector.id,
-          phase: 'backfill',
-          page: page + 1,
-          fetched: result.items.length,
-          added: totalAdded,
-          running: true,
-        })
-
-        if (!result.nextCursor) {
-          state.tailComplete = true
-          stopReason = 'backfill_complete'
-          break
-        }
-
-        state.tailCursor = result.nextCursor
-        cursor = result.nextCursor
-
-        // Checkpoint state every page during backfill (crash safety)
-        saveSyncState(this.db, state)
-
-        if (page < backfillMax - 1) await this.delay(delayMs)
-      }
-
+    // ── Phase 2: Backfill — runs until complete ─────────────────────
+    // Only run backfill if forward didn't error out
+    if (!lastError && !state.tailComplete && (direction === 'backfill' || direction === 'both')) {
+      const bf = await this.fetchLoop(connector, state, { ...opts, phase: 'backfill' }, sourceId, state.tailCursor, startedAt)
+      totalAdded += bf.added
+      totalPages += bf.pages
+      stopReason = bf.stopReason
+      if (bf.error) lastError = bf.error
       state.lastBackfillSyncAt = new Date().toISOString()
     }
 
@@ -405,7 +390,7 @@ export class SyncEngine {
       running: false,
     })
 
-    return {
+    const ret: ConnectorSyncResult = {
       connectorId: connector.id,
       added: totalAdded,
       total: state.totalSynced,
@@ -413,6 +398,10 @@ export class SyncEngine {
       direction,
       stopReason,
     }
+    if (lastError) {
+      ret.error = { code: lastError.code as SyncErrorCode, message: lastError.message }
+    }
+    return ret
   }
 
   private async syncEphemeral(
@@ -421,9 +410,8 @@ export class SyncEngine {
     opts: SyncOptions,
     startedAt: number,
   ): Promise<ConnectorSyncResult> {
-    const maxPages = opts.forwardMaxPages ?? 5
     const delayMs = opts.delayMs ?? 600
-    const maxMinutes = opts.maxMinutes ?? 5
+    const maxMinutes = opts.maxMinutes ?? 0
     const sourceId = getSourceId(this.db)
 
     // Ephemeral: delete old items and fetch fresh
@@ -434,8 +422,8 @@ export class SyncEngine {
     let totalPages = 0
     let stopReason = 'complete'
 
-    for (let page = 0; page < maxPages; page++) {
-      if (this.isTimedOut(startedAt, maxMinutes)) {
+    for (let page = 0; ; page++) {
+      if (maxMinutes > 0 && this.isTimedOut(startedAt, maxMinutes)) {
         stopReason = 'timeout'
         break
       }
@@ -458,7 +446,7 @@ export class SyncEngine {
 
       if (!result.nextCursor) break
       cursor = result.nextCursor
-      if (page < maxPages - 1) await this.delay(delayMs)
+      await this.delay(delayMs)
     }
 
     state.totalSynced = totalAdded

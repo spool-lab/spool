@@ -206,8 +206,6 @@ export class SyncScheduler {
     try {
       const result = await this.engine.sync(connector, {
         direction: job.direction,
-        forwardMaxPages: this.config.forwardMaxPages,
-        backfillMaxPages: this.config.backfillMaxPages,
         delayMs: this.config.pageDelayMs,
         maxMinutes: this.config.maxMinutesPerRun,
         signal: controller.signal,
