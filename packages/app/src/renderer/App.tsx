@@ -6,14 +6,13 @@ import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
-import OnboardingFlow from './components/OnboardingFlow.js'
-import SourcesPanel from './components/SourcesPanel.js'
 import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 
 type View = 'search' | 'session'
+type SettingsTab = 'general' | 'connectors' | 'agent'
 
 interface AgentInfo {
   id: string
@@ -46,11 +45,10 @@ export default function App() {
   const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string }>>(new Map())
   const aiAnswerRef = useRef('')
 
-  // OpenCLI modal state
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [showSourcesPanel, setShowSourcesPanel] = useState(false)
-  const [showCaptureModal, setShowCaptureModal] = useState(false)
+  // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
+  const [showCaptureModal, setShowCaptureModal] = useState(false)
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
@@ -106,42 +104,15 @@ export default function App() {
   }, [])
 
   const refreshCaptureSources = useCallback(() => {
-    const promises: Promise<Array<{ label: string; count: number }>>[] = []
-
-    // OpenCLI sources
-    if (window.spool?.opencli) {
-      promises.push(
-        Promise.all([
-          window.spool.opencli.listSources(),
-          window.spool.opencli.availablePlatforms(),
-        ]).then(([sources, platforms]) =>
-          sources
-            .filter(s => s.syncCount > 0)
-            .map(s => ({
-              label: platforms.find(p => p.platform === s.platform && p.command === s.command)?.label ?? `${s.platform} ${s.command}`,
-              count: s.syncCount,
-            }))
-        )
-      )
-    }
-
-    // Native connectors
-    if (window.spool?.connectors) {
-      promises.push(
-        window.spool.connectors.list().then(async connectors => {
-          const results: Array<{ label: string; count: number }> = []
-          for (const c of connectors) {
-            const count = await window.spool.connectors.getCaptureCount(c.id)
-            if (count > 0) results.push({ label: c.label, count })
-          }
-          return results
-        })
-      )
-    }
-
-    Promise.all(promises)
-      .then(results => setCaptureSources(results.flat()))
-      .catch(console.error)
+    if (!window.spool?.connectors) return
+    window.spool.connectors.list().then(async connectors => {
+      const results: Array<{ label: string; count: number }> = []
+      for (const c of connectors) {
+        const count = await window.spool.connectors.getCaptureCount(c.id)
+        if (count > 0) results.push({ label: c.label, count })
+      }
+      setCaptureSources(results)
+    }).catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -190,18 +161,15 @@ export default function App() {
   const doAiSearch = useCallback(async () => {
     if (!query.trim() || !window.spool?.aiSearch) return
 
-    // First fetch FTS results for context (if we don't have them yet)
     const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(query, 20) : [])
     if (ftsResults.length > 0 && results.length === 0) setResults(ftsResults)
 
-    // Reset AI state
     aiAnswerRef.current = ''
     setAiAnswer('')
     setAiError(null)
     setAiStreaming(true)
     setAiToolCalls(new Map())
 
-    // Fire AI query
     window.spool.aiSearch(query, aiAgent, ftsResults).catch((err) => {
       setAiError(String(err))
       setAiStreaming(false)
@@ -211,12 +179,10 @@ export default function App() {
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
     if (!q.trim()) setHomeMode(true)
-    // Only auto-search in Fast mode; AI mode waits for Enter
     if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
       searchTimer.current = setTimeout(() => doSearch(q), 200)
     }
-    // Clear AI answer when query changes
     if (aiAnswer || aiError) {
       setAiAnswer('')
       setAiError(null)
@@ -236,7 +202,6 @@ export default function App() {
   const handleModeChange = useCallback((mode: SearchMode) => {
     setSearchMode(mode)
     if (mode === 'fast') {
-      // Clear AI state, re-run FTS if there's a query
       setAiAnswer('')
       setAiError(null)
       setAiStreaming(false)
@@ -244,7 +209,6 @@ export default function App() {
       aiAnswerRef.current = ''
       if (query.trim()) doSearch(query)
     } else {
-      // Switching to AI: clear FTS results, user will press Enter to search
       setResults([])
       setIsSearching(false)
     }
@@ -266,19 +230,9 @@ export default function App() {
     setView('search'); setSelectedSession(null); setTargetMessageId(null)
   }, [])
 
-  const handleConnectClick = useCallback(async () => {
-    if (!window.spool?.opencli) return
-    const setupDone = await window.spool.opencli.getSetupValue('onboarding_complete')
-    if (setupDone === 'true') {
-      setShowSourcesPanel(true)
-    } else {
-      setShowOnboarding(true)
-    }
-  }, [])
-
-  const handleOnboardingComplete = useCallback(() => {
-    setShowOnboarding(false)
-    setShowSourcesPanel(true)
+  const handleConnectClick = useCallback(() => {
+    setSettingsTab('connectors')
+    setShowSettings(true)
   }, [])
 
   const handleCaptured = useCallback(() => {
@@ -294,7 +248,7 @@ export default function App() {
     toastTimer.current = setTimeout(() => setResumeToastCommand(null), 3200)
   }, [])
 
-  const activeAgentInfo = availableAgents.find(a => a.id === aiAgent)
+  const activeAgentInfo = availableAgents.find(a => a.id === aiAgent) ?? availableAgents[0]
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
   const activeAgentMode = activeAgentInfo?.acpMode
   const hasAgents = availableAgents.length > 0
@@ -333,7 +287,6 @@ export default function App() {
                 mode={searchMode}
                 onModeChange={hasAgents ? handleModeChange : undefined}
               />
-              {/* Agent selector — AI mode only */}
               {searchMode === 'ai' && availableAgents.length > 0 && (
                 <AgentSelector
                   agents={availableAgents}
@@ -348,7 +301,6 @@ export default function App() {
                 <SessionDetail sessionUuid={selectedSession} targetMessageId={targetMessageId} onCopySessionId={handleCopySessionId} />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
-                  {/* AI answer card — shown above results in AI mode */}
                   {searchMode === 'ai' && (aiAnswer || aiStreaming || aiError) && (
                     <AiAnswerCard
                       answer={aiAnswer}
@@ -360,13 +312,11 @@ export default function App() {
                       toolCalls={aiToolCalls}
                     />
                   )}
-                  {/* Show "Sources used" label in AI mode */}
                   {searchMode === 'ai' && results.length > 0 && (aiAnswer || aiStreaming) && (
                     <div className="px-4 pt-2 pb-1 text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em]">
                       Sources used
                     </div>
                   )}
-                  {/* AI mode: show prompt hint when no query submitted yet */}
                   {searchMode === 'ai' && !aiAnswer && !aiStreaming && !aiError && results.length === 0 && query.trim() ? (
                     <div className="flex flex-col items-center justify-center h-full text-warm-faint dark:text-dark-muted gap-2 pb-12">
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
@@ -397,8 +347,7 @@ export default function App() {
         searchMode={searchMode}
         aiAgent={activeAgentName}
         aiAgentMode={activeAgentMode}
-        onSourcesClick={() => setShowSourcesPanel(true)}
-        onSettingsClick={() => setShowSettings(true)}
+        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
 
       {resumeToastCommand && (
@@ -406,19 +355,6 @@ export default function App() {
       )}
 
       {/* Modals */}
-      {showOnboarding && (
-        <OnboardingFlow
-          onClose={() => setShowOnboarding(false)}
-          onComplete={handleOnboardingComplete}
-        />
-      )}
-      {showSourcesPanel && (
-        <SourcesPanel
-          onClose={() => { setShowSourcesPanel(false); refreshCaptureSources() }}
-          claudeCount={status?.claudeSessions ?? null}
-          codexCount={status?.codexSessions ?? null}
-        />
-      )}
       {showCaptureModal && (
         <CaptureUrlModal
           onClose={() => setShowCaptureModal(false)}
@@ -426,7 +362,12 @@ export default function App() {
         />
       )}
       {showSettings && (
-        <SettingsPanel onClose={() => { setShowSettings(false); refreshAgents() }} />
+        <SettingsPanel
+          onClose={() => { setShowSettings(false); refreshAgents(); refreshCaptureSources() }}
+          initialTab={settingsTab}
+          claudeCount={status?.claudeSessions ?? null}
+          codexCount={status?.codexSessions ?? null}
+        />
       )}
     </div>
   )

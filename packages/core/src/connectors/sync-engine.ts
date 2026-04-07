@@ -28,7 +28,7 @@ export function loadSyncState(db: Database.Database, connectorId: string): SyncS
       lastBackfillSyncAt: null,
       totalSynced: 0,
       consecutiveErrors: 0,
-      enabled: true,
+      enabled: false,
       configJson: {},
       lastErrorCode: null,
       lastErrorMessage: null,

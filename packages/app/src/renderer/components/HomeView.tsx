@@ -12,7 +12,7 @@ interface Props {
   codexCount: number | null
   captureSources: Array<{ label: string; count: number }>
   mode: SearchMode
-  onModeChange: (mode: SearchMode) => void
+  onModeChange?: (mode: SearchMode) => void
   onConnectClick: () => void
 }
 

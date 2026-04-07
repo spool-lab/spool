@@ -8,6 +8,7 @@ import {
   getOpenCLISourceId, listOpenCLISources, addOpenCLISource, removeOpenCLISource, getCaptureCount,
   getSetupValue, setSetupValue,
   ConnectorRegistry, SyncEngine, SyncScheduler, TwitterBookmarksConnector,
+  loadSyncState, saveSyncState,
 } from '@spool/core'
 import type { ConnectorStatus, AuthStatus } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -390,6 +391,15 @@ ipcMain.handle('connector:sync-now', (_e, { id }: { id: string }) => {
 
 ipcMain.handle('connector:get-status', () => {
   return syncScheduler.getStatus()
+})
+
+ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enabled: boolean }) => {
+  const state = loadSyncState(db, id)
+  saveSyncState(db, { ...state, enabled })
+  if (enabled) {
+    syncScheduler.triggerNow(id, 'both')
+  }
+  return { ok: true }
 })
 
 ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorId: string }) => {

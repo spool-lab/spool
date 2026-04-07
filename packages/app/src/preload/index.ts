@@ -174,6 +174,9 @@ const api = {
     syncNow: (id: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('connector:sync-now', { id }),
 
+    setEnabled: (id: string, enabled: boolean): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('connector:set-enabled', { id, enabled }),
+
     getStatus: (): Promise<SchedulerStatus> =>
       ipcRenderer.invoke('connector:get-status'),
 

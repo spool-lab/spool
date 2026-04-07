@@ -151,6 +151,12 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
     }
   }
 
+  const handleEnableConnector = async (connectorId: string) => {
+    if (!window.spool?.connectors) return
+    await window.spool.connectors.setEnabled(connectorId, true)
+    await loadConnectors()
+  }
+
   const handleSync = async (src: OpenCLISource) => {
     if (!window.spool?.opencli) return
     setSyncing(src.id)
@@ -205,32 +211,45 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
                     <div className="flex items-center gap-3">
                       <span
                         className="w-2 h-2 rounded-full flex-none"
-                        style={{ background: c.color }}
+                        style={{ background: c.enabled ? c.color : '#888' }}
                       />
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm text-warm-text dark:text-dark-text">
+                        <span className={`text-sm ${c.enabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
                           {c.label}
                         </span>
                         <span className="text-xs text-warm-faint dark:text-dark-muted ml-2">
-                          {isSyncing && progress
-                            ? `page ${progress.page} · ${progress.added} new`
-                            : (connectorCounts[c.id] ?? 0) > 0
-                              ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
-                              : c.state.lastErrorCode
-                                ? c.state.lastErrorMessage ?? 'Error'
-                                : 'Not synced yet'}
+                          {!c.enabled
+                            ? 'Not connected'
+                            : isSyncing && progress
+                              ? `page ${progress.page} · ${progress.added} new`
+                              : (connectorCounts[c.id] ?? 0) > 0
+                                ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
+                                : c.state.lastErrorCode
+                                  ? c.state.lastErrorMessage ?? 'Error'
+                                  : 'Not synced yet'}
                         </span>
                       </div>
-                      {!isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
-                        <span className="text-[10px] text-amber-500 font-medium">needs login</span>
+                      {!c.enabled ? (
+                        <button
+                          onClick={() => handleEnableConnector(c.id)}
+                          className="text-[11px] text-accent dark:text-accent-dark hover:underline"
+                        >
+                          Connect
+                        </button>
+                      ) : (
+                        <>
+                          {!isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
+                            <span className="text-[10px] text-amber-500 font-medium">needs login</span>
+                          )}
+                          <button
+                            onClick={() => handleConnectorSync(c.id)}
+                            disabled={isSyncing}
+                            className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            {isSyncing ? 'Syncing...' : 'Sync'}
+                          </button>
+                        </>
                       )}
-                      <button
-                        onClick={() => handleConnectorSync(c.id)}
-                        disabled={isSyncing}
-                        className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        {isSyncing ? 'Syncing...' : 'Sync'}
-                      </button>
                     </div>
                     {isSyncing && progress && (
                       <div className="ml-5 mt-1 flex items-center gap-2">

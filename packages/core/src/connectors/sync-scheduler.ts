@@ -96,6 +96,7 @@ export class SyncScheduler {
       return {
         id: c.id,
         label: c.label,
+        description: c.description,
         platform: c.platform,
         color: c.color,
         enabled: state.enabled,

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import type { StatusInfo } from '@spool/core'
 import type { SearchMode } from './SearchBar.js'
 
@@ -7,30 +7,7 @@ interface Props {
   searchMode?: SearchMode
   aiAgent?: string
   aiAgentMode?: string
-  onSourcesClick?: () => void
   onSettingsClick?: () => void
-}
-
-type Theme = 'system' | 'light' | 'dark'
-const themeCycle: Theme[] = ['system', 'light', 'dark']
-const themeIcons: Record<Theme, ReactNode> = {
-  system: (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <circle cx="8" cy="8" r="5"/>
-      <path d="M8 3V1M8 15v-2M13 8h2M1 8h2M11.5 4.5l1-1M3.5 12.5l1-1M11.5 11.5l1 1M3.5 3.5l1 1"/>
-    </svg>
-  ),
-  light: (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <circle cx="8" cy="8" r="4"/>
-      <path d="M8 2V0M8 16v-2M14 8h2M0 8h2M12 4l1.5-1.5M2.5 13.5L4 12M12 12l1.5 1.5M2.5 2.5L4 4"/>
-    </svg>
-  ),
-  dark: (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-      <path d="M13.5 8.5a6 6 0 01-6-6A6 6 0 108.5 14.5a6 6 0 005-6z"/>
-    </svg>
-  ),
 }
 
 interface UpdateStatus {
@@ -39,9 +16,8 @@ interface UpdateStatus {
   percent?: number
 }
 
-export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, aiAgentMode, onSourcesClick, onSettingsClick }: Props) {
+export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, aiAgentMode, onSettingsClick }: Props) {
   const [status, setStatus] = useState<StatusInfo | null>(null)
-  const [theme, setTheme] = useState<Theme>('system')
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
 
   useEffect(() => {
@@ -50,26 +26,12 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, ai
   }, [syncStatus])
 
   useEffect(() => {
-    if (!window.spool) return
-    window.spool.getTheme().then(t => { if (t) setTheme(t) }).catch(console.error)
-  }, [])
-
-  useEffect(() => {
     if (!window.spool?.onUpdateStatus) return () => {}
     return window.spool.onUpdateStatus((data) => {
-      // On error, clear the update state so UI doesn't get stuck on "Updating…"
       if (data.status === 'error') setUpdateStatus(null)
       else setUpdateStatus(data)
     })
   }, [])
-
-  const cycleTheme = () => {
-    if (!window.spool) return
-    const idx = themeCycle.indexOf(theme)
-    const next: Theme = themeCycle[(idx + 1) % themeCycle.length] ?? 'system'
-    setTheme(next)
-    window.spool.setTheme(next)
-  }
 
   const isAiMode = searchMode === 'ai'
   const statusText = isAiMode
@@ -116,13 +78,6 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, ai
           </button>
         )}
         <button
-          onClick={cycleTheme}
-          title={`Theme: ${theme}`}
-          className="text-warm-faint hover:text-warm-text dark:text-dark-muted dark:hover:text-dark-text transition-colors"
-        >
-          {themeIcons[theme]}
-        </button>
-        <button
           onClick={onSettingsClick}
           title="Settings"
           className="text-warm-faint hover:text-warm-text dark:text-dark-muted dark:hover:text-dark-text transition-colors"
@@ -130,12 +85,6 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, ai
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
           </svg>
-        </button>
-        <button
-          onClick={onSourcesClick}
-          className="text-[11px] text-warm-faint hover:text-warm-text dark:text-dark-muted dark:hover:text-dark-text transition-colors"
-        >
-          Sources +
         </button>
       </div>
     </div>

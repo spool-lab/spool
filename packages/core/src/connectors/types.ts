@@ -284,6 +284,7 @@ export interface SyncJob {
 export interface ConnectorStatus {
   id: string
   label: string
+  description: string
   platform: string
   color: string
   enabled: boolean
