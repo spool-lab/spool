@@ -62,6 +62,11 @@ pnpm test         # runs all tests
 ./scripts/release.sh        # bump version, build, create GitHub release
 ```
 
+## Acknowledgements
+
+- **[fieldtheory-cli](https://github.com/afar1/fieldtheory-cli)** — Twitter/X bookmark sync implementation adapted from this project
+- **[OpenCLI](https://github.com/jackwener/opencli)** — platform bookmark integration powered by OpenCLI
+
 ## License
 
 MIT
