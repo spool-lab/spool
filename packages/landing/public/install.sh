@@ -27,7 +27,7 @@ DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest"
 
 [[ -n "$DOWNLOAD_URL" ]] || err "Could not find DMG in latest release."
 
-VERSION=$(echo "$DOWNLOAD_URL" | grep -o '[0-9]*\.[0-9]*\.[0-9]*')
+VERSION=$(echo "$DOWNLOAD_URL" | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1)
 info "Downloading Spool ${VERSION}..."
 
 # ── Download ──
