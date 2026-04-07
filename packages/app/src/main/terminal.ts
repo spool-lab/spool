@@ -68,9 +68,7 @@ function withCwd(cmd: string, cwd?: string): string {
   return cwd ? `cd ${shellQuote(cwd)} && ${cmd}` : cmd
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
+import { shellQuote } from '../shared/resumeCommand.js'
 
 /**
  * Per-terminal command runners. Each takes a shell command string and an

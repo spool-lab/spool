@@ -13,6 +13,6 @@ export function getSessionResumeCommand(source: string, sessionUuid: string): st
   return `${prefix} ${shellQuote(sessionUuid)}`
 }
 
-function shellQuote(value: string): string {
+export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }

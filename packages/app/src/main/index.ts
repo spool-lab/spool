@@ -7,6 +7,7 @@ import {
   OpenCLIManager,
   getOpenCLISourceId, listOpenCLISources, addOpenCLISource, removeOpenCLISource, getCaptureCount,
   getSetupValue, setSetupValue,
+  type Source,
 } from '@spool/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
@@ -189,7 +190,7 @@ ipcMain.handle('spool:sync-now', () => {
   return runSyncWorker()
 })
 
-ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
+ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: Source; cwd?: string }) => {
   try {
     const command = getSessionResumeCommand(source, sessionUuid)
     if (!command) {
@@ -199,7 +200,7 @@ ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionU
     const resumeCwd = session
       ? resolveResumeWorkingDirectory(session)
       : resolveResumeWorkingDirectory({
-          source: source as 'claude' | 'codex',
+          source,
           cwd: cwd ?? null,
           projectDisplayPath: '',
           filePath: '',
