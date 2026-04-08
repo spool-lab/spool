@@ -113,10 +113,10 @@ function upsertItems(
   `)
   const insertStmt = db.prepare(`
     INSERT INTO captures
-      (source_id, opencli_src_id, capture_uuid, url, title, content_text,
+      (source_id, capture_uuid, url, title, content_text,
        author, platform, platform_id, content_type, thumbnail_url,
        metadata, captured_at, raw_json)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   for (const item of items) {
@@ -161,13 +161,12 @@ function deleteConnectorItems(db: Database.Database, connectorId: string): void 
 // ── Sync Engine ─────────────────────────────────────────────────────────────
 
 function getSourceId(db: Database.Database): number {
-  // Reuse the 'opencli' source for now — captures table needs a source_id FK.
-  // All connector items share this source_id; the connector_id in metadata
-  // and connector_sync_state table distinguish them.
-  const row = db.prepare("SELECT id FROM sources WHERE name = 'opencli'").get() as
+  // All connector items share the 'claude' source_id for the FK constraint.
+  // The connector_id in metadata and connector_sync_state table distinguish them.
+  const row = db.prepare("SELECT id FROM sources WHERE name = 'claude'").get() as
     | { id: number }
     | undefined
-  if (!row) throw new Error("Source 'opencli' not found in DB")
+  if (!row) throw new Error("Source 'claude' not found in DB")
   return row.id
 }
 

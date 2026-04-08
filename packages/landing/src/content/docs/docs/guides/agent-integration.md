@@ -28,6 +28,6 @@ A standalone `spool` CLI is also under development, which will allow any agent o
 ## How it will work
 
 1. Your agent sends a search query to Spool
-2. Spool searches the local SQLite index (Claude sessions, Codex sessions, OpenCLI data)
+2. Spool searches the local SQLite index (Claude sessions, Codex sessions, connector data)
 3. Matching fragments are returned with source metadata
 4. Your agent incorporates the context into its response

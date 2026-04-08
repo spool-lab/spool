@@ -1,13 +1,10 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
   searchFragments, searchAll, listRecentSessions, getSessionWithMessages, getStatus,
-  OpenCLIManager,
-  getOpenCLISourceId, listOpenCLISources, addOpenCLISource, removeOpenCLISource, getCaptureCount,
-  getSetupValue, setSetupValue,
-  ConnectorRegistry, SyncEngine, SyncScheduler, TwitterBookmarksConnector,
+  ConnectorRegistry, SyncScheduler, TwitterBookmarksConnector,
   loadSyncState, saveSyncState,
 } from '@spool/core'
 import type { ConnectorStatus, AuthStatus } from '@spool/core'
@@ -28,7 +25,6 @@ let db: Database.Database
 let syncer: Syncer
 let watcher: SpoolWatcher
 let acpManager: AcpManager
-let opencliManager: OpenCLIManager
 let connectorRegistry: ConnectorRegistry
 let syncScheduler: SyncScheduler
 
@@ -115,9 +111,6 @@ app.whenReady().then(() => {
 
   db = getDB()
   acpManager = new AcpManager()
-  opencliManager = new OpenCLIManager(db, (e) => {
-    mainWindow?.webContents.send('opencli:capture-progress', e)
-  })
   syncer = new Syncer(db)
   watcher = new SpoolWatcher(syncer)
   watcher.on('new-sessions', (_event, data) => {
@@ -158,16 +151,6 @@ app.whenReady().then(() => {
 
   setupTray(showOrCreateWindow, () => {
     runSyncWorker()
-  })
-
-  // Register ⌘K shortcut for Capture URL modal
-  app.on('browser-window-focus', () => {
-    globalShortcut.register('CommandOrControl+K', () => {
-      mainWindow?.webContents.send('spool:open-capture-modal')
-    })
-  })
-  app.on('browser-window-blur', () => {
-    globalShortcut.unregister('CommandOrControl+K')
   })
 
   app.on('activate', showOrCreateWindow)
@@ -293,84 +276,6 @@ ipcMain.handle('spool:download-update', () => {
 
 ipcMain.handle('spool:install-update', () => {
   quitAndInstall()
-})
-
-// ── OpenCLI Handlers ──────────────────────────────────────────────────────
-
-ipcMain.handle('opencli:check-setup', async () => {
-  return opencliManager.checkSetup()
-})
-
-ipcMain.handle('opencli:install-cli', async () => {
-  return opencliManager.installCli()
-})
-
-ipcMain.handle('opencli:available-platforms', async () => {
-  return opencliManager.listAvailablePlatforms()
-})
-
-ipcMain.handle('opencli:add-source', (_e, { platform, command }: { platform: string; command: string }) => {
-  const sourceId = getOpenCLISourceId(db)
-  const id = addOpenCLISource(db, sourceId, platform, command)
-  return { ok: true, id }
-})
-
-ipcMain.handle('opencli:remove-source', (_e, { id }: { id: number }) => {
-  removeOpenCLISource(db, id)
-  return { ok: true }
-})
-
-ipcMain.handle('opencli:list-sources', () => {
-  return listOpenCLISources(db)
-})
-
-ipcMain.handle('opencli:sync-source', async (_e, { id, platform, command }: { id: number; platform: string; command: string }) => {
-  try {
-    const result = await opencliManager.syncSource(id, platform, command)
-    return { ok: true, count: result.added }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-})
-
-ipcMain.handle('opencli:sync-all-sources', async () => {
-  const sources = listOpenCLISources(db)
-  let totalAdded = 0
-  const errors: string[] = []
-
-  for (const src of sources) {
-    if (!src.enabled) continue
-    try {
-      const result = await opencliManager.syncSource(src.id, src.platform, src.command)
-      totalAdded += result.added
-    } catch (err) {
-      errors.push(`${src.platform}: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  return { ok: errors.length === 0, count: totalAdded, errors }
-})
-
-ipcMain.handle('opencli:capture-url', async (_e, { url }: { url: string }) => {
-  try {
-    const item = await opencliManager.captureUrl(url)
-    return { ok: true, capture: item }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-})
-
-ipcMain.handle('opencli:get-capture-count', (_e, { platform }: { platform?: string } = {}) => {
-  return getCaptureCount(db, platform)
-})
-
-ipcMain.handle('opencli:get-setup-value', (_e, { key }: { key: string }) => {
-  return getSetupValue(db, key)
-})
-
-ipcMain.handle('opencli:set-setup-value', (_e, { key, value }: { key: string; value: string }) => {
-  setSetupValue(db, key, value)
-  return { ok: true }
 })
 
 // ── Connector Handlers ──────────────────────────────────────────────────

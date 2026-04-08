@@ -8,7 +8,6 @@ describe('getSessionResumeCommandPrefix', () => {
   })
 
   it('returns null for unsupported sources', () => {
-    expect(getSessionResumeCommandPrefix('opencli')).toBeNull()
     expect(getSessionResumeCommandPrefix('unknown-cli')).toBeNull()
   })
 })

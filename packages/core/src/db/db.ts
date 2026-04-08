@@ -39,8 +39,7 @@ function runMigrations(db: Database.Database): void {
 
     INSERT OR IGNORE INTO sources (name, base_path) VALUES
       ('claude', '~/.claude/projects'),
-      ('codex',  '~/.codex/sessions'),
-      ('opencli', '~/.spool/opencli');
+      ('codex',  '~/.codex/sessions');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,
@@ -118,24 +117,11 @@ function runMigrations(db: Database.Database): void {
       synced_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- ── OpenCLI tables ──────────────────────────────────────────────────────
-
-    CREATE TABLE IF NOT EXISTS opencli_sources (
-      id          INTEGER PRIMARY KEY,
-      source_id   INTEGER NOT NULL REFERENCES sources(id),
-      platform    TEXT NOT NULL,
-      command     TEXT NOT NULL,
-      enabled     INTEGER NOT NULL DEFAULT 1,
-      last_synced TEXT,
-      sync_count  INTEGER NOT NULL DEFAULT 0,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (platform, command)
-    );
+    -- ── Captures (connector items) ─────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS captures (
       id              INTEGER PRIMARY KEY,
       source_id       INTEGER NOT NULL REFERENCES sources(id),
-      opencli_src_id  INTEGER REFERENCES opencli_sources(id),
       capture_uuid    TEXT NOT NULL UNIQUE,
       url             TEXT NOT NULL,
       title           TEXT NOT NULL DEFAULT '',
@@ -175,11 +161,6 @@ function runMigrations(db: Database.Database): void {
       INSERT INTO captures_fts(captures_fts, rowid, title, content_text)
         VALUES('delete', OLD.id, OLD.title, OLD.content_text);
     END;
-
-    CREATE TABLE IF NOT EXISTS opencli_setup (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
 
     -- ── Connector sync state ────────────────────────────────────────────────
 

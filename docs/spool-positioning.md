@@ -12,9 +12,9 @@ Search your `[Claude Code sessions · ChatGPT history · GitHub stars · Twitter
 
 Spool lets Claude Code, Codex, and any coding agent search your personal data — past sessions, bookmarks, stars, saves — from a single search box.
 
-### 50+ platforms, pulled to your machine.
+### Your bookmarks and stars, synced locally.
 
-OpenCLI pulls your bookmarks, stars, and saves from Twitter, GitHub, Reddit, YouTube, and more — no API keys, no tokens. Spool indexes them all locally.
+Installable connector plugins sync your bookmarks, stars, and saves from Twitter/X, GitHub, and more — no API keys, no tokens. Spool indexes them all locally.
 
 ### Every agent session, indexed automatically.
 
