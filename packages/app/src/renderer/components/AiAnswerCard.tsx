@@ -34,7 +34,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, agentMode, 
   const completedToolCalls = toolCalls ? [...toolCalls.values()].filter(tc => tc.status === 'completed' || tc.status === 'failed') : []
 
   return (
-    <div data-testid="ai-answer-card" className="mx-4 mt-3 mb-1 bg-accent-bg dark:bg-[#2A1800] border border-warm-border2 dark:border-dark-border rounded-[10px] border-l-[3px] border-l-accent dark:border-l-accent-dark px-4 py-3.5 overflow-y-auto max-h-[60vh]">
+    <div data-testid="ai-answer-card" className="mx-4 mt-3 mb-1 bg-accent-bg dark:bg-accent-bg-dark border border-warm-border2 dark:border-dark-border rounded-[10px] border-l-[3px] border-l-accent dark:border-l-accent-dark px-4 py-3.5 overflow-y-auto max-h-[60vh]">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-accent dark:text-accent-dark tracking-[0.05em] uppercase">
@@ -111,7 +111,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, agentMode, 
       {!streaming && answer && (
         <button
           onClick={onResume}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-accent dark:text-accent-dark bg-transparent border border-accent dark:border-accent-dark rounded-md px-3 py-1.5 cursor-pointer hover:bg-accent-bg dark:hover:bg-[#2A1800] transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-accent dark:text-accent-dark bg-transparent border border-accent dark:border-accent-dark rounded-md px-3 py-1.5 cursor-pointer hover:bg-accent-bg dark:hover:bg-accent-bg-dark transition-colors"
         >
           Continue in {agentName} →
         </button>

@@ -66,7 +66,7 @@ export default function CaptureDetail({ capture, onBack }: Props) {
       <div className="flex items-center gap-3 mt-6 pt-4 border-t border-warm-border dark:border-dark-border">
         <button
           onClick={handleOpenOriginal}
-          className="px-3 py-1.5 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[6px] hover:bg-accent-bg dark:hover:bg-[#2A1800] transition-colors"
+          className="px-3 py-1.5 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[6px] hover:bg-accent-bg dark:hover:bg-accent-bg-dark transition-colors"
         >
           Open Original
         </button>

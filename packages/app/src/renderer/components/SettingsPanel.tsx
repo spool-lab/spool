@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { ConnectorStatus } from '@spool/core'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
+import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
+import ThemeEditorSection from './ThemeEditorSection.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'connectors' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_OPTIONS = [
@@ -34,6 +36,7 @@ interface SdkAgentConfig {
 interface AgentsConfig {
   defaultAgent?: string
   defaultSearchSort?: SearchSortOrder
+  terminal?: string
   sdkAgent?: SdkAgentConfig
 }
 
@@ -42,6 +45,8 @@ interface Props {
   initialTab?: SettingsTab
   claudeCount: number | null
   codexCount: number | null
+  themeEditor: ThemeEditorStateV1
+  onThemeEditorChange: (next: ThemeEditorStateV1) => void
 }
 
 type Theme = 'system' | 'light' | 'dark'
@@ -81,8 +86,28 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
     id: 'general',
     label: 'General',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: (
+      <svg
+        aria-hidden="true"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 3v2.5M12 18.5V21M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M3 12h2.5M18.5 12H21M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+        <circle cx="12" cy="12" r="4.25" />
       </svg>
     ),
   },
@@ -90,7 +115,7 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
     id: 'connectors',
     label: 'Connectors',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2v6M12 18v4M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M18 12h4M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/>
       </svg>
     ),
@@ -99,7 +124,7 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
     id: 'agent',
     label: 'Agent',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
       </svg>
     ),
@@ -108,31 +133,42 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function SettingsPanel({ onClose, initialTab = 'general', claudeCount, codexCount }: Props) {
+export default function SettingsPanel({
+  onClose,
+  initialTab = 'general',
+  claudeCount,
+  codexCount,
+  themeEditor,
+  onThemeEditorChange,
+}: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[640px] h-[480px] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
+      <div className="w-[720px] h-[560px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar */}
-        <div className="w-[160px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
+        <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
           <div className="px-4 mb-3">
             <h2 className="text-sm font-semibold text-warm-text dark:text-dark-text">Settings</h2>
           </div>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-1.5 text-[12px] transition-colors ${
-                tab === t.id
-                  ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
-                  : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
-              }`}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
+          <div className="px-2 space-y-0.5">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
+                  tab === t.id
+                    ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
+                    : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg/70 dark:hover:bg-dark-bg/60'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className="flex-1" />
           <div className="px-4 py-2 text-[10px] text-warm-faint dark:text-dark-muted">
             All data stays local in ~/.spool/
@@ -145,14 +181,34 @@ export default function SettingsPanel({ onClose, initialTab = 'general', claudeC
             <h3 className="text-sm font-medium text-warm-text dark:text-dark-text">
               {TABS.find(t => t.id === tab)?.label}
             </h3>
-            <button onClick={onClose} className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button
+              type="button"
+              aria-label="Close settings"
+              onClick={onClose}
+              className="rounded-[6px] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0"
+            >
+              <svg
+                aria-hidden="true"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {tab === 'general' && <GeneralTab />}
+            {tab === 'general' && (
+              <GeneralTab />
+            )}
+            {tab === 'appearance' && (
+              <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
+            )}
             {tab === 'connectors' && <ConnectorsTab claudeCount={claudeCount} codexCount={codexCount} />}
             {tab === 'agent' && <AgentTab />}
           </div>
@@ -165,19 +221,12 @@ export default function SettingsPanel({ onClose, initialTab = 'general', claudeC
 // ── General Tab ────────────────────────────────────────────────────────────
 
 function GeneralTab() {
-  const [theme, setTheme] = useState<Theme>('system')
   const [config, setConfig] = useState<AgentsConfig>({})
 
   useEffect(() => {
     if (!window.spool) return
-    window.spool.getTheme().then(t => { if (t) setTheme(t) }).catch(console.error)
     window.spool.getAgentsConfig().then(setConfig).catch(console.error)
   }, [])
-
-  const updateTheme = (t: Theme) => {
-    setTheme(t)
-    window.spool?.setTheme(t)
-  }
 
   const updateConfig = async (patch: Partial<AgentsConfig>) => {
     const next: AgentsConfig = { ...config, ...patch }
@@ -187,25 +236,6 @@ function GeneralTab() {
 
   return (
     <div className="space-y-6">
-      {/* Theme */}
-      <Section title="Theme">
-        <div className="flex gap-2">
-          {(['system', 'light', 'dark'] as Theme[]).map(t => (
-            <button
-              key={t}
-              onClick={() => updateTheme(t)}
-              className={`px-3 py-1.5 text-xs rounded-[6px] border transition-colors capitalize ${
-                theme === t
-                  ? 'bg-accent-bg dark:bg-[#2A1800] border-accent/30 dark:border-accent-dark/30 text-accent dark:text-accent-dark font-medium'
-                  : 'bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted hover:border-warm-border2 dark:hover:border-dark-border2'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </Section>
-
       {/* Search */}
       <Section title="Search">
         <div className="flex items-center justify-between gap-3">
@@ -223,8 +253,8 @@ function GeneralTab() {
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-warm-muted dark:text-dark-muted">Session resume</span>
           <SmallSelect
-            value={(config as any).terminal ?? ''}
-            onChange={(v) => updateConfig({ terminal: v || undefined } as any)}
+            value={config.terminal ?? ''}
+            onChange={(v) => updateConfig({ terminal: v || undefined } as Partial<AgentsConfig>)}
             options={TERMINAL_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           />
         </div>
@@ -247,6 +277,41 @@ function GeneralTab() {
           Spool — a local search engine for your thinking.
         </p>
       </Section>
+    </div>
+  )
+}
+
+function AppearanceTab({
+  themeEditor,
+  onThemeEditorChange,
+}: {
+  themeEditor: ThemeEditorStateV1
+  onThemeEditorChange: (next: ThemeEditorStateV1) => void
+}) {
+  const [themeSource, setThemeSource] = useState<Theme>('system')
+
+  useEffect(() => {
+    if (!window.spool) return
+    window.spool.getTheme().then(t => { if (t) setThemeSource(t) }).catch(console.error)
+  }, [])
+
+  const setThemeMode = async (t: Theme) => {
+    setThemeSource(t)
+    try {
+      await window.spool?.setTheme(t)
+    } catch (err) {
+      console.error('Failed to set theme:', err)
+    }
+  }
+
+  return (
+    <div>
+      <ThemeEditorSection
+        state={themeEditor}
+        onChange={onThemeEditorChange}
+        themeSource={themeSource}
+        onThemeMode={setThemeMode}
+      />
     </div>
   )
 }
@@ -348,7 +413,7 @@ function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null
               {!selected.enabled
                 ? 'Disabled'
                 : isSyncing
-                  ? 'Syncing...'
+                  ? 'Syncing…'
                   : selected.state.lastErrorCode?.startsWith('AUTH_')
                     ? 'Needs login'
                     : 'Connected'}
@@ -366,7 +431,7 @@ function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null
             <div className="flex items-center justify-between">
               <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
               <span className="text-[11px] text-warm-faint dark:text-dark-muted">
-                {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}...
+                {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
               </span>
             </div>
           )}
@@ -400,7 +465,7 @@ function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null
             disabled={isSyncing}
             className="w-full py-2 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[8px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
           >
-            {isSyncing ? 'Syncing...' : 'Sync now'}
+            {isSyncing ? 'Syncing…' : 'Sync now'}
           </button>
         )}
 
@@ -446,7 +511,7 @@ function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null
                   {!c.enabled
                     ? 'Not connected'
                     : isSyncing && progress
-                      ? `${progress.added} new · ${progress.phase === 'forward' ? 'fetching' : 'backfilling'}...`
+                      ? `${progress.added} new · ${progress.phase === 'forward' ? 'fetching' : 'backfilling'}…`
                       : (connectorCounts[c.id] ?? 0) > 0
                         ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}`
                         : c.state.lastErrorCode
@@ -644,7 +709,7 @@ function BuiltInSource({ name, color, count }: { name: string; color: string; co
       <span className="w-2 h-2 rounded-full flex-none" style={{ background: color }} />
       <span className="flex-1 text-xs text-warm-text dark:text-dark-text">{name}</span>
       <span className="text-[11px] text-warm-faint dark:text-dark-muted tabular-nums font-mono">
-        {count === null ? '...' : `${count} sessions`}
+        {count === null ? '…' : `${count} sessions`}
       </span>
       <span className="text-[10px] text-green-500 font-medium">auto</span>
     </div>

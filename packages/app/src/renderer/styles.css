@@ -23,7 +23,10 @@
   --color-dark-border: #2E2E28;
   --color-dark-text: #F2F2EC;
   --color-dark-muted: #9A9A8E;
+  --color-dark-faint: #505048;
   --color-accent-dark: #F07020;
+  /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
+  --color-accent-bg-dark: #2a1800;
 
   /* Source badges */
   --color-src-claude: #6B5B8A;
@@ -51,15 +54,6 @@ body {
   user-select: none;
 }
 
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-
 mark {
   background: transparent;
   color: inherit;
@@ -77,4 +71,51 @@ mark {
 
 .duration-150 {
   --tw-duration: 150ms;
+}
+
+/* ── Scrollbars: subtle thumb, theme-aware (≈10% black in light / white in dark) ── */
+:root {
+  --spool-scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --spool-scrollbar-thumb-hover: rgba(0, 0, 0, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --spool-scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --spool-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--spool-scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--spool-scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--spool-scrollbar-thumb-hover);
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

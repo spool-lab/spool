@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import SegmentedPill from './SegmentedPill.js'
 
 export type SearchMode = 'fast' | 'ai'
 
@@ -85,44 +86,30 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
             </button>
           )}
           {onModeChange && (
-            <ModePill mode={mode} onModeChange={onModeChange} compact={!isHome} />
+            <SegmentedPill
+              value={mode}
+              onChange={onModeChange}
+              compact={!isHome}
+              ariaLabel="Search mode"
+              options={[
+                {
+                  value: 'fast',
+                  label: 'Fast',
+                  icon: <ZapIcon size={!isHome ? 12 : 13} />,
+                  hideLabel: !isHome,
+                },
+                {
+                  value: 'ai',
+                  label: 'Agent',
+                  icon: <SparklesIcon size={!isHome ? 12 : 13} />,
+                  hideLabel: !isHome,
+                  testId: 'mode-agent',
+                },
+              ]}
+            />
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-function ModePill({ mode, onModeChange, compact }: { mode: SearchMode; onModeChange: (m: SearchMode) => void; compact: boolean }) {
-  return (
-    <div className="flex bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[20px] p-[2px] gap-[1px]">
-      <button
-        onClick={() => onModeChange('fast')}
-        className={[
-          'flex items-center gap-1 rounded-[16px] text-[11px] font-medium cursor-pointer border-none transition-all duration-[120ms]',
-          compact ? 'px-2 py-[3px]' : 'px-2.5 py-1',
-          mode === 'fast'
-            ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-sm'
-            : 'bg-transparent text-warm-muted dark:text-dark-muted',
-        ].join(' ')}
-      >
-        <ZapIcon size={compact ? 12 : 13} />
-        {!compact && <span>Fast</span>}
-      </button>
-      <button
-        data-testid="mode-agent"
-        onClick={() => onModeChange('ai')}
-        className={[
-          'flex items-center gap-1 rounded-[16px] text-[11px] font-medium cursor-pointer border-none transition-all duration-[120ms]',
-          compact ? 'px-2 py-[3px]' : 'px-2.5 py-1',
-          mode === 'ai'
-            ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-sm'
-            : 'bg-transparent text-warm-muted dark:text-dark-muted',
-        ].join(' ')}
-      >
-        <SparklesIcon size={compact ? 12 : 13} />
-        {!compact && <span>Agent</span>}
-      </button>
     </div>
   )
 }

@@ -10,9 +10,12 @@ import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
+import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
+import { applyEditorTheme } from './theme/applyEditorTheme.js'
+import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
 type View = 'search' | 'session'
-type SettingsTab = 'general' | 'connectors' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
 
 interface AgentInfo {
   id: string
@@ -52,9 +55,48 @@ export default function App() {
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
-
+  const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
+  const [schemeDark, setSchemeDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+  )
+  const themeHydrated = useRef(false)
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
+
+  useEffect(() => {
+    if (!window.spool?.opencli) {
+      themeHydrated.current = true
+      return
+    }
+    loadThemeEditorState()
+      .then(setThemeEditor)
+      .catch(console.error)
+      .finally(() => {
+        themeHydrated.current = true
+      })
+  }, [])
+
+  useEffect(() => {
+    applyEditorTheme(themeEditor)
+  }, [themeEditor])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onScheme = () => {
+      setSchemeDark(mq.matches)
+      applyEditorTheme(themeEditor)
+    }
+    mq.addEventListener('change', onScheme)
+    return () => mq.removeEventListener('change', onScheme)
+  }, [themeEditor])
+
+  useEffect(() => {
+    if (!themeHydrated.current || !window.spool?.opencli) return
+    const t = window.setTimeout(() => {
+      saveThemeEditorState(themeEditor).catch(console.error)
+    }, 400)
+    return () => window.clearTimeout(t)
+  }, [themeEditor])
 
   // Load agents + config, apply configured default
   const refreshAgents = useCallback(() => {
@@ -347,6 +389,7 @@ export default function App() {
         searchMode={searchMode}
         aiAgent={activeAgentName}
         aiAgentMode={activeAgentMode}
+        onSourcesClick={() => { setSettingsTab('connectors'); setShowSettings(true) }}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
 
@@ -367,6 +410,8 @@ export default function App() {
           initialTab={settingsTab}
           claudeCount={status?.claudeSessions ?? null}
           codexCount={status?.codexSessions ?? null}
+          themeEditor={themeEditor}
+          onThemeEditorChange={setThemeEditor}
         />
       )}
     </div>
@@ -419,7 +464,7 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
               onClick={() => { onSelect(a.id); setOpen(false) }}
               className={`block w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors ${
                 a.id === activeAgent
-                  ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800]'
+                  ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
                   : 'text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface2'
               }`}
             >

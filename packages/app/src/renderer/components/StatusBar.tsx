@@ -7,6 +7,7 @@ interface Props {
   searchMode?: SearchMode
   aiAgent?: string
   aiAgentMode?: string
+  onSourcesClick?: () => void
   onSettingsClick?: () => void
 }
 
@@ -16,7 +17,14 @@ interface UpdateStatus {
   percent?: number
 }
 
-export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, aiAgentMode, onSettingsClick }: Props) {
+export default function StatusBar({
+  syncStatus,
+  searchMode = 'fast',
+  aiAgent,
+  aiAgentMode,
+  onSourcesClick,
+  onSettingsClick,
+}: Props) {
   const [status, setStatus] = useState<StatusInfo | null>(null)
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
 
@@ -40,7 +48,9 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, ai
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none h-[30px] bg-warm-surface dark:bg-dark-surface border-t border-warm-border dark:border-dark-border flex items-center justify-between px-4">
+    <div
+      className="flex-none h-[30px] border-t border-warm-border dark:border-dark-border flex items-center justify-between px-4 bg-warm-surface dark:bg-dark-surface"
+    >
       <div className="flex items-center gap-1.5">
         {isAiMode ? (
           <span className="w-1.5 h-1.5 rounded-full flex-none bg-accent dark:bg-accent-dark" />
@@ -75,6 +85,16 @@ export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, ai
           >
             <span className="w-1.5 h-1.5 rounded-full bg-accent dark:bg-accent-dark" />
             Restart to update
+          </button>
+        )}
+        {onSourcesClick && (
+          <button
+            type="button"
+            onClick={onSourcesClick}
+            title="Data sources"
+            className="text-[11px] text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors font-medium"
+          >
+            Sources
           </button>
         )}
         <button
