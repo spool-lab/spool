@@ -13,13 +13,13 @@ Open Spool from your Applications folder. It starts indexing your Claude Code an
 
 Use the search bar to find anything across your indexed data — past agent sessions, bookmarks, starred repos, and more.
 
-## 3. Pull more data with OpenCLI
+## 3. Install connector plugins
 
-Use [OpenCLI](https://github.com/jackwener/opencli) to pull bookmarks, stars, and saves from 50+ platforms:
+Install connector plugins to pull bookmarks, stars, and saves from your favorite platforms:
 
 ```bash
-opencli pull github-stars
-opencli pull twitter-bookmarks
+spool connectors install twitter-bookmarks
+spool connectors sync
 ```
 
-Spool indexes everything OpenCLI captures.
+Spool indexes everything your connectors capture.

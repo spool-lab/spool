@@ -6,7 +6,6 @@ import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
-import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
@@ -48,7 +47,6 @@ export default function App() {
   // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
-  const [showCaptureModal, setShowCaptureModal] = useState(false)
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
@@ -120,15 +118,6 @@ export default function App() {
     window.spool.getStatus().then(setStatus).catch(console.error)
     refreshCaptureSources()
   }, [syncStatus, refreshCaptureSources])
-
-  // Listen for ⌘K capture modal shortcut
-  useEffect(() => {
-    if (!window.spool?.onOpenCaptureModal) return () => {}
-    const off = window.spool.onOpenCaptureModal(() => {
-      setShowCaptureModal(true)
-    })
-    return off
-  }, [])
 
   useEffect(() => {
     if (!window.spool) return () => {}
@@ -234,11 +223,6 @@ export default function App() {
     setSettingsTab('connectors')
     setShowSettings(true)
   }, [])
-
-  const handleCaptured = useCallback(() => {
-    refreshCaptureSources()
-    if (query.trim() && searchMode === 'fast') doSearch(query)
-  }, [query, searchMode, doSearch, refreshCaptureSources])
 
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
@@ -354,13 +338,6 @@ export default function App() {
         <ResumeToast command={resumeToastCommand} />
       )}
 
-      {/* Modals */}
-      {showCaptureModal && (
-        <CaptureUrlModal
-          onClose={() => setShowCaptureModal(false)}
-          onCaptured={handleCaptured}
-        />
-      )}
       {showSettings && (
         <SettingsPanel
           onClose={() => { setShowSettings(false); refreshAgents(); refreshCaptureSources() }}

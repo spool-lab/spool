@@ -129,8 +129,7 @@ Each data source has a fixed color used consistently across badges, chips, and d
 
 ### Sources Panel (accessible from status bar)
 - Slides up from status bar or opens as a separate window. Two tabs: **Sources** and **Import URL**.
-- Sources tab: list of configured connectors with toggle switch, last-sync time, item count, and OpenCLI daemon status at the bottom.
-- Import URL tab: single text input (monospace), auto-detects platform and shows preview card before confirming capture.
+- Sources tab: list of configured connectors with toggle switch, last-sync time, item count.
 - Toggle switches: on = `--accent` background. Off = `--border2` background.
 
 ### AI Answer Card
@@ -142,8 +141,8 @@ Each data source has a fixed color used consistently across badges, chips, and d
 ### Status Bar
 - Always visible, 30px height, `--surface` background.
 - Left: colored dot (green/yellow/red) + synced item count + last sync time.
-- Right: `⌘K Capture URL` text button + `Sources ⊕` button (replace `⊕` with vector icon).
-- Red dot only when OpenCLI daemon is offline or a source has auth error — not for normal background sync.
+- Right: `Sources ⊕` button (replace `⊕` with vector icon).
+- Red dot only when a connector has auth error — not for normal background sync.
 
 ## Icons
 - **Library:** Lucide React (`lucide-react`) — consistent stroke weight, MIT licensed.

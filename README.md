@@ -29,8 +29,7 @@ pnpm build
 Spool indexes your AI conversations and bookmarks into a single local search box.
 
 - **AI sessions** — watches Claude/Codex session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects` and `~/.codex-profiles/*/sessions`
-- **Bookmarks & stars** — pulls from 50+ platforms via [OpenCLI](https://github.com/jackwener/opencli)
-- **URL capture** — save any URL with `Cmd+K`
+- **Connectors** — sync bookmarks and stars from platforms like Twitter/X, GitHub, and more via installable connector plugins
 - **Agent search** — a `/spool` skill inside Claude Code feeds matching fragments back into your conversation
 
 Everything stays on your machine. Nothing leaves.
@@ -65,7 +64,6 @@ pnpm test         # runs all tests
 ## Acknowledgements
 
 - **[fieldtheory-cli](https://github.com/afar1/fieldtheory-cli)** — Twitter/X bookmark sync implementation adapted from this project
-- **[OpenCLI](https://github.com/jackwener/opencli)** — platform bookmark integration powered by OpenCLI
 
 ## License
 

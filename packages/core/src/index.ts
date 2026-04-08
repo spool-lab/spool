@@ -6,10 +6,6 @@ export * from './parsers/codex.js'
 export * from './sync/syncer.js'
 export * from './sync/watcher.js'
 export { searchFragments, searchCaptures, searchAll } from './db/queries.js'
-export { OpenCLIManager } from './opencli/manager.js'
-export { detectPlatform, parseOpenCLIOutput, parseOpenCLIItem } from './opencli/parser.js'
-export { SYNC_STRATEGIES, getStrategy, getStrategiesForPlatform, getStrategyPlatforms } from './opencli/strategies.js'
-export type { SyncStrategy } from './opencli/strategies.js'
 export { resolveSystemBinary, cachedResolve, clearResolveCache } from './util/resolve-bin.js'
 
 // ── Connector framework ─────────────────────────────────────────────────────

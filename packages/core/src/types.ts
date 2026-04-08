@@ -1,4 +1,4 @@
-export type Source = 'claude' | 'codex' | 'opencli'
+export type Source = 'claude' | 'codex'
 
 export interface ParsedMessage {
   uuid: string
@@ -85,7 +85,7 @@ export interface SyncResult {
   errors: number
 }
 
-// ── OpenCLI Types ────────────────────────────────────────────────────────────
+// ── Capture Types ────────────────────────────────────────────────────────────
 
 export interface CaptureResult {
   rank: number
@@ -98,32 +98,6 @@ export interface CaptureResult {
   contentType: string
   author: string | null
   capturedAt: string
-}
-
-export interface OpenCLISource {
-  id: number
-  sourceId: number
-  platform: string
-  command: string
-  enabled: boolean
-  lastSynced: string | null
-  syncCount: number
-}
-
-export interface OpenCLISetupStatus {
-  cliInstalled: boolean
-  cliVersion: string | null
-  browserBridgeReady: boolean
-  connectivityOk: boolean
-  connectivityError: string | null
-  chromeRunning: boolean
-}
-
-export interface PlatformInfo {
-  platform: string
-  command: string
-  label: string
-  description: string
 }
 
 export interface CapturedItem {
