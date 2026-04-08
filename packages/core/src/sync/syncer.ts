@@ -1,19 +1,23 @@
-import { statSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type Database from 'better-sqlite3'
 import { parseClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
-import { parseCodexSession } from '../parsers/codex.js'
+import { parseCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
+import { parseGeminiSession } from '../parsers/gemini.js'
+import type { SessionSource } from '../types.js'
 import { getSessionRoots } from './source-paths.js'
 import {
+  deleteSessionByFilePath,
   getSourceId,
   getOrCreateProject,
   getSessionMtime,
   getAllSessionMtimes,
   upsertSession,
+  upsertSessionSearch,
   insertMessages,
 } from '../db/queries.js'
-import type { SyncResult } from '../types.js'
+import type { ParsedMessage, SyncResult } from '../types.js'
 
 export interface SyncProgressEvent {
   phase: 'scanning' | 'syncing' | 'indexing' | 'done'
@@ -35,27 +39,35 @@ export class Syncer {
 
   syncAll(): SyncResult {
     const seenPaths = new Set<string>()
-    const files: Array<{ path: string; source: 'claude' | 'codex' }> = []
+    const files: Array<{ path: string; source: SessionSource }> = []
 
-    for (const dir of getSessionRoots('claude')) {
-      try { addUniqueFiles(files, seenPaths, collectJSONL(dir, 'claude')) } catch { /* dir may not exist */ }
+    for (const source of ['claude', 'codex', 'gemini'] as const) {
+      for (const dir of getSessionRoots(source)) {
+        try { addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source)) } catch { /* dir may not exist */ }
+      }
     }
-    for (const dir of getSessionRoots('codex')) {
-      try { addUniqueFiles(files, seenPaths, collectJSONL(dir, 'codex')) } catch { /* dir may not exist */ }
-    }
-
-    this.onProgress?.({ phase: 'scanning', count: 0, total: files.length })
 
     const knownMtimes = getAllSessionMtimes(this.db)
     this.codexTitleIndex = loadCodexSessionIndex()
 
-    // Count how many files actually need syncing (no mtime match)
-    const needsSync = files.filter(f => {
+    const pendingFiles = files.flatMap(f => {
       const existing = knownMtimes.get(f.path)
-      if (!existing) return true
-      try { return existing !== getMtime(f.path) } catch { return false }
+      try {
+        const indexedMtime = getIndexedMtime(f.path, f.source)
+        if (existing === indexedMtime) return []
+        return [{ ...f, indexedMtime }]
+      } catch {
+        return []
+      }
     })
-    const isBulk = needsSync.length > 100
+    pendingFiles.sort((a, b) => b.indexedMtime.localeCompare(a.indexedMtime))
+
+    this.onProgress?.({ phase: 'scanning', count: 0, total: files.length })
+    if (pendingFiles.length > 0) {
+      this.onProgress?.({ phase: 'syncing', count: 0, total: pendingFiles.length })
+    }
+
+    const isBulk = pendingFiles.length > 100
 
     // For bulk syncs (e.g. first launch), drop FTS triggers and rebuild at the end.
     // FTS5 segment merges on per-row triggers cause significant write amplification;
@@ -71,15 +83,15 @@ export class Syncer {
 
     try {
       const BATCH = 20
-      for (let i = 0; i < files.length; i += BATCH) {
-        const batch = files.slice(i, i + BATCH)
+      for (let i = 0; i < pendingFiles.length; i += BATCH) {
+        const batch = pendingFiles.slice(i, i + BATCH)
         for (const file of batch) {
-          const result = this.syncFile(file.path, file.source, knownMtimes)
+          const result = this.syncFile(file.path, file.source, knownMtimes, file.indexedMtime)
           if (result === 'added') added++
           else if (result === 'updated') updated++
           else if (result === 'error') errors++
         }
-        this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, files.length), total: files.length })
+        this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, pendingFiles.length), total: pendingFiles.length })
       }
 
       this.applyCodexTitles()
@@ -87,23 +99,27 @@ export class Syncer {
       if (isBulk) {
         this.onProgress?.({ phase: 'indexing', count: 0, total: 0 })
         this.db.exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
+        this.db.exec("INSERT INTO messages_fts_trigram(messages_fts_trigram) VALUES('rebuild')")
         this.db.exec(`
-          CREATE TRIGGER IF NOT EXISTS messages_fts_insert
+          CREATE TRIGGER messages_fts_insert
           AFTER INSERT ON messages BEGIN
             INSERT INTO messages_fts(rowid, content_text) VALUES(NEW.id, NEW.content_text);
+            INSERT INTO messages_fts_trigram(rowid, content_text) VALUES(NEW.id, NEW.content_text);
           END
         `)
         this.db.exec(`
-          CREATE TRIGGER IF NOT EXISTS messages_fts_delete
+          CREATE TRIGGER messages_fts_delete
           AFTER DELETE ON messages BEGIN
             INSERT INTO messages_fts(messages_fts, rowid, content_text)
+              VALUES('delete', OLD.id, OLD.content_text);
+            INSERT INTO messages_fts_trigram(messages_fts_trigram, rowid, content_text)
               VALUES('delete', OLD.id, OLD.content_text);
           END
         `)
       }
     }
 
-    this.onProgress?.({ phase: 'done', count: files.length, total: files.length })
+    this.onProgress?.({ phase: 'done', count: pendingFiles.length, total: pendingFiles.length })
     return { added, updated, errors }
   }
 
@@ -119,9 +135,9 @@ export class Syncer {
     })()
   }
 
-  syncFile(filePath: string, source: 'claude' | 'codex', knownMtimes?: Map<string, string>): 'added' | 'updated' | 'skipped' | 'error' {
+  syncFile(filePath: string, source: SessionSource, knownMtimes?: Map<string, string>, precomputedMtime?: string): 'added' | 'updated' | 'skipped' | 'error' {
     try {
-      const mtime = getMtime(filePath)
+      const mtime = precomputedMtime ?? getIndexedMtime(filePath, source)
       const existingMtime = knownMtimes
         ? (knownMtimes.get(filePath) ?? null)
         : getSessionMtime(this.db, filePath)
@@ -129,9 +145,21 @@ export class Syncer {
 
       const parsed = source === 'claude'
         ? parseClaudeSession(filePath)
-        : parseCodexSession(filePath)
+        : source === 'codex'
+          ? parseCodexSession(filePath)
+          : parseGeminiSession(filePath)
 
-      if (!parsed) return 'skipped'
+      if (!parsed) {
+        if (existingMtime !== null) {
+          this.db.prepare(`
+            INSERT INTO sync_log (source_id, file_path, status, message)
+            VALUES (?, ?, 'ok', ?)
+          `).run(getSourceId(this.db, source), filePath, 'filtered from index')
+          deleteSessionByFilePath(this.db, filePath)
+          return 'updated'
+        }
+        return 'skipped'
+      }
 
       if (source === 'codex') {
         const codexTitle = this.codexTitleIndex.get(parsed.sessionUuid)
@@ -162,6 +190,12 @@ export class Syncer {
         })
 
         insertMessages(this.db, sessionId, sourceId, parsed.messages)
+        upsertSessionSearch(this.db, {
+          sessionId,
+          title: parsed.title,
+          userText: buildSessionSearchText(parsed.messages, 'user'),
+          assistantText: buildSessionSearchText(parsed.messages, 'assistant'),
+        })
 
         this.db.prepare(`
           INSERT INTO sync_log (source_id, file_path, status)
@@ -187,9 +221,9 @@ export class Syncer {
 }
 
 function addUniqueFiles(
-  files: Array<{ path: string; source: 'claude' | 'codex' }>,
+  files: Array<{ path: string; source: SessionSource }>,
   seenPaths: Set<string>,
-  candidates: Array<{ path: string; source: 'claude' | 'codex' }>,
+  candidates: Array<{ path: string; source: SessionSource }>,
 ): void {
   for (const candidate of candidates) {
     if (seenPaths.has(candidate.path)) continue
@@ -202,19 +236,29 @@ function getMtime(filePath: string): string {
   return statSync(filePath).mtime.toISOString()
 }
 
-function collectJSONL(
+function getIndexedMtime(filePath: string, source: SessionSource): string {
+  return `${getMtime(filePath)}::${getIndexVersion(source)}`
+}
+
+function getIndexVersion(source: SessionSource): string {
+  if (source === 'codex') return CODEX_INDEX_VERSION
+  if (source === 'gemini') return 'gemini-v1-session-search-fts'
+  return 'claude-v3-session-search-fts'
+}
+
+function collectSessionFiles(
   dir: string,
-  source: 'claude' | 'codex',
-): Array<{ path: string; source: 'claude' | 'codex' }> {
-  const results: Array<{ path: string; source: 'claude' | 'codex' }> = []
+  source: SessionSource,
+): Array<{ path: string; source: SessionSource }> {
+  const results: Array<{ path: string; source: SessionSource }> = []
   walkDir(dir, results, source)
   return results
 }
 
 function walkDir(
   dir: string,
-  results: Array<{ path: string; source: 'claude' | 'codex' }>,
-  source: 'claude' | 'codex',
+  results: Array<{ path: string; source: SessionSource }>,
+  source: SessionSource,
 ): void {
   let entries: import('node:fs').Dirent<string>[]
   try {
@@ -225,11 +269,28 @@ function walkDir(
   for (const entry of entries) {
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
+      if (source === 'gemini' && !shouldTraverseGeminiDir(dir, fullPath, entry.name)) continue
       walkDir(fullPath, results, source)
-    } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+    } else if (entry.isFile() && isSessionFilePath(fullPath, source)) {
       results.push({ path: fullPath, source })
     }
   }
+}
+
+function shouldTraverseGeminiDir(parentDir: string, fullPath: string, entryName: string): boolean {
+  if (entryName === 'chats') return true
+  if (basename(parentDir) === 'tmp') return true
+  if (/(?:^|\/)chats(?:\/|$)/.test(parentDir)) return true
+  return existsSync(join(fullPath, 'chats'))
+}
+
+function isSessionFilePath(filePath: string, source: SessionSource): boolean {
+  if (source === 'gemini') {
+    return filePath.endsWith('.json')
+      && basename(filePath).startsWith('session-')
+      && /(?:^|\/)chats\//.test(filePath)
+  }
+  return filePath.endsWith('.jsonl')
 }
 
 function loadCodexSessionIndex(): Map<string, string> {
@@ -247,9 +308,29 @@ function loadCodexSessionIndex(): Map<string, string> {
   return titles
 }
 
+function buildSessionSearchText(messages: ParsedMessage[], role: 'user' | 'assistant'): string {
+  const MAX_CHARS = 60000
+  let result = ''
+
+  for (const message of messages) {
+    if (message.isSidechain || message.role !== role) continue
+    const text = message.contentText.trim()
+    if (!text) continue
+
+    const nextChunk = result ? `\n${text}` : text
+    if (result.length + nextChunk.length > MAX_CHARS) {
+      result += nextChunk.slice(0, Math.max(0, MAX_CHARS - result.length))
+      break
+    }
+    result += nextChunk
+  }
+
+  return result
+}
+
 function resolveProject(
   filePath: string,
-  source: 'claude' | 'codex',
+  source: SessionSource,
   cwd: string,
 ): { slug: string; displayPath: string; displayName: string } {
   const home = homedir()
@@ -261,7 +342,7 @@ function resolveProject(
     const parts = displayPath.split('/').filter(Boolean)
     const displayName = parts[parts.length - 1] ?? slug
     return { slug, displayPath, displayName }
-  } else {
+  } else if (source === 'codex') {
     // ~/.codex/sessions/{YYYY}/{MM}/{DD}/rollout-...jsonl
     // Group by cwd (project working dir)
     const displayPath = cwd || home
@@ -270,4 +351,13 @@ function resolveProject(
     const slug = displayPath.replace(/^\//, '').replace(/\//g, '-') || 'default'
     return { slug, displayPath, displayName }
   }
+
+  const projectIdentifier = dirname(filePath).split('/').at(-2) ?? 'gemini'
+  const displayPath = cwd || projectIdentifier
+  const parts = displayPath.split('/').filter(Boolean)
+  const displayName = parts[parts.length - 1] ?? projectIdentifier
+  const slug = cwd
+    ? displayPath.replace(/^\//, '').replace(/\//g, '-')
+    : projectIdentifier
+  return { slug: slug || projectIdentifier, displayPath, displayName }
 }

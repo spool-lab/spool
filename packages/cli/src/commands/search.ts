@@ -1,19 +1,21 @@
 import { Command } from 'commander'
 import { getDB, searchFragments } from '@spool/core'
-import type { FragmentResult } from '@spool/core'
+import type { FragmentResult, SessionSource } from '@spool/core'
+
+const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini'])
 
 export const searchCommand = new Command('search')
   .description('Search your AI session history')
   .argument('<query>', 'Search query')
   .option('-n, --limit <n>', 'Max results', '10')
-  .option('-s, --source <name>', 'Filter by source: claude|codex')
+  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini')
   .option('--since <date>', 'Only search sessions after this date (ISO or relative like "7d")')
   .option('--json', 'Output as JSON')
   .action(async (query: string, opts: { limit: string; source?: string; since?: string; json?: boolean }) => {
     const db = getDB(true)
 
     const since = opts.since ? resolveSince(opts.since) : undefined
-    const source = opts.source === 'claude' || opts.source === 'codex' ? opts.source : undefined
+    const source = opts.source && SESSION_SOURCES.has(opts.source) ? opts.source as SessionSource : undefined
     const results = searchFragments(db, query, {
       limit: parseInt(opts.limit, 10),
       ...(source !== undefined && { source }),

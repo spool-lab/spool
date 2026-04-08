@@ -7,7 +7,7 @@ After [installing Spool](/docs/installation/), you can start searching your data
 
 ## 1. Launch Spool
 
-Open Spool from your Applications folder. It starts indexing your Claude Code and Codex sessions automatically.
+Open Spool from your Applications folder. It starts indexing your Claude Code, Codex, and Gemini CLI sessions automatically.
 
 ## 2. Search from the app
 

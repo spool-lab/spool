@@ -5,14 +5,17 @@
   "productName": "Spool",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build && electron-builder --publish never",
-    "build:mac": "electron-vite build && electron-builder --mac --arm64",
-    "build:linux": "electron-vite build && electron-builder --linux",
-    "build:electron": "electron-vite build",
+    "rebuild:native": "pnpm run rebuild:native:electron",
+    "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
+    "build:core": "pnpm --filter @spool/core build",
+    "dev": "pnpm run build:core && pnpm run rebuild:native && electron-vite dev",
+    "build": "pnpm run build:core && electron-vite build && electron-builder --publish never",
+    "build:mac": "pnpm run build:core && electron-vite build && electron-builder --mac --arm64",
+    "build:linux": "pnpm run build:core && electron-vite build && electron-builder --linux",
+    "build:electron": "pnpm run build:core && electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
-    "test:e2e": "npx playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "pnpm run build:core && pnpm run rebuild:native:electron && npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",

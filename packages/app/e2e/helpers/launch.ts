@@ -19,14 +19,19 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
 
   const claudeDir = join(tmpDir, 'claude', 'projects')
   const codexDir = join(tmpDir, 'codex', 'sessions')
+  const geminiCliHome = join(tmpDir, 'gemini-cli-home')
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
+  cpSync(join(FIXTURES_DIR, 'gemini-cli-home'), geminiCliHome, { recursive: true })
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
     SPOOL_DATA_DIR: join(tmpDir, 'data'),
+    SPOOL_ELECTRON_USER_DATA_DIR: join(tmpDir, 'electron-user-data'),
     SPOOL_CLAUDE_DIR: claudeDir,
     SPOOL_CODEX_DIR: codexDir,
+    SPOOL_GEMINI_DIR: geminiCliHome,
+    GEMINI_CLI_HOME: geminiCliHome,
     ELECTRON_DISABLE_GPU: '1',
   }
 

@@ -23,6 +23,7 @@ Spool watches the following directories for real-time session indexing. These pa
 | Claude Code (profiles) | `~/.claude-profiles/*/projects/` |
 | Codex CLI | `~/.codex/sessions/` |
 | Codex CLI (profiles) | `~/.codex-profiles/*/sessions/` |
+| Gemini CLI | `~/.gemini/tmp/*/chats/` |
 
 New sessions become searchable the moment they're written.
 

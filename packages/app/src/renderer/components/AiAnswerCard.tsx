@@ -3,7 +3,7 @@ import type { FragmentResult } from '@spool/core'
 interface ToolCallInfo {
   title: string
   status: string
-  kind?: string
+  kind?: string | undefined
 }
 
 interface Props {

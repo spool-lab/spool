@@ -61,4 +61,17 @@ describe('resolveResumeWorkingDirectory', () => {
       filePath: '/Users/test/.codex/sessions/2026/04/05/rollout.jsonl',
     })).toBeUndefined()
   })
+
+  it('uses the Gemini project display path when cwd is unavailable', () => {
+    const projectDir = makeTempDir('spool-resume-gemini-')
+
+    expect(resolveResumeWorkingDirectory({
+      source: 'gemini',
+      cwd: '',
+      projectDisplayPath: projectDir,
+      filePath: '/Users/test/.gemini/tmp/workspace/chats/session-2026-04-08T00-00-deadbeef.json',
+    })).toBe(projectDir)
+
+    rmSync(projectDir, { recursive: true, force: true })
+  })
 })

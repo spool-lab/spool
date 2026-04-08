@@ -6,7 +6,7 @@ The missing search engine for your own data.
   <img src="docs/spool-v0.png" alt="Spool" width="720">
 </p>
 
-Search your Claude Code sessions, Codex CLI history, GitHub stars, Twitter bookmarks, and YouTube likes — locally, instantly.
+Search your Claude Code sessions, Codex CLI history, Gemini CLI chats, GitHub stars, Twitter bookmarks, and YouTube likes — locally, instantly.
 
 > **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
@@ -28,7 +28,7 @@ pnpm build
 
 Spool indexes your AI conversations and bookmarks into a single local search box.
 
-- **AI sessions** — watches Claude/Codex session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects` and `~/.codex-profiles/*/sessions`
+- **AI sessions** — watches Claude/Codex/Gemini session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, and Gemini’s project temp dirs under `~/.gemini/tmp/*/chats`
 - **Bookmarks & stars** — pulls from 50+ platforms via [OpenCLI](https://github.com/jackwener/opencli)
 - **URL capture** — save any URL with `Cmd+K`
 - **Agent search** — a `/spool` skill inside Claude Code feeds matching fragments back into your conversation
@@ -55,6 +55,13 @@ pnpm test         # runs all tests
 ```
 
 > **Note:** The `electron-rebuild` step is required whenever you run `pnpm install` or switch Node.js versions. Without it, the Electron app will crash at launch with a `NODE_MODULE_VERSION` mismatch error from `better-sqlite3`.
+
+If you switch between **Node-side tests** and **Electron app/e2e runs**, rebuild `better-sqlite3` for the matching runtime:
+
+```bash
+pnpm run rebuild:native:node      # before @spool/core / Node-based tests
+pnpm run rebuild:native:electron  # before launching the Electron app or e2e tests
+```
 
 ## Release
 

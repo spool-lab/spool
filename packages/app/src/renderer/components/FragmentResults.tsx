@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
 import ContinueActions from './ContinueActions.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
+import { getSessionSourceColor, getSessionSourceLabel, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 
 type Props = {
   results: SearchResult[]
@@ -28,14 +29,14 @@ export default function FragmentResults({ results, query, onOpenSession, default
         </svg>
         <p className="text-sm text-warm-muted dark:text-dark-muted">No results for "{query}"</p>
         <p className="text-xs text-warm-faint dark:text-dark-muted opacity-80">
-          Try different keywords or run{' '}
+          Try different keywords, use spaces for multi-term search, or run{' '}
           <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code>
         </p>
       </div>
     )
   }
 
-  // Derive source tabs: claude, codex, plus any capture platforms
+  // Derive source tabs: agent session sources plus any capture platforms
   const sourceKeys = [...new Set(results.map(r =>
     r.kind === 'fragment' ? r.source : r.platform
   ))]
@@ -60,7 +61,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
                   : 'border-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
               }`}
             >
-              {src === 'all' ? 'All' : src}
+              {src === 'all' ? 'All' : formatSourceFilterLabel(src)}
             </button>
           ))}
         </div>
@@ -102,6 +103,13 @@ export default function FragmentResults({ results, query, onOpenSession, default
   )
 }
 
+function formatSourceFilterLabel(source: string): string {
+  if (source === 'claude' || source === 'codex' || source === 'gemini') {
+    return getSessionSourceLabel(source)
+  }
+  return source
+}
+
 function FragmentRow({
   result,
   onOpenSession,
@@ -126,6 +134,7 @@ function FragmentRow({
           <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
             You discussed this · {project}
             {result.profileLabel && <span> · {result.profileLabel}</span>}
+            {result.matchCount > 1 && <span data-testid="match-count"> · {result.matchCount} matches</span>}
           </span>
           <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
         </div>
@@ -202,13 +211,14 @@ function PlatformBadge({ platform }: { platform: string }) {
 }
 
 function SourceBadge({ source }: { source: string }) {
-  const isClaude = source === 'claude'
   return (
     <span
+      data-testid="source-badge"
+      data-source={source}
       className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
-      style={{ background: isClaude ? '#6B5B8A' : '#1A6B3C' }}
+      style={{ background: getSessionSourceColor(source) }}
     >
-      {isClaude ? 'claude' : 'codex'}
+      {getSessionSourceShortLabel(source)}
     </span>
   )
 }

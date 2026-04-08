@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, OpenCLISource, SearchResult, Source } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, OpenCLISource, SearchResult, Source, SearchMatchType, SessionSource } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
+import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
 export function getOrCreateProject(
   db: Database.Database,
@@ -25,7 +26,7 @@ export function getOrCreateProject(
   return Number(result.lastInsertRowid)
 }
 
-export function getSourceId(db: Database.Database, name: 'claude' | 'codex'): number {
+export function getSourceId(db: Database.Database, name: SessionSource): number {
   const row = db.prepare('SELECT id FROM sources WHERE name = ?').get(name) as
     | { id: number }
     | undefined
@@ -38,6 +39,11 @@ export function getSessionMtime(db: Database.Database, filePath: string): string
     .prepare('SELECT raw_file_mtime FROM sessions WHERE file_path = ?')
     .get(filePath) as { raw_file_mtime: string | null } | undefined
   return row?.raw_file_mtime ?? null
+}
+
+export function deleteSessionByFilePath(db: Database.Database, filePath: string): boolean {
+  const result = db.prepare('DELETE FROM sessions WHERE file_path = ?').run(filePath)
+  return result.changes > 0
 }
 
 export function getAllSessionMtimes(db: Database.Database): Map<string, string> {
@@ -95,6 +101,31 @@ export function upsertSession(
   )
 
   return Number(result.lastInsertRowid)
+}
+
+export function upsertSessionSearch(
+  db: Database.Database,
+  opts: {
+    sessionId: number
+    title: string
+    userText: string
+    assistantText: string
+  },
+): void {
+  db.prepare(`
+    INSERT INTO session_search (session_id, title, user_text, assistant_text, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(session_id) DO UPDATE SET
+      title = excluded.title,
+      user_text = excluded.user_text,
+      assistant_text = excluded.assistant_text,
+      updated_at = datetime('now')
+  `).run(
+    opts.sessionId,
+    opts.title,
+    opts.userText,
+    opts.assistantText,
+  )
 }
 
 export function insertMessages(
@@ -201,15 +232,97 @@ export function getSessionWithMessages(
 export function searchFragments(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: 'claude' | 'codex'; since?: string } = {},
+  opts: { limit?: number; source?: SessionSource; since?: string } = {},
 ): FragmentResult[] {
   const { limit = 10, source, since } = opts
 
-  const ftsQuery = query.includes('"') || query.includes('*') || query.includes(' OR ')
-    ? query
-    : `"${query.replace(/"/g, '""')}"`
+  const rowLimit = Math.max(limit * 10, 50)
+  const naturalTerms = getNaturalSearchTerms(query)
+  const naturalPhrase = getNaturalSearchPhrase(query)
+  const canUseSessionFts = canUseSessionSearchFts(query)
 
-  const conditions: string[] = ['messages_fts MATCH ?', 'm.is_sidechain = 0']
+  if (naturalTerms.length === 1) {
+    return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', {
+      ...(source ? { source } : {}),
+      ...(since ? { since } : {}),
+    }).slice(0, limit)
+  }
+
+  const groups = buildSearchPlan(query).map(step => {
+    if (naturalTerms.length > 1 && (step.matchType === 'phrase' || step.matchType === 'all_terms')) {
+      return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, {
+        ...(source ? { source } : {}),
+        ...(since ? { since } : {}),
+      })
+    }
+
+    const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'
+    const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, {
+      ...(source ? { source } : {}),
+      ...(since ? { since } : {}),
+    })
+    return collapseFragmentRows(rows, step.matchType)
+  })
+
+  return mergeFragmentGroups(groups, limit)
+}
+
+export function searchSessionPreview(
+  db: Database.Database,
+  query: string,
+  opts: { limit?: number; source?: SessionSource; since?: string } = {},
+): FragmentResult[] {
+  const { limit = 5, source, since } = opts
+  const normalizedQuery = query.trim()
+  if (!normalizedQuery) return []
+
+  const terms = getNaturalSearchTerms(query)
+  const previewTerms = terms.length > 0 ? terms : [normalizedQuery]
+  const rows = searchPreviewRows(db, previewTerms, limit, {
+    ...(source ? { source } : {}),
+    ...(since ? { since } : {}),
+  })
+  const snippetRows = selectBestSessionSnippets(
+    db,
+    rows.map(row => row['sessionId'] as number),
+    previewTerms,
+  )
+
+  return rows.map((row, index) => {
+    const sessionId = row['sessionId'] as number
+    const snippetRow = snippetRows.get(sessionId)
+    const snippetSource = snippetRow?.contentText ?? String(row['sessionTitle'] ?? '')
+    const profileLabel = getProfileLabelFromFilePath(row['filePath'] as string)
+
+    return {
+      rank: index + 1,
+      sessionId,
+      sessionUuid: row['sessionUuid'] as string,
+      sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
+      matchCount: snippetRow?.matchingMessageCount ?? 1,
+      matchType: 'all_terms',
+      source: row['source'] as SessionSource,
+      ...(profileLabel ? { profileLabel } : {}),
+      ...(row['cwd'] ? { cwd: row['cwd'] as string } : {}),
+      project: row['project'] as string,
+      startedAt: row['startedAt'] as string,
+      snippet: buildLikeSnippet(snippetSource, previewTerms),
+      messageId: snippetRow?.messageId ?? 0,
+      messageRole: snippetRow?.messageRole ?? 'system',
+      messageTimestamp: snippetRow?.messageTimestamp ?? (row['startedAt'] as string),
+    }
+  })
+}
+
+function searchFragmentRows(
+  db: Database.Database,
+  ftsTable: 'messages_fts' | 'messages_fts_trigram',
+  ftsQuery: string,
+  limit: number,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { source, since } = opts
+  const conditions: string[] = [`${ftsTable} MATCH ?`, 'm.is_sidechain = 0']
   const params: (string | number)[] = [ftsQuery]
 
   if (source) {
@@ -236,9 +349,9 @@ export function searchFragments(
       sess.cwd      AS cwd,
       p.display_path AS project,
       src2.name     AS source,
-      snippet(messages_fts, -1, '<mark>', '</mark>', '…', 20) AS snippet
-    FROM messages_fts
-    JOIN messages m ON m.id = messages_fts.rowid
+      snippet(${ftsTable}, -1, '<mark>', '</mark>', '…', 20) AS snippet
+    FROM ${ftsTable}
+    JOIN messages m ON m.id = ${ftsTable}.rowid
     JOIN sessions sess ON sess.id = m.session_id
     JOIN projects p ON p.id = sess.project_id
     JOIN sources src2 ON src2.id = sess.source_id
@@ -247,27 +360,481 @@ export function searchFragments(
     LIMIT ?
   `
 
-  return (db.prepare(sql).all(...params) as Array<Record<string, unknown>>).map(
-    (row, i) => {
-      const profileLabel = getProfileLabelFromFilePath(row['filePath'] as string)
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
 
-      return {
-        rank: i + 1,
-        sessionId: row['sessionId'] as number,
-        sessionUuid: row['sessionUuid'] as string,
-        sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
-        source: row['source'] as 'claude' | 'codex',
-        ...(profileLabel ? { profileLabel } : {}),
-        ...(row['cwd'] ? { cwd: row['cwd'] as string } : {}),
-        project: row['project'] as string,
-        startedAt: row['startedAt'] as string,
-        snippet: row['snippet'] as string,
-        messageId: row['messageId'] as number,
-        messageRole: row['messageRole'] as string,
-        messageTimestamp: row['messageTimestamp'] as string,
+function searchPreviewRows(
+  db: Database.Database,
+  terms: string[],
+  limit: number,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { source, since } = opts
+  const scoreParts: string[] = []
+  const scoreParams: string[] = []
+  const whereClauses: string[] = []
+  const whereParams: string[] = []
+
+  for (const term of terms) {
+    const containsPattern = toLikePattern(term)
+    const prefixPattern = `${escapeLike(term)}%`
+    scoreParts.push(`CASE WHEN ss.title LIKE ? ESCAPE '\\' THEN 20 ELSE 0 END`)
+    scoreParams.push(prefixPattern)
+    scoreParts.push(`CASE WHEN ss.title LIKE ? ESCAPE '\\' THEN 8 ELSE 0 END`)
+    scoreParams.push(containsPattern)
+    scoreParts.push(`CASE WHEN ss.user_text LIKE ? ESCAPE '\\' THEN 4 ELSE 0 END`)
+    scoreParams.push(containsPattern)
+    scoreParts.push(`CASE WHEN ss.assistant_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(containsPattern)
+
+    whereClauses.push(`(
+      ss.title LIKE ? ESCAPE '\\'
+      OR ss.user_text LIKE ? ESCAPE '\\'
+      OR ss.assistant_text LIKE ? ESCAPE '\\'
+    )`)
+    whereParams.push(containsPattern, containsPattern, containsPattern)
+  }
+
+  const conditions = [...whereClauses]
+  const params: Array<string | number> = [...scoreParams, ...whereParams]
+
+  if (source) {
+    conditions.push('src2.name = ?')
+    params.push(source)
+  }
+  if (since) {
+    conditions.push('sess.started_at >= ?')
+    params.push(since)
+  }
+  params.push(limit)
+
+  const previewScoreExpr = scoreParts.join(' + ')
+  const sql = `
+    SELECT
+      sess.id AS sessionId,
+      sess.session_uuid AS sessionUuid,
+      sess.file_path AS filePath,
+      sess.title AS sessionTitle,
+      sess.started_at AS startedAt,
+      sess.cwd AS cwd,
+      p.display_path AS project,
+      src2.name AS source,
+      ${previewScoreExpr} AS previewScore
+    FROM sessions sess
+    JOIN session_search ss ON ss.session_id = sess.id
+    JOIN projects p ON p.id = sess.project_id
+    JOIN sources src2 ON src2.id = sess.source_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY previewScore DESC, sess.started_at DESC
+    LIMIT ?
+  `
+
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
+
+function collapseFragmentRows(rows: Array<Record<string, unknown>>, matchType: SearchMatchType): FragmentResult[] {
+  const seen = new Map<string, FragmentResult>()
+  const ordered: FragmentResult[] = []
+
+  for (const row of rows) {
+    const sessionUuid = row['sessionUuid'] as string
+    const existing = seen.get(sessionUuid)
+
+    if (existing) {
+      existing.matchCount += 1
+      continue
+    }
+
+    const profileLabel = getProfileLabelFromFilePath(row['filePath'] as string)
+    const fragment: FragmentResult = {
+      rank: ordered.length + 1,
+      sessionId: row['sessionId'] as number,
+      sessionUuid,
+      sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
+      matchCount: 1,
+      matchType,
+      source: row['source'] as SessionSource,
+      ...(profileLabel ? { profileLabel } : {}),
+      ...(row['cwd'] ? { cwd: row['cwd'] as string } : {}),
+      project: row['project'] as string,
+      startedAt: row['startedAt'] as string,
+      snippet: row['snippet'] as string,
+      messageId: row['messageId'] as number,
+      messageRole: row['messageRole'] as string,
+      messageTimestamp: row['messageTimestamp'] as string,
+    }
+
+    seen.set(sessionUuid, fragment)
+    ordered.push(fragment)
+  }
+
+  return ordered
+}
+
+function mergeFragmentGroups(groups: FragmentResult[][], limit: number): FragmentResult[] {
+  const merged: FragmentResult[] = []
+  const seen = new Map<string, FragmentResult>()
+
+  for (const group of groups) {
+    for (const fragment of group) {
+      const existing = seen.get(fragment.sessionUuid)
+      if (existing) {
+        existing.matchCount = Math.max(existing.matchCount, fragment.matchCount)
+        continue
       }
-    },
+      if (merged.length >= limit) continue
+
+      const next = {
+        ...fragment,
+        rank: merged.length + 1,
+      }
+      merged.push(next)
+      seen.set(next.sessionUuid, next)
+    }
+  }
+
+  return merged
+}
+
+function searchFragmentSessionFallback(
+  db: Database.Database,
+  terms: string[],
+  phrase: string,
+  limit: number,
+  matchType: SearchMatchType,
+  opts: { source?: SessionSource; since?: string } = {},
+): FragmentResult[] {
+  if (terms.length < 1) return []
+
+  const rows = searchSessionRowsByTerms(db, terms, phrase, limit, matchType, opts)
+  const snippetRows = selectBestSessionSnippets(
+    db,
+    rows.map(row => row['sessionId'] as number),
+    terms,
   )
+  type RankedFallbackRow = Omit<FragmentResult, 'rank'> & {
+    _titleMatchScore: number
+    _userMatchScore: number
+    _assistantMatchScore: number
+    _sameMessageCoverage: number
+  }
+  const ranked = rows.map((row) => {
+    const snippetRow = snippetRows.get(row['sessionId'] as number)
+    const snippetSource = snippetRow?.contentText ?? String(row['sessionTitle'] ?? '')
+    const profileLabel = getProfileLabelFromFilePath(row['filePath'] as string)
+
+    return {
+      sessionId: row['sessionId'] as number,
+      sessionUuid: row['sessionUuid'] as string,
+      sessionTitle: (row['sessionTitle'] as string | null) ?? '(no title)',
+      matchCount: snippetRow?.matchingMessageCount ?? 1,
+      matchType,
+      source: row['source'] as SessionSource,
+      ...(profileLabel ? { profileLabel } : {}),
+      ...(row['cwd'] ? { cwd: row['cwd'] as string } : {}),
+      project: row['project'] as string,
+      startedAt: row['startedAt'] as string,
+      snippet: buildLikeSnippet(snippetSource, terms),
+      messageId: snippetRow?.messageId ?? 0,
+      messageRole: snippetRow?.messageRole ?? 'system',
+      messageTimestamp: snippetRow?.messageTimestamp ?? (row['startedAt'] as string),
+      _titleMatchScore: row['titleMatchScore'] as number,
+      _userMatchScore: row['userMatchScore'] as number,
+      _assistantMatchScore: row['assistantMatchScore'] as number,
+      _sameMessageCoverage: snippetRow?.termCoverage ?? 0,
+    } satisfies RankedFallbackRow
+  })
+
+  ranked.sort((a, b) => {
+    if (b._sameMessageCoverage !== a._sameMessageCoverage) {
+      return b._sameMessageCoverage - a._sameMessageCoverage
+    }
+    if (b._titleMatchScore !== a._titleMatchScore) {
+      return b._titleMatchScore - a._titleMatchScore
+    }
+    if (b._userMatchScore !== a._userMatchScore) {
+      return b._userMatchScore - a._userMatchScore
+    }
+    if (b._assistantMatchScore !== a._assistantMatchScore) {
+      return b._assistantMatchScore - a._assistantMatchScore
+    }
+    return String(b.startedAt).localeCompare(String(a.startedAt))
+  })
+
+  return ranked.map((row, index) => ({
+    rank: index + 1,
+    sessionId: row.sessionId,
+    sessionUuid: row.sessionUuid,
+    sessionTitle: row.sessionTitle,
+    matchCount: row.matchCount,
+    matchType: row.matchType,
+    source: row.source,
+    ...(row.profileLabel ? { profileLabel: row.profileLabel } : {}),
+    ...(row.cwd ? { cwd: row.cwd } : {}),
+    project: row.project,
+    startedAt: row.startedAt,
+    snippet: row.snippet,
+    messageId: row.messageId,
+    messageRole: row.messageRole,
+    messageTimestamp: row.messageTimestamp,
+  }))
+}
+
+function searchSessionRowsByTerms(
+  db: Database.Database,
+  terms: string[],
+  phrase: string,
+  limit: number,
+  matchType: SearchMatchType,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  if (canUseSessionSearchFts(phrase)) {
+    return searchSessionRowsByFts(db, terms, phrase, limit, matchType, opts)
+  }
+
+  return searchSessionRowsByLike(db, terms, limit, opts)
+}
+
+function searchSessionRowsByLike(
+  db: Database.Database,
+  terms: string[],
+  limit: number,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { source, since } = opts
+  const titleScoreParts: string[] = []
+  const whereClauses: string[] = []
+  const scoreParams: string[] = []
+  const whereParams: string[] = []
+
+  for (const term of terms) {
+    const pattern = toLikePattern(term)
+    titleScoreParts.push(`CASE WHEN ss.title LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+    titleScoreParts.push(`CASE WHEN ss.user_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+    titleScoreParts.push(`CASE WHEN ss.assistant_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+    whereClauses.push(`(
+      ss.title LIKE ? ESCAPE '\\'
+      OR ss.user_text LIKE ? ESCAPE '\\'
+      OR ss.assistant_text LIKE ? ESCAPE '\\'
+    )`)
+    whereParams.push(pattern, pattern, pattern)
+  }
+
+  const conditions = [...whereClauses]
+  const params: Array<string | number> = [...scoreParams, ...whereParams]
+
+  if (source) {
+    conditions.push('src2.name = ?')
+    params.push(source)
+  }
+  if (since) {
+    conditions.push('sess.started_at >= ?')
+    params.push(since)
+  }
+  params.push(limit)
+
+  const titleScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 0).join(' + ')
+  const userScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 1).join(' + ')
+  const assistantScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 2).join(' + ')
+  const sql = `
+    SELECT
+      sess.id AS sessionId,
+      sess.session_uuid AS sessionUuid,
+      sess.file_path AS filePath,
+      sess.title AS sessionTitle,
+      sess.started_at AS startedAt,
+      sess.cwd AS cwd,
+      p.display_path AS project,
+      src2.name AS source,
+      ${titleScoreExpr} AS titleMatchScore,
+      ${userScoreExpr} AS userMatchScore,
+      ${assistantScoreExpr} AS assistantMatchScore
+    FROM sessions sess
+    JOIN session_search ss ON ss.session_id = sess.id
+    JOIN projects p ON p.id = sess.project_id
+    JOIN sources src2 ON src2.id = sess.source_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY titleMatchScore DESC, userMatchScore DESC, assistantMatchScore DESC, sess.started_at DESC
+    LIMIT ?
+  `
+
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
+
+function searchSessionRowsByFts(
+  db: Database.Database,
+  terms: string[],
+  phrase: string,
+  limit: number,
+  matchType: SearchMatchType,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { source, since } = opts
+  const ftsTable = selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
+  const ftsQuery = matchType === 'phrase'
+    ? `"${phrase.replace(/"/g, '""')}"`
+    : terms.map(term => `"${term.replace(/"/g, '""')}"`).join(' AND ')
+
+  const titleScoreParts: string[] = []
+  const scoreParams: string[] = []
+  const likeParams: string[] = []
+
+  for (const term of terms) {
+    const pattern = toLikePattern(term)
+    titleScoreParts.push(`CASE WHEN ss.title LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+    titleScoreParts.push(`CASE WHEN ss.user_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+    titleScoreParts.push(`CASE WHEN ss.assistant_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    scoreParams.push(pattern)
+  }
+
+  const conditions = [`${ftsTable} MATCH ?`]
+  const params: Array<string | number> = [...scoreParams, ftsQuery]
+
+  if (source) {
+    conditions.push('src2.name = ?')
+    params.push(source)
+  }
+  if (since) {
+    conditions.push('sess.started_at >= ?')
+    params.push(since)
+  }
+  params.push(limit)
+
+  const titleScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 0).join(' + ')
+  const userScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 1).join(' + ')
+  const assistantScoreExpr = titleScoreParts.filter((_, index) => index % 3 === 2).join(' + ')
+  const sql = `
+    SELECT
+      sess.id AS sessionId,
+      sess.session_uuid AS sessionUuid,
+      sess.file_path AS filePath,
+      sess.title AS sessionTitle,
+      sess.started_at AS startedAt,
+      sess.cwd AS cwd,
+      p.display_path AS project,
+      src2.name AS source,
+      bm25(${ftsTable}, 5.0, 1.5, 0.8) AS ftsScore,
+      ${titleScoreExpr} AS titleMatchScore,
+      ${userScoreExpr} AS userMatchScore,
+      ${assistantScoreExpr} AS assistantMatchScore
+    FROM ${ftsTable}
+    JOIN session_search ss ON ss.session_id = ${ftsTable}.rowid
+    JOIN sessions sess ON sess.id = ss.session_id
+    JOIN projects p ON p.id = sess.project_id
+    JOIN sources src2 ON src2.id = sess.source_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY titleMatchScore DESC, userMatchScore DESC, assistantMatchScore DESC, ftsScore ASC, sess.started_at DESC
+    LIMIT ?
+  `
+
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
+
+function selectBestSessionSnippets(
+  db: Database.Database,
+  sessionIds: number[],
+  terms: string[],
+) {
+  type SessionSnippetRow = {
+    sessionId: number
+    messageId: number
+    messageRole: string
+    messageTimestamp: string
+    contentText: string
+    termCoverage?: number
+    matchingMessageCount?: number
+  }
+  if (sessionIds.length === 0) return new Map<number, SessionSnippetRow>()
+  const coverageExpr = terms.map(() => `CASE WHEN content_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`).join(' + ')
+  const anyClauses = terms.map(() => 'content_text LIKE ? ESCAPE \'\\\'').join(' OR ')
+  const allPatterns = terms.map(toLikePattern)
+  const anyPatterns = terms.map(toLikePattern)
+  const sessionPlaceholders = sessionIds.map(() => '?').join(', ')
+
+  const matchSql = `
+    WITH raw AS (
+      SELECT
+        id AS messageId,
+        session_id AS sessionId,
+        role AS messageRole,
+        timestamp AS messageTimestamp,
+        content_text AS contentText,
+        seq,
+        ${coverageExpr} AS termCoverage
+      FROM messages
+      WHERE session_id IN (${sessionPlaceholders})
+        AND is_sidechain = 0
+        AND (${anyClauses})
+    ),
+    ranked AS (
+      SELECT
+        sessionId,
+        messageId,
+        messageRole,
+        messageTimestamp,
+        contentText,
+        termCoverage,
+        COUNT(*) OVER (PARTITION BY sessionId) AS matchingMessageCount,
+        ROW_NUMBER() OVER (
+          PARTITION BY sessionId
+          ORDER BY termCoverage DESC, CASE WHEN messageRole = 'user' THEN 0 ELSE 1 END, seq
+        ) AS rn
+      FROM raw
+    )
+    SELECT
+      sessionId,
+      messageId,
+      messageRole,
+      messageTimestamp,
+      contentText,
+      termCoverage,
+      matchingMessageCount
+    FROM ranked
+    WHERE rn = 1
+  `
+
+  const rows = db.prepare(matchSql).all(...allPatterns, ...sessionIds, ...anyPatterns) as SessionSnippetRow[]
+  return new Map(rows.map(row => [row.sessionId, row]))
+}
+
+function buildLikeSnippet(text: string, terms: string[]): string {
+  const normalizedText = text.trim()
+  if (!normalizedText) return ''
+
+  const firstHit = terms
+    .map(term => normalizedText.indexOf(term))
+    .filter(index => index >= 0)
+    .sort((a, b) => a - b)[0] ?? 0
+
+  const start = Math.max(0, firstHit - 60)
+  const end = Math.min(normalizedText.length, firstHit + 140)
+  let snippet = normalizedText.slice(start, end)
+
+  if (start > 0) snippet = `…${snippet}`
+  if (end < normalizedText.length) snippet = `${snippet}…`
+
+  const uniqueTerms = Array.from(new Set(terms)).sort((a, b) => b.length - a.length)
+  for (const term of uniqueTerms) {
+    snippet = snippet.split(term).join(`<mark>${term}</mark>`)
+  }
+
+  return snippet
+}
+
+function toLikePattern(term: string): string {
+  return `%${escapeLike(term)}%`
+}
+
+function escapeLike(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
 }
 
 export function getStatus(db: Database.Database): StatusInfo {
@@ -284,12 +851,14 @@ export function getStatus(db: Database.Database): StatusInfo {
   const totalSessions = counts.reduce((sum, r) => sum + r.cnt, 0)
   const claudeRow = counts.find(r => r.name === 'claude')
   const codexRow = counts.find(r => r.name === 'codex')
+  const geminiRow = counts.find(r => r.name === 'gemini')
 
   return {
     dbPath: DB_PATH,
     totalSessions,
     claudeSessions: claudeRow?.cnt ?? 0,
     codexSessions: codexRow?.cnt ?? 0,
+    geminiSessions: geminiRow?.cnt ?? 0,
     lastSyncedAt: lastSync?.last ?? null,
     dbSizeBytes: getDBSize(),
   }
@@ -309,7 +878,7 @@ function rowToSession(r: Record<string, unknown>): Session {
     hasToolUse: Boolean(r['hasToolUse']),
     cwd: r['cwd'] as string | null,
     model: r['model'] as string | null,
-    source: r['source'] as 'claude' | 'codex',
+    source: r['source'] as SessionSource,
     projectDisplayPath: r['projectDisplayPath'] as string,
     projectDisplayName: r['projectDisplayName'] as string,
   }
@@ -400,11 +969,28 @@ export function searchCaptures(
 ): CaptureResult[] {
   const { limit = 10, platform, since } = opts
 
-  const ftsQuery = query.includes('"') || query.includes('*') || query.includes(' OR ')
-    ? query
-    : `"${query.replace(/"/g, '""')}"`
+  const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'captures_fts_trigram' : 'captures_fts'
+  const rowLimit = Math.max(limit * 10, 50)
+  const groups = buildSearchPlan(query).map(step => {
+    const rows = searchCaptureRows(db, ftsTable, step.query, rowLimit, {
+      ...(platform ? { platform } : {}),
+      ...(since ? { since } : {}),
+    })
+    return mapCaptureRows(rows, step.matchType)
+  })
 
-  const conditions: string[] = ['captures_fts MATCH ?']
+  return mergeCaptureGroups(groups, limit)
+}
+
+function searchCaptureRows(
+  db: Database.Database,
+  ftsTable: 'captures_fts' | 'captures_fts_trigram',
+  ftsQuery: string,
+  limit: number,
+  opts: { platform?: string; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { platform, since } = opts
+  const conditions: string[] = [`${ftsTable} MATCH ?`]
   const params: (string | number)[] = [ftsQuery]
 
   if (platform) {
@@ -428,28 +1014,52 @@ export function searchCaptures(
       c.platform,
       c.content_type  AS contentType,
       c.captured_at   AS capturedAt,
-      snippet(captures_fts, -1, '<mark>', '</mark>', '…', 20) AS snippet
-    FROM captures_fts
-    JOIN captures c ON c.id = captures_fts.rowid
+      snippet(${ftsTable}, -1, '<mark>', '</mark>', '…', 20) AS snippet
+    FROM ${ftsTable}
+    JOIN captures c ON c.id = ${ftsTable}.rowid
     WHERE ${conditions.join(' AND ')}
     ORDER BY rank
     LIMIT ?
   `
 
-  return (db.prepare(sql).all(...params) as Array<Record<string, unknown>>).map(
-    (row, i) => ({
-      rank: i + 1,
-      captureId: row['captureId'] as number,
-      captureUuid: row['captureUuid'] as string,
-      url: row['url'] as string,
-      title: (row['title'] as string) || '(no title)',
-      snippet: row['snippet'] as string,
-      platform: row['platform'] as string,
-      contentType: row['contentType'] as string,
-      author: (row['author'] as string | null) ?? null,
-      capturedAt: row['capturedAt'] as string,
-    }),
-  )
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
+
+function mapCaptureRows(rows: Array<Record<string, unknown>>, matchType: SearchMatchType): CaptureResult[] {
+  return rows.map((row, i) => ({
+    rank: i + 1,
+    captureId: row['captureId'] as number,
+    captureUuid: row['captureUuid'] as string,
+    matchType,
+    url: row['url'] as string,
+    title: (row['title'] as string) || '(no title)',
+    snippet: row['snippet'] as string,
+    platform: row['platform'] as string,
+    contentType: row['contentType'] as string,
+    author: (row['author'] as string | null) ?? null,
+    capturedAt: row['capturedAt'] as string,
+  }))
+}
+
+function mergeCaptureGroups(groups: CaptureResult[][], limit: number): CaptureResult[] {
+  const merged: CaptureResult[] = []
+  const seen = new Set<string>()
+
+  for (const group of groups) {
+    for (const capture of group) {
+      if (seen.has(capture.captureUuid)) continue
+      if (merged.length >= limit) continue
+
+      const next = {
+        ...capture,
+        rank: merged.length + 1,
+      }
+      merged.push(next)
+      seen.add(next.captureUuid)
+    }
+  }
+
+  return merged
 }
 
 export function searchAll(
@@ -459,8 +1069,8 @@ export function searchAll(
 ): SearchResult[] {
   const { limit = 20, source, since } = opts
 
-  const fragOpts: { limit: number; source?: 'claude' | 'codex'; since?: string } = { limit }
-  if (source === 'claude' || source === 'codex') fragOpts.source = source
+  const fragOpts: { limit: number; source?: SessionSource; since?: string } = { limit }
+  if (source === 'claude' || source === 'codex' || source === 'gemini') fragOpts.source = source
   if (since) fragOpts.since = since
 
   const fragments = searchFragments(db, query, fragOpts)
@@ -473,8 +1083,26 @@ export function searchAll(
     .map(c => ({ ...c, kind: 'capture' as const }))
 
   return [...fragments, ...captures]
-    .sort((a, b) => a.rank - b.rank)
+    .sort(compareSearchResultRelevance)
     .slice(0, limit)
+    .map((result, index) => ({ ...result, rank: index + 1 }))
+}
+
+function compareSearchResultRelevance(a: SearchResult, b: SearchResult): number {
+  const typeDiff = getMatchTypePriority(a.matchType) - getMatchTypePriority(b.matchType)
+  if (typeDiff !== 0) return typeDiff
+  return a.rank - b.rank
+}
+
+function getMatchTypePriority(matchType: SearchMatchType): number {
+  switch (matchType) {
+    case 'phrase':
+      return 0
+    case 'all_terms':
+      return 1
+    default:
+      return 2
+  }
 }
 
 export function listOpenCLISources(db: Database.Database): OpenCLISource[] {

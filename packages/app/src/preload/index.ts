@@ -17,9 +17,9 @@ export interface BuiltinAgent {
 }
 
 export interface SdkAgentConfig {
-  apiKey?: string
-  model?: string
-  baseURL?: string
+  apiKey?: string | undefined
+  model?: string | undefined
+  baseURL?: string | undefined
 }
 
 export interface AgentsConfig {
@@ -40,8 +40,11 @@ export interface AgentsConfig {
 export type SpoolAPI = typeof api
 
 const api = {
-  search: (query: string, limit?: number, source?: string): Promise<FragmentResult[]> =>
+  search: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search', { query, limit, source }),
+
+  searchPreview: (query: string, limit?: number, source?: string): Promise<FragmentResult[]> =>
+    ipcRenderer.invoke('spool:search-preview', { query, limit, source }),
 
   listSessions: (limit?: number): Promise<Session[]> =>
     ipcRenderer.invoke('spool:list-sessions', { limit }),
@@ -51,6 +54,9 @@ const api = {
 
   getStatus: (): Promise<StatusInfo> =>
     ipcRenderer.invoke('spool:get-status'),
+
+  getRuntimeInfo: (): Promise<{ isDev: boolean; appPath: string; appName: string }> =>
+    ipcRenderer.invoke('spool:get-runtime-info'),
 
   syncNow: (): Promise<SyncResult> =>
     ipcRenderer.invoke('spool:sync-now'),

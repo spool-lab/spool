@@ -1,4 +1,6 @@
-export type Source = 'claude' | 'codex' | 'opencli'
+export type SessionSource = 'claude' | 'codex' | 'gemini'
+export type Source = SessionSource | 'opencli'
+export type SearchMatchType = 'fts' | 'phrase' | 'all_terms'
 
 export interface ParsedMessage {
   uuid: string
@@ -12,7 +14,7 @@ export interface ParsedMessage {
 }
 
 export interface ParsedSession {
-  source: Source
+  source: SessionSource
   sessionUuid: string
   filePath: string
   title: string
@@ -36,7 +38,7 @@ export interface Session {
   hasToolUse: boolean
   cwd: string | null
   model: string | null
-  source: Source
+  source: SessionSource
   projectDisplayPath: string
   projectDisplayName: string
 }
@@ -59,7 +61,9 @@ export interface FragmentResult {
   sessionId: number
   sessionUuid: string
   sessionTitle: string
-  source: Source
+  matchCount: number
+  matchType: SearchMatchType
+  source: SessionSource
   profileLabel?: string
   cwd?: string
   project: string
@@ -75,6 +79,7 @@ export interface StatusInfo {
   totalSessions: number
   claudeSessions: number
   codexSessions: number
+  geminiSessions: number
   lastSyncedAt: string | null
   dbSizeBytes: number
 }
@@ -91,6 +96,7 @@ export interface CaptureResult {
   rank: number
   captureId: number
   captureUuid: string
+  matchType: SearchMatchType
   url: string
   title: string
   snippet: string

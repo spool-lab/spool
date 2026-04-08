@@ -1,7 +1,7 @@
 import chokidar, { type FSWatcher } from 'chokidar'
-import { join } from 'node:path'
 import type { Syncer } from './syncer.js'
-import { detectSessionSource, getSessionRoots } from './source-paths.js'
+import type { SessionSource } from '../types.js'
+import { detectSessionSource, getSessionRoots, getSessionWatchPatterns } from './source-paths.js'
 // No native module dependencies — uses node:sqlite via @spool/core
 
 export type WatcherEvent = 'new-sessions'
@@ -12,9 +12,10 @@ export class SpoolWatcher {
   private listeners: WatcherEventCallback[] = []
   private pendingNew = 0
   private flushTimer: ReturnType<typeof setTimeout> | null = null
-  private sourceRoots: Record<'claude' | 'codex', string[]> = {
+  private sourceRoots: Record<SessionSource, string[]> = {
     claude: [],
     codex: [],
+    gemini: [],
   }
 
   constructor(private syncer: Syncer) {}
@@ -23,8 +24,13 @@ export class SpoolWatcher {
     this.sourceRoots = {
       claude: getSessionRoots('claude'),
       codex: getSessionRoots('codex'),
+      gemini: getSessionRoots('gemini'),
     }
-    const patterns = [...this.sourceRoots.claude, ...this.sourceRoots.codex].map(root => join(root, '**', '*.jsonl'))
+    const patterns = [
+      ...getSessionWatchPatterns('claude', this.sourceRoots.claude),
+      ...getSessionWatchPatterns('codex', this.sourceRoots.codex),
+      ...getSessionWatchPatterns('gemini', this.sourceRoots.gemini),
+    ]
 
     this.watcher = chokidar.watch(patterns, {
       persistent: true,

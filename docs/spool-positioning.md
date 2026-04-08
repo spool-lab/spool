@@ -2,7 +2,7 @@
 
 > **The missing search engine for your own data.**
 
-Search your `[Claude Code sessions · ChatGPT history · GitHub stars · Twitter bookmarks · YouTube likes]` — locally.
+Search your `[Claude Code sessions · Codex history · Gemini chats · ChatGPT history · GitHub stars · Twitter bookmarks · YouTube likes]` — locally.
 
 ---
 
@@ -10,7 +10,7 @@ Search your `[Claude Code sessions · ChatGPT history · GitHub stars · Twitter
 
 ### Your coding agent is already the best search engine you have.
 
-Spool lets Claude Code, Codex, and any coding agent search your personal data — past sessions, bookmarks, stars, saves — from a single search box.
+Spool lets Claude Code, Codex, Gemini CLI, and any coding agent search your personal data — past sessions, bookmarks, stars, saves — from a single search box.
 
 ### 50+ platforms, pulled to your machine.
 
@@ -18,7 +18,7 @@ OpenCLI pulls your bookmarks, stars, and saves from Twitter, GitHub, Reddit, You
 
 ### Every agent session, indexed automatically.
 
-Spool watches `~/.claude/` and `~/.codex/` in real time. Every conversation you have with Claude Code or Codex — searchable the moment it's written.
+Spool watches `~/.claude/`, `~/.codex/`, and Gemini CLI’s `~/.gemini/tmp/*/chats` in real time. Every conversation you have with Claude Code, Codex, or Gemini CLI — searchable the moment it's written.
 
 ### Context that flows back in.
 

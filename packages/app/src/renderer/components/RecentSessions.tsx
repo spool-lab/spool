@@ -1,4 +1,5 @@
 import type { Session } from '@spool/core'
+import { getSessionSourceColor } from '../../shared/sessionSources.js'
 
 interface Props {
   sessions: Session[]
@@ -55,11 +56,10 @@ function SessionRow({ session, onOpen }: { session: Session; onOpen: (uuid: stri
 
 function SourceDot({ source }: { source: string }) {
   return (
-    <div className={`w-2 h-2 rounded-full mt-1 ${
-      source === 'claude'
-        ? 'bg-orange-400'
-        : 'bg-green-500'
-    }`} />
+    <div
+      className="w-2 h-2 rounded-full mt-1"
+      style={{ background: getSessionSourceColor(source) }}
+    />
   )
 }
 

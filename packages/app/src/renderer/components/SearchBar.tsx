@@ -1,24 +1,34 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type SearchMode = 'fast' | 'ai'
 
 interface Props {
   query: string
   onChange: (q: string) => void
-  onBack?: () => void
-  onSubmit?: () => void
+  onBack?: (() => void) | undefined
+  onSubmit?: (() => void) | undefined
   isSearching: boolean
-  variant?: 'home' | 'compact'
-  mode?: SearchMode
-  onModeChange?: (mode: SearchMode) => void
+  variant?: ('home' | 'compact') | undefined
+  mode?: SearchMode | undefined
+  onModeChange?: ((mode: SearchMode) => void) | undefined
 }
 
 export default function SearchBar({ query, onChange, onBack, onSubmit, isSearching, variant = 'compact', mode = 'fast', onModeChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [showBusyIndicator, setShowBusyIndicator] = useState(false)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (!isSearching) {
+      setShowBusyIndicator(false)
+      return
+    }
+    const timer = setTimeout(() => setShowBusyIndicator(true), 120)
+    return () => clearTimeout(timer)
+  }, [isSearching])
 
   const isHome = variant === 'home'
 
@@ -36,17 +46,26 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
         </button>
       )}
       <div className="relative flex-1 group">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-faint dark:text-dark-muted">
-          {isSearching ? (
-            <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="30" strokeDashoffset="10"/>
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M11 11L13.5 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          )}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-faint dark:text-dark-muted">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            className={`absolute inset-0 transition-opacity duration-150 ${showBusyIndicator ? 'opacity-0' : 'opacity-100'}`}
+          >
+            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M11 11L13.5 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <svg
+            className={`absolute inset-0 transition-opacity duration-150 ${showBusyIndicator ? 'opacity-100 animate-spin' : 'opacity-0'}`}
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="30" strokeDashoffset="10"/>
+          </svg>
         </div>
         <input
           ref={inputRef}
@@ -64,6 +83,7 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
             'placeholder:text-warm-faint dark:placeholder:text-dark-muted',
             'text-warm-text dark:text-dark-text',
             'focus:ring-0',
+            'transition-[border-color,box-shadow,background-color] duration-150',
             isHome
               ? 'pl-10 pr-[130px] py-3 text-[15px] shadow-sm'
               : 'pl-9 pr-[100px] py-[7px] text-[13.5px]',

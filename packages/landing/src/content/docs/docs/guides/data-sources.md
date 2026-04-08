@@ -15,6 +15,7 @@ Spool watches these directories in real time:
 | Claude Code (profiles) | `~/.claude-profiles/*/projects/` |
 | Codex CLI | `~/.codex/sessions/` |
 | Codex CLI (profiles) | `~/.codex-profiles/*/sessions/` |
+| Gemini CLI | `~/.gemini/tmp/*/chats/` |
 
 New sessions become searchable the moment they're written. No manual export needed.
 

@@ -28,6 +28,7 @@
   /* Source badges */
   --color-src-claude: #6B5B8A;
   --color-src-codex: #1A6B3C;
+  --color-src-gemini: #4285F4;
 
   /* Typography */
   --font-sans: 'Geist Variable', system-ui, sans-serif;

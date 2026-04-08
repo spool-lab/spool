@@ -5,12 +5,14 @@ interface Props {
   onClose: () => void
   claudeCount: number | null
   codexCount: number | null
+  geminiCount?: number | null
 }
 
 /** Source badge color by platform */
 const PLATFORM_COLORS: Record<string, string> = {
   claude: '#6B5B8A',
   codex: '#1A6B3C',
+  gemini: '#4285F4',
   twitter: '#3A3A3A',
   github: '#555555',
   youtube: '#B22222',
@@ -51,7 +53,7 @@ function formatSyncTime(iso: string | null): string {
   return `${days}d ago`
 }
 
-export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props) {
+export default function SourcesPanel({ onClose, claudeCount, codexCount, geminiCount = null }: Props) {
   const [sources, setSources] = useState<OpenCLISource[]>([])
   const [platforms, setPlatforms] = useState<PlatformInfo[]>([])
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
@@ -195,6 +197,7 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount }: Props
             </h3>
             <BuiltInSource name="Claude Code" color={PLATFORM_COLORS['claude']!} count={claudeCount} />
             <BuiltInSource name="Codex CLI" color={PLATFORM_COLORS['codex']!} count={codexCount} />
+            <BuiltInSource name="Gemini CLI" color={PLATFORM_COLORS['gemini']!} count={geminiCount} />
           </div>
 
           {/* Native Connectors */}

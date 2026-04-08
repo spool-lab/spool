@@ -4,16 +4,16 @@ import type { SearchMode } from './SearchBar.js'
 
 interface Props {
   syncStatus: { phase: string; count: number; total: number } | null
-  searchMode?: SearchMode
-  aiAgent?: string
-  aiAgentMode?: string
-  onSettingsClick?: () => void
+  searchMode?: SearchMode | undefined
+  aiAgent?: string | undefined
+  aiAgentMode?: string | undefined
+  onSettingsClick?: (() => void) | undefined
 }
 
 interface UpdateStatus {
   status: 'available' | 'downloading' | 'ready' | 'error'
-  version?: string
-  percent?: number
+  version?: string | undefined
+  percent?: number | undefined
 }
 
 export default function StatusBar({ syncStatus, searchMode = 'fast', aiAgent, aiAgentMode, onSettingsClick }: Props) {
