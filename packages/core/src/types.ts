@@ -25,6 +25,11 @@ export interface ParsedSession {
   messages: ParsedMessage[]
 }
 
+export type ParseSessionResult =
+  | { kind: 'parsed'; session: ParsedSession }
+  | { kind: 'filtered' }
+  | { kind: 'skipped' }
+
 export interface Session {
   id: number
   projectId: number

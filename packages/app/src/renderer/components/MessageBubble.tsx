@@ -1,18 +1,35 @@
+import type { ReactNode } from 'react'
 import type { Message } from '@spool/core'
+
+export type FindRange = {
+  start: number
+  end: number
+}
 
 interface Props {
   message: Message
+  findRanges?: FindRange[]
+  matchIndexOffset?: number
+  activeMatchIndex?: number
+  onActiveMatchRef?: (node: HTMLElement | null) => void
 }
 
-export default function MessageBubble({ message }: Props) {
+export default function MessageBubble({
+  message,
+  findRanges = [],
+  matchIndexOffset = 0,
+  activeMatchIndex = -1,
+  onActiveMatchRef,
+}: Props) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
+  const contentText = message.contentText || (isSystem ? '(summary)' : '')
 
   if (isSystem) {
     return (
       <div className="px-4 py-2">
         <div className="bg-neutral-100 dark:bg-neutral-800/60 rounded px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400 italic">
-          {message.contentText || '(summary)'}
+          {renderHighlightedText(contentText, findRanges, matchIndexOffset, activeMatchIndex, onActiveMatchRef)}
         </div>
       </div>
     )
@@ -39,13 +56,58 @@ export default function MessageBubble({ message }: Props) {
             </div>
           )}
           <p className="text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed whitespace-pre-wrap break-words select-text cursor-text">
-            {message.contentText || <span className="text-neutral-400 italic">(tool use)</span>}
+            {message.contentText
+              ? renderHighlightedText(contentText, findRanges, matchIndexOffset, activeMatchIndex, onActiveMatchRef)
+              : <span className="text-neutral-400 italic">(tool use)</span>}
           </p>
           <p className="text-[10px] text-neutral-400 mt-1">{formatTime(message.timestamp)}</p>
         </div>
       </div>
     </div>
   )
+}
+
+function renderHighlightedText(
+  text: string,
+  ranges: FindRange[],
+  matchIndexOffset: number,
+  activeMatchIndex: number,
+  onActiveMatchRef?: (node: HTMLElement | null) => void,
+): ReactNode {
+  if (!ranges.length) return text
+
+  const parts: ReactNode[] = []
+  let cursor = 0
+
+  ranges.forEach((range, localIndex) => {
+    if (range.start > cursor) {
+      parts.push(text.slice(cursor, range.start))
+    }
+
+    const matchText = text.slice(range.start, range.end)
+    const globalIndex = matchIndexOffset + localIndex
+    const isActive = globalIndex === activeMatchIndex
+
+    parts.push(
+      <mark
+        key={`${globalIndex}-${range.start}-${range.end}`}
+        ref={isActive ? onActiveMatchRef ?? null : null}
+        data-testid={isActive ? 'session-find-active-match' : undefined}
+        className="font-semibold transition-colors"
+        style={{ color: 'var(--color-accent)', background: 'transparent' }}
+      >
+        {matchText}
+      </mark>,
+    )
+
+    cursor = range.end
+  })
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor))
+  }
+
+  return parts
 }
 
 function formatTime(iso: string): string {

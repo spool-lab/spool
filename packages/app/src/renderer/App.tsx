@@ -234,7 +234,11 @@ export default function App() {
   }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError])
 
   const handleSubmit = useCallback(() => {
-    if (query.trim()) setHomeMode(false)
+    if (!query.trim()) return
+    setHomeMode(false)
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setView('search')
     if (searchMode === 'ai') {
       doAiSearch()
     } else {
@@ -250,7 +254,13 @@ export default function App() {
       setAiStreaming(false)
       setAiToolCalls(new Map())
       aiAnswerRef.current = ''
-      if (query.trim()) doSearch(query)
+      if (query.trim()) {
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        doSearch(query)
+      }
     } else {
       setResults([])
       setIsSearching(false)

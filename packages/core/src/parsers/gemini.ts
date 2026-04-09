@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
-import type { ParsedMessage, ParsedSession } from '../types.js'
+import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 
 interface GeminiToolCall {
   name?: string
@@ -28,23 +28,12 @@ interface GeminiSessionRecord {
 
 const GEMINI_INDEXABLE_TYPES = new Set(['user', 'gemini', 'info', 'warning', 'error'])
 
-export function parseGeminiSession(filePath: string): ParsedSession | null {
-  let raw: string
-  try {
-    raw = readFileSync(filePath, 'utf8')
-  } catch {
-    return null
-  }
+export function loadGeminiSession(filePath: string): ParseSessionResult {
+  const raw = readFileSync(filePath, 'utf8')
+  const record = JSON.parse(raw) as GeminiSessionRecord
 
-  let record: GeminiSessionRecord
-  try {
-    record = JSON.parse(raw) as GeminiSessionRecord
-  } catch {
-    return null
-  }
-
-  if (record.kind === 'subagent') return null
-  if (!Array.isArray(record.messages) || record.messages.length === 0) return null
+  if (record.kind === 'subagent') return { kind: 'filtered' }
+  if (!Array.isArray(record.messages) || record.messages.length === 0) return { kind: 'skipped' }
 
   const messages: ParsedMessage[] = []
   let model = ''
@@ -71,7 +60,9 @@ export function parseGeminiSession(filePath: string): ParsedSession | null {
     })
   }
 
-  if (!messages.some(message => message.role === 'user' || message.role === 'assistant')) return null
+  if (!messages.some(message => message.role === 'user' || message.role === 'assistant')) {
+    return { kind: 'skipped' }
+  }
 
   const firstUserMessage = messages.find(message => message.role === 'user' && message.contentText.trim().length > 0)
   const title = record.summary?.trim()
@@ -82,15 +73,27 @@ export function parseGeminiSession(filePath: string): ParsedSession | null {
   const cwd = resolveGeminiProjectRoot(filePath)
 
   return {
-    source: 'gemini',
-    sessionUuid: record.sessionId || filePath,
-    filePath,
-    title,
-    cwd,
-    model,
-    startedAt: record.startTime ?? timestamps[0] ?? new Date().toISOString(),
-    endedAt: record.lastUpdated ?? timestamps[timestamps.length - 1] ?? new Date().toISOString(),
-    messages,
+    kind: 'parsed',
+    session: {
+      source: 'gemini',
+      sessionUuid: record.sessionId || filePath,
+      filePath,
+      title,
+      cwd,
+      model,
+      startedAt: record.startTime ?? timestamps[0] ?? new Date().toISOString(),
+      endedAt: record.lastUpdated ?? timestamps[timestamps.length - 1] ?? new Date().toISOString(),
+      messages,
+    },
+  }
+}
+
+export function parseGeminiSession(filePath: string): ParsedSession | null {
+  try {
+    const result = loadGeminiSession(filePath)
+    return result.kind === 'parsed' ? result.session : null
+  } catch {
+    return null
   }
 }
 

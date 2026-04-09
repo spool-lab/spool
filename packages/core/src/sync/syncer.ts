@@ -2,9 +2,9 @@ import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type Database from 'better-sqlite3'
-import { parseClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
-import { parseCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
-import { parseGeminiSession } from '../parsers/gemini.js'
+import { loadClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
+import { loadCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
+import { loadGeminiSession } from '../parsers/gemini.js'
 import type { SessionSource } from '../types.js'
 import { getSessionRoots } from './source-paths.js'
 import {
@@ -143,14 +143,14 @@ export class Syncer {
         : getSessionMtime(this.db, filePath)
       if (existingMtime === mtime) return 'skipped'
 
-      const parsed = source === 'claude'
-        ? parseClaudeSession(filePath)
+      const parseResult = source === 'claude'
+        ? loadClaudeSession(filePath)
         : source === 'codex'
-          ? parseCodexSession(filePath)
-          : parseGeminiSession(filePath)
+          ? loadCodexSession(filePath)
+          : loadGeminiSession(filePath)
 
-      if (!parsed) {
-        if (existingMtime !== null) {
+      if (parseResult.kind !== 'parsed') {
+        if (parseResult.kind === 'filtered' && existingMtime !== null) {
           this.db.prepare(`
             INSERT INTO sync_log (source_id, file_path, status, message)
             VALUES (?, ?, 'ok', ?)
@@ -160,6 +160,7 @@ export class Syncer {
         }
         return 'skipped'
       }
+      const parsed = parseResult.session
 
       if (source === 'codex') {
         const codexTitle = this.codexTitleIndex.get(parsed.sessionUuid)
@@ -309,23 +310,11 @@ function loadCodexSessionIndex(): Map<string, string> {
 }
 
 function buildSessionSearchText(messages: ParsedMessage[], role: 'user' | 'assistant'): string {
-  const MAX_CHARS = 60000
-  let result = ''
-
-  for (const message of messages) {
-    if (message.isSidechain || message.role !== role) continue
-    const text = message.contentText.trim()
-    if (!text) continue
-
-    const nextChunk = result ? `\n${text}` : text
-    if (result.length + nextChunk.length > MAX_CHARS) {
-      result += nextChunk.slice(0, Math.max(0, MAX_CHARS - result.length))
-      break
-    }
-    result += nextChunk
-  }
-
-  return result
+  return messages
+    .filter(message => !message.isSidechain && message.role === role)
+    .map(message => message.contentText.trim())
+    .filter(Boolean)
+    .join('\n')
 }
 
 function resolveProject(

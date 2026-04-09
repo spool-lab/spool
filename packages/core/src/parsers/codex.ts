@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
-import type { ParsedSession, ParsedMessage } from '../types.js'
+import type { ParseSessionResult, ParsedSession, ParsedMessage } from '../types.js'
 
 interface CodexRecord {
   timestamp: string
@@ -23,14 +23,8 @@ const INTERNAL_CODEX_SESSION_MARKERS = [
   '"risk_level":"low","risk_score"',
 ] as const
 
-export function parseCodexSession(filePath: string): ParsedSession | null {
-  let raw: string
-  try {
-    raw = readFileSync(filePath, 'utf8')
-  } catch {
-    return null
-  }
-
+export function loadCodexSession(filePath: string): ParseSessionResult {
+  const raw = readFileSync(filePath, 'utf8')
   const lines = raw.split('\n').filter(l => l.trim().length > 0)
   const eventMessages: ParsedMessage[] = []
   const responseMessages: ParsedMessage[] = []
@@ -158,8 +152,8 @@ export function parseCodexSession(filePath: string): ParsedSession | null {
     messages = responseMessages
   }
 
-  if (isInternalAssessmentSession) return null
-  if (messages.length === 0) return null
+  if (isInternalAssessmentSession) return { kind: 'filtered' }
+  if (messages.length === 0) return { kind: 'skipped' }
 
   // Re-number seq
   messages = messages.map((m, i) => ({ ...m, seq: i }))
@@ -169,15 +163,27 @@ export function parseCodexSession(filePath: string): ParsedSession | null {
   const timestamps = messages.filter(m => !m.isSidechain).map(m => m.timestamp).sort()
 
   return {
-    source: 'codex',
-    sessionUuid: sessionUuid || filePath,
-    filePath,
-    title,
-    cwd,
-    model,
-    startedAt: timestamps[0] ?? new Date().toISOString(),
-    endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
-    messages,
+    kind: 'parsed',
+    session: {
+      source: 'codex',
+      sessionUuid: sessionUuid || filePath,
+      filePath,
+      title,
+      cwd,
+      model,
+      startedAt: timestamps[0] ?? new Date().toISOString(),
+      endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
+      messages,
+    },
+  }
+}
+
+export function parseCodexSession(filePath: string): ParsedSession | null {
+  try {
+    const result = loadCodexSession(filePath)
+    return result.kind === 'parsed' ? result.session : null
+  } catch {
+    return null
   }
 }
 
