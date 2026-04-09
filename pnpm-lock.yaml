@@ -28,7 +28,7 @@ importers:
         version: 5.2.7
       '@shipany/open-agent-sdk':
         specifier: link:/Users/claw/code/linkclaw/open-agent-sdk
-        version: link:../../../../../../../claw/code/linkclaw/open-agent-sdk
+        version: link:../../../../../claw/code/linkclaw/open-agent-sdk
       '@spool/core':
         specifier: workspace:*
         version: link:../core
@@ -39,8 +39,8 @@ importers:
         specifier: ^0.21.0
         version: 0.21.0
       acp-extension-codex:
-        specifier: 0.9.6
-        version: 0.9.6
+        specifier: ^0.10.0
+        version: 0.10.0
       better-sqlite3:
         specifier: ^11.10.0
         version: 11.10.0
@@ -110,8 +110,11 @@ importers:
         version: 6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)
     optionalDependencies:
       acp-extension-codex-darwin-arm64:
-        specifier: 0.9.6
-        version: 0.9.6
+        specifier: ^0.10.0
+        version: 0.10.0
+      acp-extension-codex-linux-x64:
+        specifier: ^0.10.0
+        version: 0.10.0
 
   packages/cli:
     dependencies:
@@ -1630,32 +1633,44 @@ packages:
     resolution: {integrity: sha512-DwRRgYRXsA8TAMSA205Q9HEIl/soxNdEt5DlUivHqJMxv16I2uwJ8TKjzsDidBIpB/4vnXhBeBuihFycKcCJlA==}
     hasBin: true
 
-  acp-extension-codex-darwin-arm64@0.9.6:
-    resolution: {integrity: sha512-cTWQkPo81jTCA4SavKmWXo8PmU69dO+AWep7SNxwIyVMFe3N847M3wqM/ObaiNDuzK7/v5mxGEA/rv3N/fP61A==}
+  acp-extension-codex-darwin-arm64@0.10.0:
+    resolution: {integrity: sha512-YkRkWG+osG+mf8QgaYqteKHIuzqiU4XD3nzQAT+XjfVvh7xGOnBJGV5e3U3qlf0WJuKiBUDARpugy9CGB4ZjVQ==}
     cpu: [arm64]
     os: [darwin]
     hasBin: true
 
-  acp-extension-codex-darwin-x64@0.9.6:
-    resolution: {integrity: sha512-Dn3oFqm8BuKrRJE0Go68gveY/ZsszSIFUgmf8HSuvfiTQV0KGbxWmlvIFMmbxAaN9qMqBsg8J/CXPLVQ4wX6wA==}
+  acp-extension-codex-darwin-x64@0.10.0:
+    resolution: {integrity: sha512-RFHO7xCKePPKHSmcadnTtmIK7Qd0CiXbjFfj2obv4bXC7edNgDAU5RVeLPIvG6nfnJIZ3iDIU/O3eWaUixV5rg==}
     cpu: [x64]
     os: [darwin]
     hasBin: true
 
-  acp-extension-codex-win32-arm64@0.9.6:
-    resolution: {integrity: sha512-ADQYuXM5gQN3n+VHRuddM80YJgOGo/t178j7nGyDIfNWK4zIl/1/cxiryoyKWXVYMfPouhtJn0u0z0EXiTnVvw==}
+  acp-extension-codex-linux-arm64@0.10.0:
+    resolution: {integrity: sha512-v4xhT3mTBSloewFoixX1sq/KnrwhaR5yVk65Ms830HY0+sRGpgWQ1N9G83Yo2Aik/VhCVEiR/qjoWcJGGUcmXg==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  acp-extension-codex-linux-x64@0.10.0:
+    resolution: {integrity: sha512-moK4grQe2XaS5P/jL/HCia3z0HgBHXdUZLRP/WWTaouQFY5U4bvQv0dQIpwdPPOWkPguVIV4+3WKP2VdA2X8cg==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  acp-extension-codex-win32-arm64@0.10.0:
+    resolution: {integrity: sha512-plrB26PtpfP1VsU9XKwV0IwzAQrQWFSRvvBfIbe54cWH50jntY7U8qDfjNM92T/Wkivw9U3VY/yTabVjjgwKBQ==}
     cpu: [arm64]
     os: [win32]
     hasBin: true
 
-  acp-extension-codex-win32-x64@0.9.6:
-    resolution: {integrity: sha512-0cHBZw0qjIrFpK6atU2yNz63iMYs075TIC3nyAIEzcgjGPGBfxap1i65LbuBtWWfYUFe/4T9vcwcnBB3rwqLrg==}
+  acp-extension-codex-win32-x64@0.10.0:
+    resolution: {integrity: sha512-WjLM52b7nSK5N5HlCrGLgs0vuKfgYeOJn3PNmeS/TS8fwgIw7vuXpafoJV8tW/EcZibVAfgZFbrKFp2Rr3XiKQ==}
     cpu: [x64]
     os: [win32]
     hasBin: true
 
-  acp-extension-codex@0.9.6:
-    resolution: {integrity: sha512-fdIZb70aJ7KkYgb8aaaO5B3PRInf0pL3w/GqJStlh9G9Mlhxd7WKNg1fE7VITjf+YQszCJONVbzNn0x523XpmA==}
+  acp-extension-codex@0.10.0:
+    resolution: {integrity: sha512-vpyXIe1uvf8sFpzOChK/4Msf70+VyYEcs2OC2HbHIhQnYIX86dTslPI/rDLb9BOpG2S4WicFnybheuDGR3AIRw==}
     hasBin: true
 
   acp-extension-core@0.0.5:
@@ -2539,7 +2554,7 @@ packages:
   glob@8.1.0:
     resolution: {integrity: sha512-r8hpEjiQEYlF2QU0df3dS+nxxSIreXQS1qRhMJM0Q5NDdR386C7jb7Hwwod8Fgiuex+k0GFjgft18yvxm5XoCQ==}
     engines: {node: '>=12'}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   global-agent@3.0.0:
     resolution: {integrity: sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q==}
@@ -5839,24 +5854,32 @@ snapshots:
       acp-extension-core: 0.0.5
       zod: 4.3.6
 
-  acp-extension-codex-darwin-arm64@0.9.6:
+  acp-extension-codex-darwin-arm64@0.10.0:
     optional: true
 
-  acp-extension-codex-darwin-x64@0.9.6:
+  acp-extension-codex-darwin-x64@0.10.0:
     optional: true
 
-  acp-extension-codex-win32-arm64@0.9.6:
+  acp-extension-codex-linux-arm64@0.10.0:
     optional: true
 
-  acp-extension-codex-win32-x64@0.9.6:
+  acp-extension-codex-linux-x64@0.10.0:
     optional: true
 
-  acp-extension-codex@0.9.6:
+  acp-extension-codex-win32-arm64@0.10.0:
+    optional: true
+
+  acp-extension-codex-win32-x64@0.10.0:
+    optional: true
+
+  acp-extension-codex@0.10.0:
     optionalDependencies:
-      acp-extension-codex-darwin-arm64: 0.9.6
-      acp-extension-codex-darwin-x64: 0.9.6
-      acp-extension-codex-win32-arm64: 0.9.6
-      acp-extension-codex-win32-x64: 0.9.6
+      acp-extension-codex-darwin-arm64: 0.10.0
+      acp-extension-codex-darwin-x64: 0.10.0
+      acp-extension-codex-linux-arm64: 0.10.0
+      acp-extension-codex-linux-x64: 0.10.0
+      acp-extension-codex-win32-arm64: 0.10.0
+      acp-extension-codex-win32-x64: 0.10.0
 
   acp-extension-core@0.0.5: {}
 
