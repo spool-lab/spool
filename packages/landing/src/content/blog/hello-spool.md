@@ -6,7 +6,7 @@ author: Yifeng
 tags: [announcement, product]
 ---
 
-If you use Claude Code, Codex, or any AI coding agent daily, you've accumulated hundreds of sessions. Each one contains decisions, debugging breakthroughs, architectural discussions — your best thinking, scattered across session files on your machine.
+If you use Claude Code, Codex, Gemini CLI, or any AI coding agent daily, you've accumulated hundreds of sessions. Each one contains decisions, debugging breakthroughs, architectural discussions — your best thinking, scattered across session files on your machine.
 
 Spool makes all of that searchable.
 
@@ -20,7 +20,7 @@ You can't grep through JSONL files and get useful results. You can't ask your ag
 
 Spool watches your session directories in real time. Every conversation becomes searchable the moment it's written — no manual export, no copy-paste.
 
-It also indexes data from 50+ platforms via [OpenCLI](https://github.com/jackwener/opencli): your GitHub stars, Twitter bookmarks, Reddit saves, and more. All local, all on your machine.
+It also indexes data from installable connector plugins: your GitHub stars, Twitter bookmarks, Reddit saves, and more. All local, all on your machine.
 
 ## What's next: agent-native search
 

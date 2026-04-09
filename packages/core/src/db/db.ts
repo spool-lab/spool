@@ -40,7 +40,7 @@ function runMigrations(db: Database.Database): void {
     INSERT OR IGNORE INTO sources (name, base_path) VALUES
       ('claude', '~/.claude/projects'),
       ('codex',  '~/.codex/sessions'),
-      ('opencli', '~/.spool/opencli');
+      ('gemini', '~/.gemini/tmp');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,
@@ -97,17 +97,12 @@ function runMigrations(db: Database.Database): void {
       tokenize='unicode61 remove_diacritics 1'
     );
 
-    CREATE TRIGGER IF NOT EXISTS messages_fts_insert
-    AFTER INSERT ON messages BEGIN
-      INSERT INTO messages_fts(rowid, content_text)
-        VALUES(NEW.id, NEW.content_text);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS messages_fts_delete
-    AFTER DELETE ON messages BEGIN
-      INSERT INTO messages_fts(messages_fts, rowid, content_text)
-        VALUES('delete', OLD.id, OLD.content_text);
-    END;
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
+      content_text,
+      content='messages',
+      content_rowid='id',
+      tokenize='trigram'
+    );
 
     CREATE TABLE IF NOT EXISTS sync_log (
       id        INTEGER PRIMARY KEY,
@@ -118,24 +113,37 @@ function runMigrations(db: Database.Database): void {
       synced_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- ── OpenCLI tables ──────────────────────────────────────────────────────
-
-    CREATE TABLE IF NOT EXISTS opencli_sources (
-      id          INTEGER PRIMARY KEY,
-      source_id   INTEGER NOT NULL REFERENCES sources(id),
-      platform    TEXT NOT NULL,
-      command     TEXT NOT NULL,
-      enabled     INTEGER NOT NULL DEFAULT 1,
-      last_synced TEXT,
-      sync_count  INTEGER NOT NULL DEFAULT 0,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (platform, command)
+    CREATE TABLE IF NOT EXISTS session_search (
+      session_id      INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+      title           TEXT NOT NULL DEFAULT '',
+      user_text       TEXT NOT NULL DEFAULT '',
+      assistant_text  TEXT NOT NULL DEFAULT '',
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
+      title,
+      user_text,
+      assistant_text,
+      content='session_search',
+      content_rowid='session_id',
+      tokenize='unicode61 remove_diacritics 1'
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts_trigram USING fts5(
+      title,
+      user_text,
+      assistant_text,
+      content='session_search',
+      content_rowid='session_id',
+      tokenize='trigram'
+    );
+
+    -- ── Captures (connector items) ─────────────────────────────────────────
 
     CREATE TABLE IF NOT EXISTS captures (
       id              INTEGER PRIMARY KEY,
       source_id       INTEGER NOT NULL REFERENCES sources(id),
-      opencli_src_id  INTEGER REFERENCES opencli_sources(id),
       capture_uuid    TEXT NOT NULL UNIQUE,
       url             TEXT NOT NULL,
       title           TEXT NOT NULL DEFAULT '',
@@ -164,21 +172,12 @@ function runMigrations(db: Database.Database): void {
       tokenize='unicode61 remove_diacritics 1'
     );
 
-    CREATE TRIGGER IF NOT EXISTS captures_fts_insert
-    AFTER INSERT ON captures BEGIN
-      INSERT INTO captures_fts(rowid, title, content_text)
-        VALUES(NEW.id, NEW.title, NEW.content_text);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS captures_fts_delete
-    AFTER DELETE ON captures BEGIN
-      INSERT INTO captures_fts(captures_fts, rowid, title, content_text)
-        VALUES('delete', OLD.id, OLD.title, OLD.content_text);
-    END;
-
-    CREATE TABLE IF NOT EXISTS opencli_setup (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+    CREATE VIRTUAL TABLE IF NOT EXISTS captures_fts_trigram USING fts5(
+      title,
+      content_text,
+      content='captures',
+      content_rowid='id',
+      tokenize='trigram'
     );
 
     -- ── Connector sync state ────────────────────────────────────────────────
@@ -199,4 +198,97 @@ function runMigrations(db: Database.Database): void {
       last_error_message  TEXT
     );
   `)
+
+  db.exec(`
+    DROP TRIGGER IF EXISTS messages_fts_insert;
+    DROP TRIGGER IF EXISTS messages_fts_delete;
+    DROP TRIGGER IF EXISTS captures_fts_insert;
+    DROP TRIGGER IF EXISTS captures_fts_delete;
+    DROP TRIGGER IF EXISTS session_search_fts_insert;
+    DROP TRIGGER IF EXISTS session_search_fts_update;
+    DROP TRIGGER IF EXISTS session_search_fts_delete;
+
+    CREATE TRIGGER messages_fts_insert
+    AFTER INSERT ON messages BEGIN
+      INSERT INTO messages_fts(rowid, content_text)
+        VALUES(NEW.id, NEW.content_text);
+      INSERT INTO messages_fts_trigram(rowid, content_text)
+        VALUES(NEW.id, NEW.content_text);
+    END;
+
+    CREATE TRIGGER messages_fts_delete
+    AFTER DELETE ON messages BEGIN
+      INSERT INTO messages_fts(messages_fts, rowid, content_text)
+        VALUES('delete', OLD.id, OLD.content_text);
+      INSERT INTO messages_fts_trigram(messages_fts_trigram, rowid, content_text)
+        VALUES('delete', OLD.id, OLD.content_text);
+    END;
+
+    CREATE TRIGGER captures_fts_insert
+    AFTER INSERT ON captures BEGIN
+      INSERT INTO captures_fts(rowid, title, content_text)
+        VALUES(NEW.id, NEW.title, NEW.content_text);
+      INSERT INTO captures_fts_trigram(rowid, title, content_text)
+        VALUES(NEW.id, NEW.title, NEW.content_text);
+    END;
+
+    CREATE TRIGGER captures_fts_delete
+    AFTER DELETE ON captures BEGIN
+      INSERT INTO captures_fts(captures_fts, rowid, title, content_text)
+        VALUES('delete', OLD.id, OLD.title, OLD.content_text);
+      INSERT INTO captures_fts_trigram(captures_fts_trigram, rowid, title, content_text)
+        VALUES('delete', OLD.id, OLD.title, OLD.content_text);
+    END;
+
+    CREATE TRIGGER session_search_fts_insert
+    AFTER INSERT ON session_search BEGIN
+      INSERT INTO session_search_fts(rowid, title, user_text, assistant_text)
+        VALUES(NEW.session_id, NEW.title, NEW.user_text, NEW.assistant_text);
+      INSERT INTO session_search_fts_trigram(rowid, title, user_text, assistant_text)
+        VALUES(NEW.session_id, NEW.title, NEW.user_text, NEW.assistant_text);
+    END;
+
+    CREATE TRIGGER session_search_fts_update
+    AFTER UPDATE ON session_search BEGIN
+      INSERT INTO session_search_fts(session_search_fts, rowid, title, user_text, assistant_text)
+        VALUES('delete', OLD.session_id, OLD.title, OLD.user_text, OLD.assistant_text);
+      INSERT INTO session_search_fts(rowid, title, user_text, assistant_text)
+        VALUES(NEW.session_id, NEW.title, NEW.user_text, NEW.assistant_text);
+      INSERT INTO session_search_fts_trigram(session_search_fts_trigram, rowid, title, user_text, assistant_text)
+        VALUES('delete', OLD.session_id, OLD.title, OLD.user_text, OLD.assistant_text);
+      INSERT INTO session_search_fts_trigram(rowid, title, user_text, assistant_text)
+        VALUES(NEW.session_id, NEW.title, NEW.user_text, NEW.assistant_text);
+    END;
+
+    CREATE TRIGGER session_search_fts_delete
+    AFTER DELETE ON session_search BEGIN
+      INSERT INTO session_search_fts(session_search_fts, rowid, title, user_text, assistant_text)
+        VALUES('delete', OLD.session_id, OLD.title, OLD.user_text, OLD.assistant_text);
+      INSERT INTO session_search_fts_trigram(session_search_fts_trigram, rowid, title, user_text, assistant_text)
+        VALUES('delete', OLD.session_id, OLD.title, OLD.user_text, OLD.assistant_text);
+    END;
+  `)
+
+  rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
+  rebuildFtsTableIfEmpty(db, 'captures', 'captures_fts_trigram')
+  rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
+  rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
+}
+
+function rebuildFtsTableIfEmpty(
+  db: Database.Database,
+  contentTable: 'messages' | 'captures' | 'session_search',
+  ftsTable:
+    | 'messages_fts_trigram'
+    | 'captures_fts_trigram'
+    | 'session_search_fts'
+    | 'session_search_fts_trigram',
+): void {
+  const sourceCount = (db.prepare(`SELECT COUNT(*) AS count FROM ${contentTable}`).get() as { count: number }).count
+  if (sourceCount === 0) return
+
+  const indexCount = (db.prepare(`SELECT COUNT(*) AS count FROM ${ftsTable}`).get() as { count: number }).count
+  if (indexCount > 0) return
+
+  db.exec(`INSERT INTO ${ftsTable}(${ftsTable}) VALUES('rebuild')`)
 }

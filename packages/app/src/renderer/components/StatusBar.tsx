@@ -4,17 +4,16 @@ import type { SearchMode } from './SearchBar.js'
 
 interface Props {
   syncStatus: { phase: string; count: number; total: number } | null
-  searchMode?: SearchMode
-  aiAgent?: string
-  aiAgentMode?: string
-  onSourcesClick?: () => void
-  onSettingsClick?: () => void
+  searchMode?: SearchMode | undefined
+  aiAgent?: string | undefined
+  aiAgentMode?: string | undefined
+  onSettingsClick?: (() => void) | undefined
 }
 
 interface UpdateStatus {
   status: 'available' | 'downloading' | 'ready' | 'error'
-  version?: string
-  percent?: number
+  version?: string | undefined
+  percent?: number | undefined
 }
 
 export default function StatusBar({
@@ -22,7 +21,6 @@ export default function StatusBar({
   searchMode = 'fast',
   aiAgent,
   aiAgentMode,
-  onSourcesClick,
   onSettingsClick,
 }: Props) {
   const [status, setStatus] = useState<StatusInfo | null>(null)
@@ -48,9 +46,7 @@ export default function StatusBar({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div
-      className="flex-none h-[30px] border-t border-warm-border dark:border-dark-border flex items-center justify-between px-4 bg-warm-surface dark:bg-dark-surface"
-    >
+    <div className="flex-none h-[30px] bg-warm-surface dark:bg-dark-surface border-t border-warm-border dark:border-dark-border flex items-center justify-between px-4">
       <div className="flex items-center gap-1.5">
         {isAiMode ? (
           <span className="w-1.5 h-1.5 rounded-full flex-none bg-accent dark:bg-accent-dark" />
@@ -85,16 +81,6 @@ export default function StatusBar({
           >
             <span className="w-1.5 h-1.5 rounded-full bg-accent dark:bg-accent-dark" />
             Restart to update
-          </button>
-        )}
-        {onSourcesClick && (
-          <button
-            type="button"
-            onClick={onSourcesClick}
-            title="Data sources"
-            className="text-[11px] text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors font-medium"
-          >
-            Sources
           </button>
         )}
         <button

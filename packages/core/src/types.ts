@@ -1,4 +1,6 @@
-export type Source = 'claude' | 'codex' | 'opencli'
+export type SessionSource = 'claude' | 'codex' | 'gemini'
+export type Source = SessionSource
+export type SearchMatchType = 'fts' | 'phrase' | 'all_terms'
 
 export interface ParsedMessage {
   uuid: string
@@ -12,7 +14,7 @@ export interface ParsedMessage {
 }
 
 export interface ParsedSession {
-  source: Source
+  source: SessionSource
   sessionUuid: string
   filePath: string
   title: string
@@ -22,6 +24,11 @@ export interface ParsedSession {
   endedAt: string
   messages: ParsedMessage[]
 }
+
+export type ParseSessionResult =
+  | { kind: 'parsed'; session: ParsedSession }
+  | { kind: 'filtered' }
+  | { kind: 'skipped' }
 
 export interface Session {
   id: number
@@ -36,7 +43,7 @@ export interface Session {
   hasToolUse: boolean
   cwd: string | null
   model: string | null
-  source: Source
+  source: SessionSource
   projectDisplayPath: string
   projectDisplayName: string
 }
@@ -59,7 +66,9 @@ export interface FragmentResult {
   sessionId: number
   sessionUuid: string
   sessionTitle: string
-  source: Source
+  matchCount: number
+  matchType: SearchMatchType
+  source: SessionSource
   profileLabel?: string
   cwd?: string
   project: string
@@ -75,6 +84,7 @@ export interface StatusInfo {
   totalSessions: number
   claudeSessions: number
   codexSessions: number
+  geminiSessions: number
   lastSyncedAt: string | null
   dbSizeBytes: number
 }
@@ -85,12 +95,13 @@ export interface SyncResult {
   errors: number
 }
 
-// ── OpenCLI Types ────────────────────────────────────────────────────────────
+// ── Capture Types ────────────────────────────────────────────────────────────
 
 export interface CaptureResult {
   rank: number
   captureId: number
   captureUuid: string
+  matchType: SearchMatchType
   url: string
   title: string
   snippet: string
@@ -98,32 +109,6 @@ export interface CaptureResult {
   contentType: string
   author: string | null
   capturedAt: string
-}
-
-export interface OpenCLISource {
-  id: number
-  sourceId: number
-  platform: string
-  command: string
-  enabled: boolean
-  lastSynced: string | null
-  syncCount: number
-}
-
-export interface OpenCLISetupStatus {
-  cliInstalled: boolean
-  cliVersion: string | null
-  browserBridgeReady: boolean
-  connectivityOk: boolean
-  connectivityError: string | null
-  chromeRunning: boolean
-}
-
-export interface PlatformInfo {
-  platform: string
-  command: string
-  label: string
-  description: string
 }
 
 export interface CapturedItem {

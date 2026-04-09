@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { ConnectorStatus } from '@spool/core'
+import type { AgentInfo, AgentsConfig, SdkAgentConfig } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
+import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -19,25 +21,8 @@ const TERMINAL_OPTIONS = [
   { value: 'WezTerm', label: 'WezTerm' },
 ] as const
 
-interface AgentInfo {
-  id: string
-  name: string
-  path: string
-  status: 'ready' | 'not_found' | 'not_running'
-  acpMode: 'extension' | 'native' | 'websocket' | 'sdk'
-}
-
-interface SdkAgentConfig {
-  apiKey?: string
-  model?: string
-  baseURL?: string
-}
-
-interface AgentsConfig {
-  defaultAgent?: string
-  defaultSearchSort?: SearchSortOrder
-  terminal?: string
-  sdkAgent?: SdkAgentConfig
+type SdkAgentPatch = Omit<Partial<SdkAgentConfig>, 'baseURL'> & {
+  baseURL?: string | null
 }
 
 interface Props {
@@ -45,6 +30,7 @@ interface Props {
   initialTab?: SettingsTab
   claudeCount: number | null
   codexCount: number | null
+  geminiCount: number | null
   themeEditor: ThemeEditorStateV1
   onThemeEditorChange: (next: ThemeEditorStateV1) => void
 }
@@ -138,6 +124,7 @@ export default function SettingsPanel({
   initialTab = 'general',
   claudeCount,
   codexCount,
+  geminiCount,
   themeEditor,
   onThemeEditorChange,
 }: Props) {
@@ -203,13 +190,11 @@ export default function SettingsPanel({
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {tab === 'general' && (
-              <GeneralTab />
-            )}
+            {tab === 'general' && <GeneralTab />}
             {tab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
-            {tab === 'connectors' && <ConnectorsTab claudeCount={claudeCount} codexCount={codexCount} />}
+            {tab === 'connectors' && <ConnectorsTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
             {tab === 'agent' && <AgentTab />}
           </div>
         </div>
@@ -234,6 +219,14 @@ function GeneralTab() {
     try { await window.spool.setAgentsConfig(next) } catch {}
   }
 
+  const handleTerminalChange = (value: string) => {
+    const next: AgentsConfig = { ...config }
+    if (value) next.terminal = value
+    else delete next.terminal
+    setConfig(next)
+    void window.spool?.setAgentsConfig(next)
+  }
+
   return (
     <div className="space-y-6">
       {/* Search */}
@@ -254,7 +247,7 @@ function GeneralTab() {
           <span className="text-xs text-warm-muted dark:text-dark-muted">Session resume</span>
           <SmallSelect
             value={config.terminal ?? ''}
-            onChange={(v) => updateConfig({ terminal: v || undefined } as Partial<AgentsConfig>)}
+            onChange={handleTerminalChange}
             options={TERMINAL_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           />
         </div>
@@ -318,7 +311,7 @@ function AppearanceTab({
 
 // ── Connectors Tab ─────────────────────────────────────────────────────────
 
-function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null; codexCount: number | null }) {
+function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
   const [connectorCounts, setConnectorCounts] = useState<Record<string, number>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -482,8 +475,9 @@ function ConnectorsTab({ claudeCount, codexCount }: { claudeCount: number | null
   return (
     <div className="space-y-5">
       <Section title="Agent Sessions">
-        <BuiltInSource name="Claude Code" color="#6B5B8A" count={claudeCount} />
-        <BuiltInSource name="Codex CLI" color="#1A6B3C" count={codexCount} />
+        <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
+        <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
+        <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
       </Section>
 
       <Section title="Data Sources">
@@ -571,6 +565,15 @@ function AgentTab() {
     try { await window.spool.setAgentsConfig(next) } catch {}
   }
 
+  const updateSdkAgent = (patch: SdkAgentPatch) => {
+    const current = config.sdkAgent ?? {}
+    const { baseURL, ...restPatch } = patch
+    const nextSdkAgent: SdkAgentConfig = { ...current, ...restPatch }
+    if (baseURL) nextSdkAgent.baseURL = baseURL
+    else delete nextSdkAgent.baseURL
+    void updateConfig({ sdkAgent: nextSdkAgent })
+  }
+
   return (
     <div className="space-y-6">
       {/* Built-in Agent */}
@@ -605,7 +608,7 @@ function AgentTab() {
                 <input
                   type="password"
                   value={config.sdkAgent?.apiKey ?? ''}
-                  onChange={(e) => updateConfig({ sdkAgent: { ...config.sdkAgent, apiKey: e.target.value } })}
+                  onChange={(e) => updateSdkAgent({ apiKey: e.target.value })}
                   placeholder="sk-ant-..."
                   className="flex-1 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2.5 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent placeholder:text-warm-faint/50 dark:placeholder:text-dark-muted/50"
                 />
@@ -614,7 +617,7 @@ function AgentTab() {
                 <div className="relative flex-1">
                   <select
                     value={config.sdkAgent?.model ?? 'claude-sonnet-4-6'}
-                    onChange={(e) => updateConfig({ sdkAgent: { ...config.sdkAgent, model: e.target.value } })}
+                    onChange={(e) => updateSdkAgent({ model: e.target.value })}
                     className="appearance-none w-full h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg pl-2.5 pr-7 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent"
                   >
                     {SDK_MODEL_OPTIONS.map(opt => (
@@ -628,7 +631,7 @@ function AgentTab() {
                 <input
                   type="text"
                   value={config.sdkAgent?.baseURL ?? ''}
-                  onChange={(e) => updateConfig({ sdkAgent: { ...config.sdkAgent, baseURL: e.target.value || undefined } })}
+                  onChange={(e) => updateSdkAgent({ baseURL: e.target.value || null })}
                   placeholder="Default (Anthropic API)"
                   className="flex-1 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2.5 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent placeholder:text-warm-faint/50 dark:placeholder:text-dark-muted/50"
                 />

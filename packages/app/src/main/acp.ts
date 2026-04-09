@@ -5,6 +5,16 @@ import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import WebSocketImpl from 'ws'
 import { cachedResolve, type FragmentResult } from '@spool/core'
+import type {
+  Client as AcpClient,
+  CreateTerminalRequest,
+  CreateTerminalResponse,
+  ReadTextFileRequest,
+  ReadTextFileResponse,
+  SessionNotification as AcpSessionNotification,
+  TerminalOutputRequest,
+  TerminalOutputResponse,
+} from '@agentclientprotocol/sdk'
 
 export interface AgentInfo {
   id: string
@@ -18,17 +28,17 @@ export interface ToolCallEvent {
   toolCallId: string
   title: string
   status: string
-  kind?: string
+  kind?: string | undefined
 }
 
 /** Configuration for the built-in Open Agent SDK runtime */
 export interface SdkAgentConfig {
   /** Anthropic API key (or third-party provider key) */
-  apiKey?: string
+  apiKey?: string | undefined
   /** Model ID (e.g. 'claude-sonnet-4-6') */
-  model?: string
+  model?: string | undefined
   /** API base URL override (for OpenRouter or other providers) */
-  baseURL?: string
+  baseURL?: string | undefined
 }
 
 /** User-facing config stored in ~/.spool/agents.json */
@@ -59,17 +69,12 @@ interface AcpSession {
   initialized: boolean
 }
 
-interface TerminalParams { command?: string; args?: string[]; cwd?: string; sessionId?: string }
-interface TerminalIdParams { terminalId: string; sessionId?: string }
-interface ReadFileParams { path: string; sessionId?: string }
-interface SessionNotification { update?: { sessionUpdate?: string; content?: { type: string; text?: string }; toolCallId?: string; title?: string; status?: string; kind?: string } }
-
 /**
  * ACP Manager — connects to local agents via the Agent Client Protocol.
  *
  * Supports three connection modes:
  *   - extension: via acp-extension-{name} npm packages (Claude Code, Codex CLI)
- *   - native:    CLI itself is ACP server, spawn `{bin} acp` (Kimi, OpenCode)
+ *   - native:    CLI itself is ACP server, spawn `{bin} {acpArgs}` (Gemini, Kimi, OpenCode)
  *   - websocket: HTTP + WebSocket API, non-ACP (Alma)
  */
 
@@ -127,6 +132,12 @@ const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Codex CLI',
     bin: 'codex',
     acpMode: 'extension',
+  },
+  gemini: {
+    name: 'Gemini CLI',
+    bin: 'gemini',
+    acpMode: 'native',
+    acpArgs: ['--acp'],
   },
   kimi: {
     name: 'Kimi Code',
@@ -285,7 +296,7 @@ export class AcpManager {
   /**
    * Query via ACP protocol.
    * For 'extension' mode: spawns acp-extension-{name} package.
-   * For 'native' mode: spawns `{bin} acp` directly (kimi, opencode).
+   * For 'native' mode: spawns `{bin} {acpArgs}` directly (gemini, kimi, opencode).
    * Establishes ClientSideConnection, then does initialize → newSession → prompt
    * with streaming sessionUpdate chunks.
    */
@@ -368,7 +379,13 @@ export class AcpManager {
     let fullText = ''
 
     const MAX_TERMINAL_OUTPUT = 1024 * 1024 // 1 MB cap
-    const terminals = new Map<string, { proc: ChildProcess; output: string; exitCode: number | null }>()
+    const terminals = new Map<string, {
+      proc: ChildProcess
+      output: string
+      exitCode: number | null
+      signal: NodeJS.Signals | null
+      truncated: boolean
+    }>()
     let terminalCounter = 0
 
     function killTerminalProc(t: { proc: ChildProcess }) {
@@ -380,7 +397,7 @@ export class AcpManager {
       terminals.clear()
     }
 
-    const conn = new acp.ClientSideConnection(() => ({
+    const conn = new acp.ClientSideConnection((): AcpClient => ({
       requestPermission: async (params: { options?: Array<{ optionId: string; kind?: string }> }) => {
         try {
           // Auto-approve: pick the first allow/approve option from the agent's list
@@ -394,58 +411,87 @@ export class AcpManager {
         }
       },
       extMethod: async () => ({}),
-      createTerminal: async (params: TerminalParams) => {
+      createTerminal: async (params: CreateTerminalRequest): Promise<CreateTerminalResponse> => {
         const id = `term-${++terminalCounter}`
-        const termProc = spawn(params.command ?? 'bash', params.args ?? [], {
-          cwd: params.cwd || process.cwd(),
+        const termProc = spawn(params.command, params.args ?? [], {
+          cwd: params.cwd ?? process.cwd(),
           env: process.env,
           stdio: ['pipe', 'pipe', 'pipe'],
           shell: true,
         })
-        const state = { proc: termProc, output: '', exitCode: null as number | null }
+        const state = {
+          proc: termProc,
+          output: '',
+          exitCode: null as number | null,
+          signal: null as NodeJS.Signals | null,
+          truncated: false,
+        }
         const append = (d: Buffer) => {
-          if (state.output.length < MAX_TERMINAL_OUTPUT) state.output += d.toString()
+          if (state.output.length < MAX_TERMINAL_OUTPUT) {
+            state.output += d.toString()
+            if (state.output.length > MAX_TERMINAL_OUTPUT) {
+              state.output = state.output.slice(0, MAX_TERMINAL_OUTPUT)
+              state.truncated = true
+            }
+          } else {
+            state.truncated = true
+          }
         }
         termProc.stdout?.on('data', append)
         termProc.stderr?.on('data', append)
-        termProc.on('close', (code) => { state.exitCode = code })
+        termProc.on('close', (code, signal) => {
+          state.exitCode = code
+          state.signal = signal
+        })
         terminals.set(id, state)
         return { terminalId: id }
       },
-      terminalOutput: async (params: TerminalIdParams) => {
+      terminalOutput: async (params: TerminalOutputRequest): Promise<TerminalOutputResponse> => {
         const t = terminals.get(params.terminalId)
-        return { output: t?.output ?? '', exitCode: t?.exitCode ?? null }
+        return {
+          output: t?.output ?? '',
+          truncated: t?.truncated ?? false,
+          ...(t && (t.exitCode !== null || t.signal !== null)
+            ? { exitStatus: { exitCode: t.exitCode, signal: t.signal ?? null } }
+            : {}),
+        }
       },
-      waitForTerminalExit: async (params: TerminalIdParams) => {
+      waitForTerminalExit: async (params) => {
         const t = terminals.get(params.terminalId)
         if (!t) return { exitCode: -1 }
-        if (t.exitCode !== null) return { exitCode: t.exitCode }
+        if (t.exitCode !== null || t.signal !== null) return { exitCode: t.exitCode, signal: t.signal ?? null }
         return new Promise((resolve) => {
-          t.proc.on('close', (code) => resolve({ exitCode: code ?? -1 }))
+          t.proc.on('close', (code, signal) => resolve({ exitCode: code ?? null, signal: signal ?? null }))
         })
       },
-      killTerminal: async (params: TerminalIdParams) => {
+      killTerminal: async (params) => {
         const t = terminals.get(params.terminalId)
         if (t) killTerminalProc(t)
         return {}
       },
-      releaseTerminal: async (params: TerminalIdParams) => {
+      releaseTerminal: async (params) => {
         const t = terminals.get(params.terminalId)
         if (t) killTerminalProc(t)
         terminals.delete(params.terminalId)
         return {}
       },
-      readTextFile: async (params: ReadFileParams) => {
+      readTextFile: async (params: ReadTextFileRequest): Promise<ReadTextFileResponse> => {
         try {
           return { content: await readFile(params.path, 'utf8') }
         } catch {
           return { content: '' }
         }
       },
-      sessionUpdate: async (notification: SessionNotification) => {
+      sessionUpdate: async (notification: AcpSessionNotification) => {
         try {
-          const update = notification.update
-          if (!update || !('sessionUpdate' in update)) return
+          const update = notification.update as {
+            sessionUpdate: string
+            content?: { type: string; text?: string }
+            toolCallId?: string
+            title?: string | null
+            status?: string | null
+            kind?: string | null
+          }
 
           switch (update.sessionUpdate) {
             case 'agent_message_chunk': {
@@ -458,21 +504,23 @@ export class AcpManager {
               break
             }
             case 'tool_call': {
-              onToolCall?.({
+              const toolCall = {
                 toolCallId: update.toolCallId ?? `tool-${Date.now()}`,
                 title: update.title ?? 'Tool call',
                 status: update.status ?? 'in_progress',
-                kind: update.kind,
-              })
+                ...(update.kind ? { kind: update.kind } : {}),
+              }
+              onToolCall?.(toolCall)
               break
             }
             case 'tool_call_update': {
-              onToolCall?.({
+              const toolCall = {
                 toolCallId: update.toolCallId ?? `tool-${Date.now()}`,
                 title: update.title ?? '',
                 status: update.status ?? 'in_progress',
-                kind: update.kind,
-              })
+                ...(update.kind ? { kind: update.kind } : {}),
+              }
+              onToolCall?.(toolCall)
               break
             }
           }
@@ -573,7 +621,20 @@ export class AcpManager {
     const sdkCfg = userConfig?.sdkAgent
     if (!sdkCfg?.apiKey) throw new Error('Open Agent requires an API key. Configure it in Settings.')
 
-    const { createAgent } = await import('@shipany/open-agent-sdk')
+    const sdkImportPath = '@shipany/open-agent-sdk'
+    const { createAgent } = await import(/* @vite-ignore */ sdkImportPath) as {
+      createAgent: (config: {
+        apiKey: string
+        model: string
+        baseURL?: string | undefined
+        permissionMode: string
+        allowedTools: string[]
+        abortSignal: AbortSignal
+        maxTurns: number
+      }) => {
+        query: (query: string) => AsyncIterable<unknown>
+      }
+    }
 
     const abortController = new AbortController()
     this.activeSdkAbort = abortController
@@ -581,7 +642,7 @@ export class AcpManager {
     const agent = createAgent({
       apiKey: sdkCfg.apiKey,
       model: sdkCfg.model || 'claude-sonnet-4-6',
-      baseURL: sdkCfg.baseURL || undefined,
+      ...(sdkCfg.baseURL ? { baseURL: sdkCfg.baseURL } : {}),
       permissionMode: 'bypassPermissions',
       allowedTools: ['Bash', 'Read', 'Glob', 'Grep'],
       abortSignal: abortController.signal,
@@ -602,12 +663,13 @@ export class AcpManager {
               onChunk(block.text)
             }
             if (block.type === 'tool_use') {
-              onToolCall?.({
+              const toolCall = {
                 toolCallId: block.id ?? `tool-${Date.now()}`,
                 title: block.name ?? 'Tool call',
                 status: 'in_progress',
-                kind: block.name,
-              })
+                ...(block.name ? { kind: block.name } : {}),
+              }
+              onToolCall?.(toolCall)
             }
           }
         }
@@ -809,21 +871,21 @@ export class AcpManager {
   private buildPrompt(userQuery: string): string {
     return [
       'You have access to a local knowledge base called Spool that indexes:',
-      '  1. The user\'s AI coding sessions (Claude Code, Codex CLI)',
-      '  2. Web content captured via OpenCLI (X/Twitter bookmarks, Hacker News, etc.)',
+      '  1. The user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI)',
+      '  2. Platform data synced via connectors (X/Twitter bookmarks, GitHub stars, etc.)',
       '',
       'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
       '',
       '── Agent session schema ──',
-      '  sources(id, name TEXT, base_path TEXT)  -- "claude" or "codex"',
+      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", or "gemini"',
       '  projects(id, source_id, slug, display_path, display_name, last_synced)',
       '  sessions(id, project_id, source_id, session_uuid TEXT, title TEXT, started_at TEXT, ended_at TEXT, message_count INT, has_tool_use INT)',
       '  messages(id, session_id, source_id, role TEXT, content_text TEXT, timestamp TEXT, tool_names TEXT)',
       '  messages_fts(content_text)  -- FTS5 virtual table, content synced from messages',
       '',
-      '── OpenCLI captures schema ──',
-      '  opencli_sources(id, source_id, platform TEXT, command TEXT, enabled INT, last_synced TEXT, sync_count INT)',
-      '  captures(id, source_id, opencli_src_id, capture_uuid TEXT, url TEXT, title TEXT, content_text TEXT, author TEXT, platform TEXT, platform_id TEXT, content_type TEXT, captured_at TEXT, raw_json TEXT)',
+      '── Connector captures schema ──',
+      '  connector_sync_state(connector_id TEXT PRIMARY KEY, head_cursor, tail_cursor, tail_complete INT, last_forward_sync_at, total_synced INT, enabled INT, config_json TEXT)',
+      '  captures(id, source_id, capture_uuid TEXT, url TEXT, title TEXT, content_text TEXT, author TEXT, platform TEXT, platform_id TEXT, content_type TEXT, metadata TEXT, captured_at TEXT, raw_json TEXT)',
       '  captures_fts(title, content_text)  -- FTS5 virtual table, content synced from captures',
       '',
       'Example queries:',
@@ -836,18 +898,18 @@ export class AcpManager {
       '  # FTS search on captures (bookmarks, saved web content)',
       '  sqlite3 ~/.spool/spool.db "SELECT c.title, c.author, c.url, c.content_text, c.platform, c.captured_at FROM captures_fts f JOIN captures c ON c.id = f.rowid WHERE captures_fts MATCH \'search terms\' ORDER BY rank LIMIT 10"',
       '',
-      '  # List captures for a specific source boundary (platform + command)',
-      '  sqlite3 ~/.spool/spool.db "SELECT c.title, c.author, c.url, c.content_text, c.captured_at, os.platform, os.command FROM captures c JOIN opencli_sources os ON os.id = c.opencli_src_id WHERE os.platform = \'twitter\' AND os.command = \'bookmarks\' ORDER BY c.captured_at DESC LIMIT 20"',
+      '  # List captures for a specific connector',
+      '  sqlite3 ~/.spool/spool.db "SELECT c.title, c.author, c.url, c.content_text, c.captured_at, c.platform FROM captures c WHERE json_extract(c.metadata, \'$.connectorId\') = \'twitter-bookmarks\' ORDER BY c.captured_at DESC LIMIT 20"',
       '',
-      '  # What platforms are connected',
-      '  sqlite3 ~/.spool/spool.db "SELECT platform, command, sync_count, last_synced FROM opencli_sources WHERE enabled = 1"',
+      '  # What connectors are enabled',
+      '  sqlite3 ~/.spool/spool.db "SELECT connector_id, total_synced, last_forward_sync_at FROM connector_sync_state WHERE enabled = 1"',
       '',
       'Important:',
       '- Interpret the user\'s intent and decide what to search. Don\'t just match their exact words.',
       '- For questions about bookmarks, saved content, or web platforms → query captures/captures_fts.',
       '- For questions about coding sessions, projects, or what the user built → query messages/sessions.',
       '- Treat source boundaries as part of the query semantics, not as an implementation detail.',
-      '- For OpenCLI captures, use both `platform` and `opencli_sources.command` to distinguish nearby sources such as `twitter/bookmarks` vs `twitter/timeline`, `twitter/notifications`, or `github/stars` vs `github/notifications`.',
+      '- For connector captures, use `json_extract(metadata, \'$.connectorId\')` to distinguish different connectors for the same platform.',
       '- If the user names a source, only return results from that source unless they explicitly ask for cross-source search.',
       '- For cross-source questions, first identify the relevant sources, then query each source separately, confirm hits or no-hits per source, and only then merge them into one answer.',
       '- For temporal queries ("what did I do recently"), use explicit date filters and be conservative when comparing times across different sources.',

@@ -16,7 +16,7 @@ Tailwind neutrals instead of DESIGN.md's warm palette, and the status bar needs 
 3. **Fonts:** Geist Sans + Geist Mono loaded offline-safe via fontsource npm packages
 4. **Color tokens:** Warm palette from DESIGN.md as Tailwind `@theme` variables
 5. **Mode toggle:** ⚡ Fast | 🤖 AI pill inside search bar (UI chrome only, not wired up)
-6. **Status bar:** Redesigned — left: sync info; right: ⌘K Capture + Sources ⊕
+6. **Status bar:** Redesigned — left: sync info; right: Sources ⊕
 
 ## Tech Context
 
@@ -194,7 +194,7 @@ const SOURCES = [
 // Rendered as pill chips with colored dot + label + count
 ```
 
-Sources beyond Claude/Codex are out of scope until OpenCLI integration lands.
+Sources beyond Claude/Codex are out of scope until connector plugin integration lands.
 The "+ Connect" chip is rendered as a dashed-border placeholder.
 
 ### Step 7 — StatusBar redesign
@@ -209,7 +209,6 @@ The "+ Connect" chip is rendered as a dashed-border placeholder.
     </span>
   </div>
   <div className="flex items-center gap-3">
-    <button className="text-[11px] text-warm-faint hover:text-warm-text">⌘K Capture</button>
     <button className="text-[11px] text-warm-faint hover:text-warm-text">Sources ⊕</button>
   </div>
 </div>

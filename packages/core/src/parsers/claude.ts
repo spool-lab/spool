@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import type { ParsedSession, ParsedMessage } from '../types.js'
+import type { ParseSessionResult, ParsedSession, ParsedMessage } from '../types.js'
 
 interface ContentItem {
   type: string
@@ -8,14 +8,8 @@ interface ContentItem {
   input?: unknown
 }
 
-export function parseClaudeSession(filePath: string): ParsedSession | null {
-  let raw: string
-  try {
-    raw = readFileSync(filePath, 'utf8')
-  } catch {
-    return null
-  }
-
+export function loadClaudeSession(filePath: string): ParseSessionResult {
+  const raw = readFileSync(filePath, 'utf8')
   const lines = raw.split('\n').filter(l => l.trim().length > 0)
   const messages: ParsedMessage[] = []
   let sessionUuid = ''
@@ -97,7 +91,7 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
     })
   }
 
-  if (messages.length === 0) return null
+  if (messages.length === 0) return { kind: 'skipped' }
 
   // Use cwd from messages if not in top-level fields
   if (!cwd) {
@@ -115,15 +109,27 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
   const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort()
 
   return {
-    source: 'claude',
-    sessionUuid: sessionUuid || filePath,
-    filePath,
-    title,
-    cwd,
-    model,
-    startedAt: timestamps[0] ?? new Date().toISOString(),
-    endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
-    messages,
+    kind: 'parsed',
+    session: {
+      source: 'claude',
+      sessionUuid: sessionUuid || filePath,
+      filePath,
+      title,
+      cwd,
+      model,
+      startedAt: timestamps[0] ?? new Date().toISOString(),
+      endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
+      messages,
+    },
+  }
+}
+
+export function parseClaudeSession(filePath: string): ParsedSession | null {
+  try {
+    const result = loadClaudeSession(filePath)
+    return result.kind === 'parsed' ? result.session : null
+  } catch {
+    return null
   }
 }
 

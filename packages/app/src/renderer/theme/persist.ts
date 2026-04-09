@@ -57,15 +57,14 @@ export function mergeThemeImportLoose(raw: unknown, current: ThemeEditorStateV1)
 }
 
 export async function loadThemeEditorState(): Promise<ThemeEditorStateV1> {
-  if (!window.spool?.opencli) return defaultThemeEditorState()
   try {
-    const raw = await window.spool.opencli.getSetupValue(THEME_EDITOR_STORAGE_KEY)
+    const raw = window.localStorage.getItem(THEME_EDITOR_STORAGE_KEY)
     if (raw) {
       const parsed = normalizeThemeEditorState(JSON.parse(raw))
       if (parsed) return parsed
     }
     const next = defaultThemeEditorState()
-    const legacy = await window.spool.opencli.getSetupValue(LEGACY_DARK_PALETTE_KEY)
+    const legacy = window.localStorage.getItem(LEGACY_DARK_PALETTE_KEY)
     if (legacy === 'forest') {
       next.dark = darkPresetSeed('everforest', next.dark)
     }
@@ -76,6 +75,5 @@ export async function loadThemeEditorState(): Promise<ThemeEditorStateV1> {
 }
 
 export async function saveThemeEditorState(state: ThemeEditorStateV1): Promise<void> {
-  if (!window.spool?.opencli) return
-  await window.spool.opencli.setSetupValue(THEME_EDITOR_STORAGE_KEY, JSON.stringify(state))
+  window.localStorage.setItem(THEME_EDITOR_STORAGE_KEY, JSON.stringify(state))
 }

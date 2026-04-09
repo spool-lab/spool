@@ -18,7 +18,11 @@ Search across all indexed sources.
 ```bash
 spool search "auth middleware"
 spool search "auth middleware" --source claude
+spool search "auth middleware" --source gemini
+spool search '"auth middleware"'
 ```
+
+By default, whitespace-separated terms are treated as a multi-keyword search, so `auth middleware` can match entries that contain both terms even when they are not adjacent. Natural multi-term searches prioritize exact phrase hits first, then broader all-terms matches. If you want an exact phrase match only, pass explicit FTS quotes inside the query, for example `spool search '"auth middleware"'`.
 
 ### `spool index`
 

@@ -31,6 +31,32 @@ describe('getSessionRoots', () => {
       personalProjects,
     ])
   })
+
+  test('should normalize configured Gemini home paths to the temp directory root', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-gemini-source-paths-'))
+    const geminiHome = join(baseDir, '.gemini')
+    tempDirs.push(baseDir)
+
+    mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
+    vi.stubEnv('GEMINI_CLI_HOME', baseDir)
+
+    expect(getSessionRoots('gemini')).toEqual([
+      join(geminiHome, 'tmp'),
+    ])
+  })
+
+  test('should normalize explicit Gemini CLI home overrides to the chats temp root', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-gemini-override-'))
+    const geminiHome = join(baseDir, '.gemini')
+    tempDirs.push(baseDir)
+
+    mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
+    vi.stubEnv('SPOOL_GEMINI_DIR', baseDir)
+
+    expect(getSessionRoots('gemini')).toEqual([
+      join(geminiHome, 'tmp'),
+    ])
+  })
 })
 
 describe('detectSessionSource', () => {
@@ -40,16 +66,20 @@ describe('detectSessionSource', () => {
 
     const claudeRoot = join(baseDir, 'claude-work', 'projects')
     const codexRoot = join(baseDir, 'codex-personal', 'sessions')
+    const geminiRoot = join(baseDir, 'gemini', 'tmp')
     mkdirSync(join(claudeRoot, 'project-a'), { recursive: true })
     mkdirSync(join(codexRoot, '2026', '03', '29'), { recursive: true })
+    mkdirSync(join(geminiRoot, 'workspace', 'chats'), { recursive: true })
 
     const sourceRoots = {
       claude: [claudeRoot],
       codex: [codexRoot],
+      gemini: [geminiRoot],
     } as const
 
     expect(detectSessionSource(join(claudeRoot, 'project-a', 'session.jsonl'), sourceRoots)).toBe('claude')
     expect(detectSessionSource(join(codexRoot, '2026', '03', '29', 'rollout.jsonl'), sourceRoots)).toBe('codex')
+    expect(detectSessionSource(join(geminiRoot, 'workspace', 'chats', 'session-2026-04-08T00-00-deadbeef.json'), sourceRoots)).toBe('gemini')
     expect(detectSessionSource(join(baseDir, 'other', 'session.jsonl'), sourceRoots)).toBeUndefined()
   })
 })

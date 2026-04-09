@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
@@ -6,7 +6,6 @@ import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
-import CaptureUrlModal from './components/CaptureUrlModal.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
@@ -22,12 +21,19 @@ interface AgentInfo {
   name: string
   path: string
   status: 'ready' | 'not_found' | 'not_running'
-  acpMode: 'extension' | 'native' | 'websocket'
+  acpMode: 'extension' | 'native' | 'websocket' | 'sdk'
+}
+
+interface RuntimeInfo {
+  isDev: boolean
+  appPath: string
+  appName: string
 }
 
 export default function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [previewSuggestions, setPreviewSuggestions] = useState<FragmentResult[]>([])
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(null)
   const [view, setView] = useState<View>('search')
@@ -35,8 +41,12 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [syncStatus, setSyncStatus] = useState<{ phase: string; count: number; total: number } | null>(null)
   const [status, setStatus] = useState<StatusInfo | null>(null)
+  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchRequestSeq = useRef(0)
+  const previewRequestSeq = useRef(0)
 
   // AI mode state
   const [searchMode, setSearchMode] = useState<SearchMode>('fast')
@@ -45,29 +55,23 @@ export default function App() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiAgent, setAiAgent] = useState('claude')
   const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([])
-  const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string }>>(new Map())
+  const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string | undefined }>>(new Map())
   const aiAnswerRef = useRef('')
 
   // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
-  const [showCaptureModal, setShowCaptureModal] = useState(false)
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
-  const [schemeDark, setSchemeDark] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
-  )
   const themeHydrated = useRef(false)
+  const deferredResults = useDeferredValue(results)
+  const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
   useEffect(() => {
-    if (!window.spool?.opencli) {
-      themeHydrated.current = true
-      return
-    }
     loadThemeEditorState()
       .then(setThemeEditor)
       .catch(console.error)
@@ -83,7 +87,6 @@ export default function App() {
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const onScheme = () => {
-      setSchemeDark(mq.matches)
       applyEditorTheme(themeEditor)
     }
     mq.addEventListener('change', onScheme)
@@ -91,7 +94,7 @@ export default function App() {
   }, [themeEditor])
 
   useEffect(() => {
-    if (!themeHydrated.current || !window.spool?.opencli) return
+    if (!themeHydrated.current) return
     const t = window.setTimeout(() => {
       saveThemeEditorState(themeEditor).catch(console.error)
     }, 400)
@@ -120,7 +123,9 @@ export default function App() {
 
   useEffect(() => {
     return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current)
       if (toastTimer.current) clearTimeout(toastTimer.current)
+      if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
     }
   }, [])
 
@@ -138,7 +143,12 @@ export default function App() {
     const offToolCall = window.spool.onAiToolCall?.((tc) => {
       setAiToolCalls(prev => {
         const next = new Map(prev)
-        next.set(tc.toolCallId, { title: tc.title || prev.get(tc.toolCallId)?.title || '', status: tc.status, kind: tc.kind })
+        const previous = prev.get(tc.toolCallId)
+        next.set(tc.toolCallId, {
+          title: tc.title || previous?.title || '',
+          status: tc.status,
+          ...(tc.kind ? { kind: tc.kind } : previous?.kind ? { kind: previous.kind } : {}),
+        })
         return next
       })
     })
@@ -160,23 +170,25 @@ export default function App() {
   useEffect(() => {
     if (!window.spool) return
     window.spool.getStatus().then(setStatus).catch(console.error)
+    window.spool.getRuntimeInfo?.().then(setRuntimeInfo).catch(console.error)
     refreshCaptureSources()
   }, [syncStatus, refreshCaptureSources])
-
-  // Listen for ⌘K capture modal shortcut
-  useEffect(() => {
-    if (!window.spool?.onOpenCaptureModal) return () => {}
-    const off = window.spool.onOpenCaptureModal(() => {
-      setShowCaptureModal(true)
-    })
-    return off
-  }, [])
 
   useEffect(() => {
     if (!window.spool) return () => {}
     const offProgress = window.spool.onSyncProgress((e) => {
       setSyncStatus(e)
+      if (query.trim() && searchMode === 'fast' && (e.phase === 'syncing' || e.phase === 'indexing')) {
+        if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
+        syncRefreshTimer.current = setTimeout(() => {
+          doSearch(query)
+        }, 250)
+      }
       if (e.phase === 'done') {
+        if (syncRefreshTimer.current) {
+          clearTimeout(syncRefreshTimer.current)
+          syncRefreshTimer.current = null
+        }
         setTimeout(() => setSyncStatus(null), 3000)
         window.spool.getStatus().then(setStatus).catch(console.error)
         if (query.trim() && searchMode === 'fast') doSearch(query)
@@ -191,13 +203,35 @@ export default function App() {
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); setIsSearching(false); return }
+    const requestId = ++searchRequestSeq.current
     setIsSearching(true)
     try {
       const res = window.spool ? await window.spool.search(q, 20) : []
-      setResults(res)
+      if (requestId !== searchRequestSeq.current) return
+      startTransition(() => {
+        setResults(res)
+      })
     } finally {
-      setIsSearching(false)
+      if (requestId === searchRequestSeq.current) {
+        setIsSearching(false)
+      }
     }
+  }, [])
+
+  const doPreviewSearch = useCallback(async (q: string) => {
+    if (!q.trim() || !window.spool?.searchPreview) {
+      setPreviewSuggestions([])
+      setLastCompletedPreviewQuery(q)
+      return
+    }
+
+    const requestId = ++previewRequestSeq.current
+    const suggestions = await window.spool.searchPreview(q, 5)
+    if (requestId !== previewRequestSeq.current) return
+    startTransition(() => {
+      setPreviewSuggestions(suggestions)
+    })
+    setLastCompletedPreviewQuery(q)
   }, [])
 
   const doAiSearch = useCallback(async () => {
@@ -205,6 +239,7 @@ export default function App() {
 
     const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(query, 20) : [])
     if (ftsResults.length > 0 && results.length === 0) setResults(ftsResults)
+    const fragmentContext = ftsResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
 
     aiAnswerRef.current = ''
     setAiAnswer('')
@@ -212,7 +247,7 @@ export default function App() {
     setAiStreaming(true)
     setAiToolCalls(new Map())
 
-    window.spool.aiSearch(query, aiAgent, ftsResults).catch((err) => {
+    window.spool.aiSearch(query, aiAgent, fragmentContext).catch((err) => {
       setAiError(String(err))
       setAiStreaming(false)
     })
@@ -223,17 +258,22 @@ export default function App() {
     if (!q.trim()) setHomeMode(true)
     if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
-      searchTimer.current = setTimeout(() => doSearch(q), 200)
+      searchTimer.current = setTimeout(() => doSearch(q), 120)
+      void doPreviewSearch(q)
     }
     if (aiAnswer || aiError) {
       setAiAnswer('')
       setAiError(null)
       aiAnswerRef.current = ''
     }
-  }, [doSearch, searchMode, aiAnswer, aiError])
+  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError])
 
   const handleSubmit = useCallback(() => {
-    if (query.trim()) setHomeMode(false)
+    if (!query.trim()) return
+    setHomeMode(false)
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setView('search')
     if (searchMode === 'ai') {
       doAiSearch()
     } else {
@@ -249,7 +289,13 @@ export default function App() {
       setAiStreaming(false)
       setAiToolCalls(new Map())
       aiAnswerRef.current = ''
-      if (query.trim()) doSearch(query)
+      if (query.trim()) {
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        doSearch(query)
+      }
     } else {
       setResults([])
       setIsSearching(false)
@@ -277,11 +323,6 @@ export default function App() {
     setShowSettings(true)
   }, [])
 
-  const handleCaptured = useCallback(() => {
-    refreshCaptureSources()
-    if (query.trim() && searchMode === 'fast') doSearch(query)
-  }, [query, searchMode, doSearch, refreshCaptureSources])
-
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
@@ -294,6 +335,7 @@ export default function App() {
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
   const activeAgentMode = activeAgentInfo?.acpMode
   const hasAgents = availableAgents.length > 0
+  const fragmentSources = deferredResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
 
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
@@ -304,13 +346,16 @@ export default function App() {
             onChange={handleQueryChange}
             onSubmit={handleSubmit}
             onSelectSuggestion={handleSelectSuggestion}
-            suggestions={results.filter((r: any) => r.kind !== 'capture')}
+            suggestions={previewSuggestions}
             isSearching={isSearching}
+            hasSettledQuery={lastCompletedPreviewQuery === query}
+            isDev={Boolean(runtimeInfo?.isDev)}
             claudeCount={status?.claudeSessions ?? null}
             codexCount={status?.codexSessions ?? null}
+            geminiCount={status?.geminiSessions ?? null}
             captureSources={captureSources}
             mode={searchMode}
-            onModeChange={hasAgents ? handleModeChange : undefined}
+            {...(hasAgents ? { onModeChange: handleModeChange } : {})}
             onConnectClick={handleConnectClick}
           />
         ) : (
@@ -327,7 +372,7 @@ export default function App() {
                 isSearching={isSearching}
                 variant="compact"
                 mode={searchMode}
-                onModeChange={hasAgents ? handleModeChange : undefined}
+                {...(hasAgents ? { onModeChange: handleModeChange } : {})}
               />
               {searchMode === 'ai' && availableAgents.length > 0 && (
                 <AgentSelector
@@ -348,18 +393,18 @@ export default function App() {
                       answer={aiAnswer}
                       streaming={aiStreaming}
                       agentName={activeAgentName}
-                      agentMode={activeAgentMode}
-                      sources={results}
+                      {...(activeAgentMode ? { agentMode: activeAgentMode } : {})}
+                      sources={fragmentSources}
                       error={aiError}
                       toolCalls={aiToolCalls}
                     />
                   )}
-                  {searchMode === 'ai' && results.length > 0 && (aiAnswer || aiStreaming) && (
+                  {searchMode === 'ai' && fragmentSources.length > 0 && (aiAnswer || aiStreaming) && (
                     <div className="px-4 pt-2 pb-1 text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em]">
                       Sources used
                     </div>
                   )}
-                  {searchMode === 'ai' && !aiAnswer && !aiStreaming && !aiError && results.length === 0 && query.trim() ? (
+                  {searchMode === 'ai' && !aiAnswer && !aiStreaming && !aiError && fragmentSources.length === 0 && query.trim() ? (
                     <div className="flex flex-col items-center justify-center h-full text-warm-faint dark:text-dark-muted gap-2 pb-12">
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
                         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
@@ -369,7 +414,7 @@ export default function App() {
                   ) : (
                     <div className="flex-1 min-h-0">
                       <FragmentResults
-                        results={results}
+                        results={deferredResults}
                         query={query}
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
@@ -388,8 +433,7 @@ export default function App() {
         syncStatus={syncStatus}
         searchMode={searchMode}
         aiAgent={activeAgentName}
-        aiAgentMode={activeAgentMode}
-        onSourcesClick={() => { setSettingsTab('connectors'); setShowSettings(true) }}
+        {...(activeAgentMode ? { aiAgentMode: activeAgentMode } : {})}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
 
@@ -397,19 +441,13 @@ export default function App() {
         <ResumeToast command={resumeToastCommand} />
       )}
 
-      {/* Modals */}
-      {showCaptureModal && (
-        <CaptureUrlModal
-          onClose={() => setShowCaptureModal(false)}
-          onCaptured={handleCaptured}
-        />
-      )}
       {showSettings && (
         <SettingsPanel
           onClose={() => { setShowSettings(false); refreshAgents(); refreshCaptureSources() }}
           initialTab={settingsTab}
           claudeCount={status?.claudeSessions ?? null}
           codexCount={status?.codexSessions ?? null}
+          geminiCount={status?.geminiSessions ?? null}
           themeEditor={themeEditor}
           onThemeEditorChange={setThemeEditor}
         />
@@ -438,7 +476,8 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
   onSelect: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const active = agents.find(a => a.id === activeAgent) ?? agents[0]
+  if (agents.length === 0) return null
+  const active = agents.find(a => a.id === activeAgent) ?? agents[0]!
 
   if (agents.length <= 1) {
     return (

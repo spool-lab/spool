@@ -11,6 +11,17 @@ pnpm install
 pnpm dev
 ```
 
+## Native module runtimes
+
+`better-sqlite3` is used from both Node-based tests and the Electron app. Rebuild it for the runtime you are about to use:
+
+```bash
+pnpm run rebuild:native:node      # Node / vitest / core tests
+pnpm run rebuild:native:electron  # Electron app / Playwright e2e
+```
+
+If you hit a `NODE_MODULE_VERSION` mismatch, rerun the matching rebuild command and try again.
+
 ## Project structure
 
 ```
