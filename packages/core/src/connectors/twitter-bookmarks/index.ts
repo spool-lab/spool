@@ -1,4 +1,4 @@
-import type { Connector, AuthStatus, PageResult } from '../types.js'
+import type { Connector, AuthStatus, PageResult, FetchContext } from '../types.js'
 import { SyncError, SyncErrorCode } from '../types.js'
 import { extractChromeXCookies, detectChromeUserDataDir } from './chrome-cookies.js'
 import { fetchBookmarkPage } from './graphql-fetch.js'
@@ -47,7 +47,7 @@ export class TwitterBookmarksConnector implements Connector {
     }
   }
 
-  async fetchPage(cursor: string | null): Promise<PageResult> {
+  async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
     // Extract cookies fresh for each sync cycle (they may expire)
     // Cache within a single sync run to avoid re-reading DB on every page
     if (!this.cachedCookies) {

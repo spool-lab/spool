@@ -150,6 +150,15 @@ export interface PageResult {
   nextCursor: string | null
 }
 
+export interface FetchContext {
+  /** Pagination cursor. null = start from the newest page. */
+  cursor: string | null
+  /** Platform ID of the newest known item (head anchor). null = no anchor. */
+  sinceItemId: string | null
+  /** Which sync phase is requesting this page. */
+  phase: 'forward' | 'backfill'
+}
+
 export interface Connector {
   /** Unique identifier, e.g. 'twitter-bookmarks'. */
   readonly id: string
@@ -173,10 +182,8 @@ export interface Connector {
    * The sync engine calls this repeatedly, following nextCursor.
    * The connector handles API-level retries (429, 5xx) internally.
    * If retries are exhausted, throw a SyncError.
-   *
-   * @param cursor - null for the first (newest) page
    */
-  fetchPage(cursor: string | null): Promise<PageResult>
+  fetchPage(ctx: FetchContext): Promise<PageResult>
 }
 
 // ── Sync State ───────────────────────────────────────────────────────────────
