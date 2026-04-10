@@ -402,14 +402,24 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
-            <span className={`text-[11px] font-medium ${selected.enabled ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
+            <span className={`text-[11px] font-medium ${
+              !selected.enabled
+                ? 'text-warm-faint dark:text-dark-muted'
+                : isSyncing
+                  ? 'text-green-500'
+                  : selected.state.lastErrorCode
+                    ? 'text-red-500'
+                    : 'text-green-500'
+            }`}>
               {!selected.enabled
                 ? 'Disabled'
                 : isSyncing
                   ? 'Syncing…'
                   : selected.state.lastErrorCode?.startsWith('AUTH_')
                     ? 'Needs login'
-                    : 'Connected'}
+                    : selected.state.lastErrorCode
+                      ? 'Error'
+                      : 'Connected'}
             </span>
           </div>
           {selected.enabled && (connectorCounts[selected.id] ?? 0) > 0 && (
@@ -428,7 +438,15 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               </span>
             </div>
           )}
-          {selected.enabled && !selected.state.tailComplete && !isSyncing && (
+          {selected.enabled && !isSyncing && selected.state.lastErrorCode && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-warm-muted dark:text-dark-muted">Error</span>
+              <span className="text-[11px] text-red-400 dark:text-red-400 max-w-[60%] truncate text-right" title={selected.state.lastErrorMessage ?? undefined}>
+                {selected.state.lastErrorMessage ?? selected.state.lastErrorCode}
+              </span>
+            </div>
+          )}
+          {selected.enabled && !selected.state.tailComplete && !isSyncing && !selected.state.lastErrorCode && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
               <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
