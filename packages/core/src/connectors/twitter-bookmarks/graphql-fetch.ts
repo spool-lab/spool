@@ -209,14 +209,18 @@ export function parseBookmarksResponse(json: any, now?: string): BookmarkPageRes
 export async function fetchBookmarkPage(
   csrfToken: string,
   cursor: string | null,
-  cookieHeader?: string,
+  opts?: {
+    cookieHeader?: string
+    fetchFn?: typeof globalThis.fetch
+  },
 ): Promise<BookmarkPageResult> {
+  const { cookieHeader, fetchFn = globalThis.fetch } = opts ?? {}
   let lastError: Error | undefined
 
   for (let attempt = 0; attempt < 4; attempt++) {
     let response: Response
     try {
-      response = await fetch(
+      response = await fetchFn(
         buildUrl(cursor ?? undefined),
         { headers: buildHeaders(csrfToken, cookieHeader) },
       )
