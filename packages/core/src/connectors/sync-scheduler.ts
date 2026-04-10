@@ -147,11 +147,13 @@ export class SyncScheduler {
       const state = loadSyncState(this.db, connector.id)
       if (!state.enabled) continue
 
-      // Skip if in backoff due to errors
-      if (state.consecutiveErrors > 0) {
+      // Skip if in backoff due to errors.
+      // Use lastErrorAt (when the error occurred) as the backoff base, not
+      // lastForwardSyncAt/lastBackfillSyncAt (which may be from an earlier
+      // successful sync and would under-count the backoff window).
+      if (state.consecutiveErrors > 0 && state.lastErrorAt) {
         const backoffMs = this.getBackoffMs(state.consecutiveErrors)
-        const lastAttempt = state.lastForwardSyncAt ?? state.lastBackfillSyncAt
-        if (lastAttempt && now - new Date(lastAttempt).getTime() < backoffMs) {
+        if (now - new Date(state.lastErrorAt).getTime() < backoffMs) {
           continue
         }
       }

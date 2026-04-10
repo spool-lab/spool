@@ -204,6 +204,9 @@ export interface SyncState {
   enabled: boolean
   /** Per-connector config overrides (e.g. Chrome profile). */
   configJson: Record<string, unknown>
+  /** When the last error occurred (ISO 8601). Used as the backoff base time.
+   *  Cleared on successful sync. */
+  lastErrorAt: string | null
   /** Last error code, null if last sync succeeded. */
   lastErrorCode: SyncErrorCode | null
   /** Last error message for UI display. */

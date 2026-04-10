@@ -31,6 +31,7 @@ export function loadSyncState(db: Database.Database, connectorId: string): SyncS
       consecutiveErrors: 0,
       enabled: false,
       configJson: {},
+      lastErrorAt: null,
       lastErrorCode: null,
       lastErrorMessage: null,
     }
@@ -51,6 +52,7 @@ export function loadSyncState(db: Database.Database, connectorId: string): SyncS
     consecutiveErrors: row['consecutive_errors'] as number,
     enabled: Boolean(row['enabled']),
     configJson,
+    lastErrorAt: row['last_error_at'] as string | null,
     lastErrorCode: row['last_error_code'] as SyncErrorCode | null,
     lastErrorMessage: row['last_error_message'] as string | null,
   }
@@ -61,8 +63,9 @@ export function saveSyncState(db: Database.Database, state: SyncState): void {
     INSERT INTO connector_sync_state
       (connector_id, head_cursor, head_item_id, tail_cursor, tail_complete,
        last_forward_sync_at, last_backfill_sync_at, total_synced,
-       consecutive_errors, enabled, config_json, last_error_code, last_error_message)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       consecutive_errors, enabled, config_json,
+       last_error_at, last_error_code, last_error_message)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(connector_id) DO UPDATE SET
       head_cursor = excluded.head_cursor,
       head_item_id = excluded.head_item_id,
@@ -74,6 +77,7 @@ export function saveSyncState(db: Database.Database, state: SyncState): void {
       consecutive_errors = excluded.consecutive_errors,
       enabled = excluded.enabled,
       config_json = excluded.config_json,
+      last_error_at = excluded.last_error_at,
       last_error_code = excluded.last_error_code,
       last_error_message = excluded.last_error_message
   `).run(
@@ -84,7 +88,7 @@ export function saveSyncState(db: Database.Database, state: SyncState): void {
     state.totalSynced, state.consecutiveErrors,
     state.enabled ? 1 : 0,
     JSON.stringify(state.configJson),
-    state.lastErrorCode, state.lastErrorMessage,
+    state.lastErrorAt, state.lastErrorCode, state.lastErrorMessage,
   )
 }
 
@@ -202,10 +206,19 @@ export class SyncEngine {
         ? await this.syncEphemeral(connector, state, opts, startedAt)
         : await this.syncPersistent(connector, state, opts, startedAt)
 
-      // Success: clear error state
-      state.consecutiveErrors = 0
-      state.lastErrorCode = null
-      state.lastErrorMessage = null
+      if (result.error) {
+        // fetchLoop caught the error and returned it in the result
+        // (didn't throw), so we still need to record it.
+        state.consecutiveErrors += 1
+        state.lastErrorAt = new Date().toISOString()
+        state.lastErrorCode = result.error.code as SyncErrorCode
+        state.lastErrorMessage = result.error.message
+      } else {
+        state.consecutiveErrors = 0
+        state.lastErrorAt = null
+        state.lastErrorCode = null
+        state.lastErrorMessage = null
+      }
       saveSyncState(this.db, state)
 
       return result
@@ -219,6 +232,7 @@ export class SyncEngine {
           )
 
       state.consecutiveErrors += 1
+      state.lastErrorAt = new Date().toISOString()
       state.lastErrorCode = syncErr.code
       state.lastErrorMessage = syncErr.message
       saveSyncState(this.db, state)
@@ -262,7 +276,7 @@ export class SyncEngine {
       && state.headCursor === null
 
     // Capture the since-anchor at loop entry, before page-0 may update
-    // headItemId (A.1.3). This is the stop signal for forward early-exit:
+    // headItemId. This is the stop signal for forward early-exit:
     // "stop when you reach this item — everything at or beyond it is already indexed."
     const sinceItemId = opts.phase === 'forward' ? state.headItemId : null
 
@@ -344,7 +358,7 @@ export class SyncEngine {
       // Much more efficient than stale-page detection for small incremental syncs
       // (e.g. 2 new bookmarks → 1 page instead of 3+ stale pages).
       // Note: sinceItemId was already captured into headItemId before page 0's
-      // update (A.1.3 only updates headItemId on page 0 of a fresh forward),
+      // update (headItemId is only updated on page 0 of a fresh forward),
       // so we compare against the original anchor stored at fetchLoop entry.
       if (opts.phase === 'forward' && sinceItemId) {
         const hitAnchor = result.items.some(
