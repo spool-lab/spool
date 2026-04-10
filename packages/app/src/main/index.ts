@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, net } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import {
@@ -182,7 +182,40 @@ app.whenReady().then(() => {
 
   // ── Connector framework ──────────────────────────────────────────────
   connectorRegistry = new ConnectorRegistry()
-  connectorRegistry.register(new TwitterBookmarksConnector())
+  // Use Electron's net.request for proxy support with full header control.
+  // net.fetch drops Cookie (forbidden header) and injects Sec-Fetch-* headers;
+  // net.request gives us raw control over what goes on the wire.
+  const proxyFetch: typeof globalThis.fetch = (input, init) => {
+    const url = input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
+    const hdrs = (init?.headers ?? {}) as Record<string, string>
+    return new Promise((resolve, reject) => {
+      const req = net.request({ url, method: init?.method ?? 'GET' })
+      for (const [key, value] of Object.entries(hdrs)) {
+        req.setHeader(key, value)
+      }
+
+      req.on('response', (resp) => {
+        const chunks: Buffer[] = []
+        resp.on('data', (chunk: Buffer) => chunks.push(chunk))
+        resp.on('end', () => {
+          const body = Buffer.concat(chunks)
+          resolve(new Response(body, {
+            status: resp.statusCode,
+            statusText: resp.statusMessage,
+            headers: resp.headers as Record<string, string>,
+          }))
+        })
+      })
+      req.on('error', (err) => {
+        reject(err)
+      })
+      req.end()
+    })
+  }
+
+  connectorRegistry.register(new TwitterBookmarksConnector({
+    fetchFn: proxyFetch,
+  }))
 
   syncScheduler = new SyncScheduler(db, connectorRegistry)
   syncScheduler.on((event: SchedulerEvent) => {

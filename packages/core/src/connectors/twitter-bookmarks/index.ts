@@ -15,13 +15,16 @@ export class TwitterBookmarksConnector implements Connector {
   private chromeUserDataDir: string | undefined
   private chromeProfileDirectory: string
   private cachedCookies: ChromeCookieResult | null = null
+  private fetchFn: typeof globalThis.fetch
 
   constructor(opts?: {
     chromeUserDataDir?: string
     chromeProfileDirectory?: string
+    fetchFn?: typeof globalThis.fetch
   }) {
     this.chromeUserDataDir = opts?.chromeUserDataDir
     this.chromeProfileDirectory = opts?.chromeProfileDirectory ?? 'Default'
+    this.fetchFn = opts?.fetchFn ?? globalThis.fetch
   }
 
   async checkAuth(): Promise<AuthStatus> {
@@ -67,7 +70,7 @@ export class TwitterBookmarksConnector implements Connector {
     const result = await fetchBookmarkPage(
       this.cachedCookies.csrfToken,
       cursor,
-      this.cachedCookies.cookieHeader,
+      { cookieHeader: this.cachedCookies.cookieHeader, fetchFn: this.fetchFn },
     )
 
     return {
