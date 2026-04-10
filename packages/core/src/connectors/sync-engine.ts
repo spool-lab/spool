@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type {
   Connector,
+  FetchContext,
   SyncState,
   SyncOptions,
   ConnectorSyncResult,
@@ -251,6 +252,20 @@ export class SyncEngine {
     const stalePageLimit = opts.stalePageLimit ?? 3
     const checkpointEvery = 25
 
+    // Initial sync handoff: forward writes tailCursor ONLY on the very first sync
+    // (tailCursor still null, no prior forward interrupted = headCursor null).
+    // This lets backfill pick up where forward left off. On subsequent cycles,
+    // forward must NOT touch tailCursor — otherwise it overwrites backfill's
+    // deep progress with a shallow position near the newest end.
+    const isInitialSync = opts.phase === 'forward'
+      && state.tailCursor === null
+      && state.headCursor === null
+
+    // Capture the since-anchor at loop entry, before page-0 may update
+    // headItemId (A.1.3). This is the stop signal for forward early-exit:
+    // "stop when you reach this item — everything at or beyond it is already indexed."
+    const sinceItemId = opts.phase === 'forward' ? state.headItemId : null
+
     let cursor = startCursor
     let added = 0
     let pages = 0
@@ -266,7 +281,8 @@ export class SyncEngine {
 
       let result
       try {
-        result = await connector.fetchPage(cursor)
+        const fetchCtx: FetchContext = { cursor, sinceItemId, phase: opts.phase }
+        result = await connector.fetchPage(fetchCtx)
       } catch (err) {
         // Save progress before returning — don't throw, don't lose work
         console.error(`[sync-engine] ${connector.id} ${opts.phase} page ${page + 1} error:`, err instanceof Error ? err.message : err)
@@ -283,6 +299,7 @@ export class SyncEngine {
       pages++
 
       if (result.items.length === 0 && !result.nextCursor) {
+        if (opts.phase === 'forward') state.headCursor = null
         if (opts.phase === 'backfill') state.tailComplete = true
         return { added, pages, stopReason: opts.phase === 'backfill' ? 'backfill_complete' : 'end_of_data' }
       }
@@ -297,10 +314,20 @@ export class SyncEngine {
       )()
       added += newCount
 
-      // Track head (forward) or tail (backfill)
-      if (opts.phase === 'forward') {
+      // Update headItemId: the platform ID of the newest item we've ever seen.
+      // Only on forward, only on the first page (page 0), and only when NOT
+      // resuming from headCursor — a resumed forward is catching up to the
+      // existing anchor, not establishing a new one.
+      // Monotonic-forward check: only overwrite if we don't already have one,
+      // or if the new value is genuinely newer (i.e. different from current).
+      // On platforms with cursor-walking (no server-side since), the first page
+      // of a fresh forward always starts at the newest end, so page-0's first
+      // item is guaranteed to be >= the current headItemId.
+      if (opts.phase === 'forward' && page === 0 && startCursor === null) {
         const firstItem = result.items[0]
-        if (firstItem && firstItem.platformId) state.headItemId = firstItem.platformId
+        if (firstItem?.platformId && firstItem.platformId !== state.headItemId) {
+          state.headItemId = firstItem.platformId
+        }
       }
 
       opts.onProgress?.({
@@ -312,24 +339,51 @@ export class SyncEngine {
         running: true,
       })
 
+      // Early-exit: forward stops when it reaches the since-anchor (headItemId).
+      // This means we've caught up to the point where the last forward left off.
+      // Much more efficient than stale-page detection for small incremental syncs
+      // (e.g. 2 new bookmarks → 1 page instead of 3+ stale pages).
+      // Note: sinceItemId was already captured into headItemId before page 0's
+      // update (A.1.3 only updates headItemId on page 0 of a fresh forward),
+      // so we compare against the original anchor stored at fetchLoop entry.
+      if (opts.phase === 'forward' && sinceItemId) {
+        const hitAnchor = result.items.some(
+          item => item.platformId === sinceItemId,
+        )
+        if (hitAnchor) {
+          state.headCursor = null
+          return { added, pages, stopReason: 'reached_since' }
+        }
+      }
+
       // Stale page detection: stop when we keep seeing only known data
       if (newCount === 0) stalePages++
       else stalePages = 0
       if (stalePages >= stalePageLimit) {
+        if (opts.phase === 'forward') state.headCursor = null
         if (opts.phase === 'backfill') state.tailComplete = true
         return { added, pages, stopReason: opts.phase === 'forward' ? 'caught_up' : 'backfill_complete' }
       }
 
       if (!result.nextCursor) {
+        if (opts.phase === 'forward') state.headCursor = null
         if (opts.phase === 'backfill') state.tailComplete = true
         return { added, pages, stopReason: opts.phase === 'backfill' ? 'backfill_complete' : 'end_of_data' }
       }
 
       cursor = result.nextCursor
 
-      // Update cursor in state for resume
-      if (opts.phase === 'forward') state.tailCursor = cursor
-      else state.tailCursor = cursor
+      // Update cursors in state for resume.
+      if (opts.phase === 'forward') {
+        // Save forward progress so an interrupted cycle can resume here
+        // instead of re-fetching from the newest end.
+        state.headCursor = cursor
+        // Only write tailCursor during initial sync (handoff to backfill).
+        if (isInitialSync) state.tailCursor = cursor
+      } else {
+        // Backfill always tracks its own progress.
+        state.tailCursor = cursor
+      }
 
       // Checkpoint periodically (crash safety)
       if (pages % checkpointEvery === 0) {
@@ -355,13 +409,29 @@ export class SyncEngine {
     let lastError: { code: string; message: string } | undefined
 
     // ── Phase 1: Forward sync ───────────────────────────────────────
+    // Resume from headCursor if a previous forward was interrupted (timeout,
+    // cancel, error). Otherwise start from null (platform's newest end).
     if (direction === 'forward' || direction === 'both') {
-      const fwd = await this.fetchLoop(connector, state, { ...opts, phase: 'forward' }, sourceId, null, startedAt)
+      const hadAnchor = state.headItemId !== null
+      const fwd = await this.fetchLoop(connector, state, { ...opts, phase: 'forward' }, sourceId, state.headCursor ?? null, startedAt)
       totalAdded += fwd.added
       totalPages += fwd.pages
       stopReason = fwd.stopReason
       if (fwd.error) lastError = fwd.error
       state.lastForwardSyncAt = new Date().toISOString()
+
+      // Anchor invalidation recovery (Q3): if forward ran to completion
+      // (not interrupted) but never hit the since-anchor, the anchor is stale
+      // (e.g. user un-bookmarked that item). Clear it so next forward starts
+      // fresh and re-establishes the anchor from page 0.
+      const completedWithoutHit = hadAnchor
+        && fwd.stopReason !== 'reached_since'
+        && fwd.stopReason !== 'timeout'
+        && fwd.stopReason !== 'cancelled'
+        && !fwd.stopReason.startsWith('error')
+      if (completedWithoutHit) {
+        state.headItemId = null
+      }
     }
 
     // ── Phase 2: Backfill — runs until complete ─────────────────────
@@ -431,7 +501,7 @@ export class SyncEngine {
         break
       }
 
-      const result = await connector.fetchPage(cursor)
+      const result = await connector.fetchPage({ cursor, sinceItemId: null, phase: 'forward' })
       totalPages++
 
       for (const item of result.items) {

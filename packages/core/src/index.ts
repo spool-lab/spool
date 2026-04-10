@@ -24,6 +24,7 @@ export {
 export type {
   Connector,
   AuthStatus,
+  FetchContext,
   PageResult,
   SyncState,
   SyncOptions,

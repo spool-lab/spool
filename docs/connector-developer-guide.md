@@ -14,7 +14,7 @@ A connector does NOT:
 - Write to the database (the engine handles upserts)
 - Handle retries or backoff (the scheduler handles this)
 
-Your job is simple: **given a cursor, return one page of items.**
+Your job is simple: **given a `FetchContext`, return one page of items.** Most connectors only need the `cursor` field — `sinceItemId` and `phase` are optional hints.
 
 ---
 
@@ -32,7 +32,7 @@ interface Connector {
   readonly ephemeral: boolean  // true = cache (full-replace), false = user data (incremental)
 
   checkAuth(opts?: Record<string, string>): Promise<AuthStatus>
-  fetchPage(cursor: string | null): Promise<PageResult>
+  fetchPage(ctx: FetchContext): Promise<PageResult>
 }
 ```
 
@@ -67,11 +67,20 @@ interface AuthStatus {
 - Always provide a `hint` on failure. The hint is shown directly in the UI. Write it as an instruction the user can act on.
 - Never throw. Always return an `AuthStatus` object.
 
-#### `fetchPage(cursor: string | null): Promise<PageResult>`
+#### `fetchPage(ctx: FetchContext): Promise<PageResult>`
 
 The core data fetching method. Called repeatedly by the sync engine to paginate through the platform's data.
 
 ```typescript
+interface FetchContext {
+  cursor: string | null         // Pagination cursor. null = start from newest.
+  sinceItemId: string | null    // Platform ID of newest known item. The engine
+                                // passes this during forward sync so you can
+                                // optimize if your API supports "since" filtering.
+                                // null during backfill or first-ever sync.
+  phase: 'forward' | 'backfill' // Which sync phase is requesting this page.
+}
+
 interface PageResult {
   items: CapturedItem[]    // Items on this page
   nextCursor: string | null // Cursor for next page, null = no more data
@@ -84,6 +93,7 @@ interface PageResult {
 - Items should be ordered newest-first within each page (this is how most APIs work naturally).
 - Throw `SyncError` on failures. The engine catches it, updates error state, and the scheduler handles backoff.
 - Keep pages small-ish (10–25 items). The engine adds a delay between pages to avoid rate limiting.
+- You can safely ignore `sinceItemId` and `phase` — just destructure `{ cursor }` and use it. The engine has its own early-exit logic that works regardless.
 
 ---
 
@@ -204,11 +214,12 @@ On a successful sync, `consecutiveErrors` resets to 0.
 ### Stop Conditions
 
 The sync engine stops a forward sync when ANY of:
-1. **Caught up**: 3 consecutive pages with 0 new items
-2. **End of data**: `nextCursor` is `null`
-3. **Time limit**: Exceeded `maxMinutes` (10 min for scheduler, unlimited for CLI)
-4. **Cancelled**: App is quitting or user aborted
-5. **Error**: `fetchPage()` threw
+1. **Reached since-anchor**: A page contains the item matching `sinceItemId` (caught up precisely — most efficient)
+2. **Caught up**: 3 consecutive pages with 0 new items (fallback when no anchor exists)
+3. **End of data**: `nextCursor` is `null`
+4. **Time limit**: Exceeded `maxMinutes` (10 min for scheduler, unlimited for CLI). Forward saves `headCursor` for resume.
+5. **Cancelled**: App is quitting or user aborted. Forward saves `headCursor` for resume.
+6. **Error**: `fetchPage()` threw. Forward saves `headCursor` for resume.
 
 ### Progress & Events
 
@@ -279,7 +290,7 @@ async checkAuth(): Promise<AuthStatus> {
   }
 }
 
-async fetchPage(cursor: string | null): Promise<PageResult> {
+async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
   const cookies = extractChromeCookies('.example.com', ['session_id', 'csrf_token'])
   const response = await fetch('https://api.example.com/bookmarks', {
     headers: { Cookie: cookies.cookieHeader }
@@ -307,7 +318,7 @@ async checkAuth(): Promise<AuthStatus> {
   }
 }
 
-async fetchPage(cursor: string | null): Promise<PageResult> {
+async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
   const page = cursor ? parseInt(cursor) : 1
   const { stdout } = await execAsync(`gh api /user/starred?per_page=30&page=${page}`)
   const repos = JSON.parse(stdout)
@@ -418,7 +429,7 @@ export default class GitHubStarsConnector implements Connector {
     }
   }
 
-  async fetchPage(cursor: string | null): Promise<PageResult> {
+  async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
     const page = cursor ? parseInt(cursor) : 1
     const perPage = 30
 
@@ -523,9 +534,13 @@ Here's the full lifecycle of a connector, from installation to search results:
 3. SYNC CYCLE (for persistent connectors)
    SyncEngine.sync(connector)
      → loadState() from connector_sync_state table
-     → FORWARD PHASE: fetchPage(null) → fetchPage(cursor1) → ... → stop on stale
-     → BACKFILL PHASE: fetchPage(tailCursor) → ... → stop on budget or end
-     → saveState() with updated cursors
+     → FORWARD: fetchPage({ cursor: headCursor ?? null, sinceItemId, phase: 'forward' })
+       → stop on reached_since / stale / timeout / cancel / error
+       → interrupted? headCursor saved for resume next cycle
+       → completed but sinceItemId not hit? anchor invalidated, rebuilt next cycle
+     → BACKFILL: fetchPage({ cursor: tailCursor, sinceItemId: null, phase: 'backfill' })
+       → stop on end-of-history / budget
+     → saveState()
 
 4. ITEM PROCESSING (per page)
    For each item in PageResult:
