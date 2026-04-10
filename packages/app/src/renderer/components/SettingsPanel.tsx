@@ -402,24 +402,14 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
-            <span className={`text-[11px] font-medium ${
-              !selected.enabled
-                ? 'text-warm-faint dark:text-dark-muted'
-                : isSyncing
-                  ? 'text-green-500'
-                  : selected.state.lastErrorCode
-                    ? 'text-red-500'
-                    : 'text-green-500'
-            }`}>
+            <span className={`text-[11px] font-medium ${selected.enabled ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
               {!selected.enabled
                 ? 'Disabled'
                 : isSyncing
                   ? 'Syncing…'
                   : selected.state.lastErrorCode?.startsWith('AUTH_')
                     ? 'Needs login'
-                    : selected.state.lastErrorCode
-                      ? 'Error'
-                      : 'Connected'}
+                    : 'Connected'}
             </span>
           </div>
           {selected.enabled && (connectorCounts[selected.id] ?? 0) > 0 && (
