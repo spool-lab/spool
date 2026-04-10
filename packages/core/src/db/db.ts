@@ -194,6 +194,7 @@ function runMigrations(db: Database.Database): void {
       consecutive_errors  INTEGER NOT NULL DEFAULT 0,
       enabled             INTEGER NOT NULL DEFAULT 1,
       config_json         TEXT NOT NULL DEFAULT '{}',
+      last_error_at       TEXT,
       last_error_code     TEXT,
       last_error_message  TEXT
     );
@@ -268,6 +269,22 @@ function runMigrations(db: Database.Database): void {
         VALUES('delete', OLD.session_id, OLD.title, OLD.user_text, OLD.assistant_text);
     END;
   `)
+
+  // ── Incremental migrations ──────────────────────────────────────────────
+  // Use SQLite's built-in user_version pragma to track schema version.
+  // Each migration runs exactly once. Add new migrations at the end with
+  // the next sequential version number.
+  const version = (db.pragma('user_version') as [{ user_version: number }])[0].user_version
+
+  if (version < 1) {
+    // v1: add last_error_at for accurate backoff timing
+    try {
+      db.exec('ALTER TABLE connector_sync_state ADD COLUMN last_error_at TEXT')
+    } catch {
+      // Column may already exist if user ran a dev build before this migration
+    }
+    db.pragma('user_version = 1')
+  }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'captures', 'captures_fts_trigram')

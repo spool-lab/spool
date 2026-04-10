@@ -50,6 +50,7 @@ function createTestDB(): InstanceType<typeof Database> {
       consecutive_errors  INTEGER NOT NULL DEFAULT 0,
       enabled             INTEGER NOT NULL DEFAULT 1,
       config_json         TEXT NOT NULL DEFAULT '{}',
+      last_error_at       TEXT,
       last_error_code     TEXT,
       last_error_message  TEXT
     );
@@ -99,7 +100,7 @@ describe('SyncEngine — dual-frontier', () => {
     engine = new SyncEngine(db)
   })
 
-  // ── A.1.1: FetchContext is passed correctly ─────────────────────────────
+  // ── FetchContext is passed correctly ─────────────────────────────────────
 
   describe('FetchContext passing', () => {
     it('passes sinceItemId and phase to connector during forward', async () => {
@@ -152,7 +153,7 @@ describe('SyncEngine — dual-frontier', () => {
     })
   })
 
-  // ── A.1.2: tailCursor scope ─────────────────────────────────────────────
+  // ── tailCursor scope ────────────────────────────────────────────────────
 
   describe('tailCursor scope', () => {
     it('forward writes tailCursor during initial sync (handoff to backfill)', async () => {
@@ -197,7 +198,7 @@ describe('SyncEngine — dual-frontier', () => {
     })
   })
 
-  // ── A.1.3: headItemId write timing ──────────────────────────────────────
+  // ── headItemId write timing ─────────────────────────────────────────────
 
   describe('headItemId write timing', () => {
     it('sets headItemId from page 0 first item', async () => {
@@ -236,7 +237,7 @@ describe('SyncEngine — dual-frontier', () => {
     })
   })
 
-  // ── A.1.4: headCursor resume ────────────────────────────────────────────
+  // ── headCursor resume ───────────────────────────────────────────────────
 
   describe('headCursor resume', () => {
     it('clears headCursor on normal forward completion', async () => {
@@ -283,7 +284,7 @@ describe('SyncEngine — dual-frontier', () => {
     })
   })
 
-  // ── A.1.5: early-exit on sinceItemId ────────────────────────────────────
+  // ── early-exit on sinceItemId ────────────────────────────────────────────
 
   describe('early-exit on sinceItemId', () => {
     it('stops forward when page contains sinceItemId', async () => {
@@ -321,7 +322,7 @@ describe('SyncEngine — dual-frontier', () => {
     })
   })
 
-  // ── A.1.6: anchor invalidation ──────────────────────────────────────────
+  // ── anchor invalidation ─────────────────────────────────────────────────
 
   describe('anchor invalidation', () => {
     it('clears headItemId when forward completes without hitting anchor', async () => {
@@ -359,7 +360,7 @@ describe('SyncEngine — dual-frontier', () => {
       const state = loadSyncState(db, 'test-connector')
       // Anchor should be preserved — forward didn't complete, can't judge validity.
       // headItemId stays #200 because this was a resumed forward (startCursor != null),
-      // so A.1.3 skips the page-0 update.
+      // so the page-0 headItemId update is skipped.
       expect(state.headItemId).toBe('#200')
     })
 
@@ -377,6 +378,40 @@ describe('SyncEngine — dual-frontier', () => {
       const state = loadSyncState(db, 'test-connector')
       // headItemId should be updated to #201 (page 0 first item, newer than #200)
       expect(state.headItemId).toBe('#201')
+    })
+  })
+
+  // ── lastErrorAt for backoff ──────────────────────────────────────────────
+
+  describe('lastErrorAt backoff base', () => {
+    it('sets lastErrorAt on sync failure', async () => {
+      const connector = createMockConnector(async () => {
+        throw new Error('network down')
+      })
+
+      await engine.sync(connector, { direction: 'forward' })
+      const state = loadSyncState(db, 'test-connector')
+      expect(state.lastErrorAt).not.toBeNull()
+      expect(state.consecutiveErrors).toBe(1)
+    })
+
+    it('clears lastErrorAt on successful sync', async () => {
+      // Pre-set error state
+      db.prepare(`
+        INSERT INTO connector_sync_state
+          (connector_id, consecutive_errors, last_error_at, last_error_code, enabled)
+        VALUES ('test-connector', 3, '2026-01-01T00:00:00Z', 'NETWORK_OFFLINE', 1)
+      `).run()
+
+      const connector = createMockConnector(async () => {
+        return { items: [makeItem('#100')], nextCursor: null }
+      })
+
+      await engine.sync(connector, { direction: 'forward' })
+      const state = loadSyncState(db, 'test-connector')
+      expect(state.lastErrorAt).toBeNull()
+      expect(state.consecutiveErrors).toBe(0)
+      expect(state.lastErrorCode).toBeNull()
     })
   })
 })

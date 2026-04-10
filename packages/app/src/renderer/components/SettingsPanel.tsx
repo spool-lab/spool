@@ -428,7 +428,15 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               </span>
             </div>
           )}
-          {selected.enabled && !selected.state.tailComplete && !isSyncing && (
+          {selected.enabled && !isSyncing && selected.state.lastErrorCode && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-warm-muted dark:text-dark-muted">Error</span>
+              <span className="text-[11px] text-red-400 dark:text-red-400 max-w-[60%] truncate text-right" title={selected.state.lastErrorMessage ?? undefined}>
+                {selected.state.lastErrorMessage ?? selected.state.lastErrorCode}
+              </span>
+            </div>
+          )}
+          {selected.enabled && !selected.state.tailComplete && !isSyncing && !selected.state.lastErrorCode && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
               <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
