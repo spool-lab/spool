@@ -50,16 +50,24 @@ interface Connector {
 
   /**
    * Fetch one page of data.
-   * The sync engine calls this repeatedly with cursors to paginate.
-   *
-   * @param cursor - null for first page, otherwise the cursor from previous page
-   * @returns items on this page + cursor for next page (null = no more pages)
+   * The sync engine calls this repeatedly with FetchContext to paginate.
+   * The connector can use sinceItemId and phase to optimize fetching,
+   * or ignore them and just use the cursor (cursor-walking).
    */
-  fetchPage(cursor: string | null): Promise<PageResult>
+  fetchPage(ctx: FetchContext): Promise<PageResult>
+}
+
+interface FetchContext {
+  cursor: string | null         // Pagination cursor. null = start from newest.
+  sinceItemId: string | null    // Platform ID of newest known item (head anchor).
+                                // Forward passes this so the connector can
+                                // optimize (e.g. stop early). null during backfill
+                                // or when no anchor exists yet.
+  phase: 'forward' | 'backfill' // Which sync phase is requesting this page.
 }
 ```
 
-A connector only needs to implement two methods: `checkAuth()` and `fetchPage()`. Everything else — persistence, scheduling, retries, UI — is handled by the framework.
+A connector only needs to implement two methods: `checkAuth()` and `fetchPage()`. Everything else — persistence, scheduling, retries, UI — is handled by the framework. The `sinceItemId` and `phase` fields in `FetchContext` are informational — a connector can safely ignore them and just use `cursor`. The engine has its own early-exit logic that works regardless of whether the connector acts on these hints.
 
 ### Key Supporting Types
 
@@ -190,8 +198,14 @@ interface SyncState {
   connectorId: string
 
   // Head frontier
-  headCursor: string | null      // cursor to resume forward sync
-  headItemId: string | null      // platform_id of newest known item
+  headCursor: string | null      // Forward resume cursor. Non-null only when
+                                 // forward was interrupted (timeout/cancel/error).
+                                 // Cleared on normal completion.
+  headItemId: string | null      // Platform ID of newest known item (since anchor).
+                                 // Set from page 0 of a fresh forward (not a resumed one).
+                                 // Used as FetchContext.sinceItemId and as the engine's
+                                 // early-exit target. Cleared automatically if forward
+                                 // completes without hitting it (anchor invalidation).
 
   // Tail frontier
   tailCursor: string | null      // cursor to resume backfill
@@ -212,11 +226,13 @@ interface SyncState {
 ### Stop Conditions
 
 Forward sync stops when ANY of:
-1. **Stale pages**: 3 consecutive pages with 0 new items (caught up)
-2. **No cursor**: API returned `nextCursor: null` (end of data)
-3. **Budget**: Hit `maxPages` limit
-4. **Timeout**: Exceeded `maxMinutes`
-5. **Cancelled**: `AbortSignal` fired
+1. **Reached since-anchor**: A page contains the item matching `sinceItemId` (caught up precisely)
+2. **Stale pages**: 3 consecutive pages with 0 new items (fallback when no anchor exists)
+3. **No cursor**: API returned `nextCursor: null` (end of data)
+4. **Timeout**: Exceeded `maxMinutes` (forward interrupted, `headCursor` preserved for resume)
+5. **Cancelled**: `AbortSignal` fired (`headCursor` preserved)
+
+Conditions 1–3 are "normal completion" — `headCursor` is cleared. Conditions 4–5 are "interruption" — `headCursor` retains the current position so the next forward resumes where it stopped instead of re-fetching from the newest end.
 
 ### Ephemeral vs. Persistent
 
@@ -236,9 +252,9 @@ class SyncEngine {
 ### Checkpoint & Crash Safety
 
 The engine checkpoints state to DB every 25 pages. If the app crashes mid-sync:
-- Forward sync: may re-fetch some pages, but dedup by `(platform, platformId)` prevents duplicates
-- Backfill: resumes from last saved `tailCursor`
-- No data loss, at most some redundant API calls
+- Forward sync: resumes from last saved `headCursor`. Pages between the crash and the last checkpoint may be re-fetched, but dedup by `(platform, platformId)` prevents duplicates.
+- Backfill: resumes from last saved `tailCursor`.
+- No data loss, at most some redundant API calls.
 
 ---
 
@@ -583,7 +599,7 @@ packages/core/src/connectors/
 A minimal connector implementation:
 
 ```typescript
-import type { Connector, AuthStatus, PageResult } from '@spool/core'
+import type { Connector, AuthStatus, PageResult, FetchContext } from '@spool/core'
 
 export default class MyConnector implements Connector {
   readonly id = 'my-platform-bookmarks'
@@ -598,8 +614,11 @@ export default class MyConnector implements Connector {
     return { ok: true }
   }
 
-  async fetchPage(cursor: string | null): Promise<PageResult> {
-    // Fetch one page of data from the platform API
+  async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
+    // Fetch one page of data from the platform API.
+    // sinceItemId and phase are available in FetchContext if your platform
+    // supports server-side "since" filtering — most connectors can ignore them
+    // and just use cursor. The engine handles early-exit on its own.
     const response = await fetchFromAPI(cursor)
     return {
       items: response.items.map(item => ({
