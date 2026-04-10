@@ -72,8 +72,9 @@ export function makeItem(platformId: string): CapturedItem {
 }
 
 export function setState(db: InstanceType<typeof Database>, partial: Partial<SyncState> & { connectorId: string }): void {
-  const defaults: SyncState = {
-    connectorId: partial.connectorId,
+  const { connectorId, ...rest } = partial
+  const state: SyncState = {
+    connectorId,
     headCursor: null,
     headItemId: null,
     tailCursor: null,
@@ -87,9 +88,9 @@ export function setState(db: InstanceType<typeof Database>, partial: Partial<Syn
     lastErrorAt: null,
     lastErrorCode: null,
     lastErrorMessage: null,
-    ...partial,
+    ...rest,
   }
-  saveSyncState(db, defaults)
+  saveSyncState(db, state)
 }
 
 export function countCaptures(db: InstanceType<typeof Database>): number {
