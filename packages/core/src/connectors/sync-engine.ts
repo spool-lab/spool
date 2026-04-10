@@ -9,7 +9,7 @@ import type {
   SyncProgress,
   SyncErrorCode,
 } from './types.js'
-import { SyncError } from './types.js'
+import { SyncError, DEFAULT_SCHEDULE } from './types.js'
 import type { CapturedItem } from '../types.js'
 
 // ── Sync State Persistence ──────────────────────────────────────────────────
@@ -261,7 +261,7 @@ export class SyncEngine {
     startCursor: string | null,
     startedAt: number,
   ): Promise<{ added: number; pages: number; stopReason: string; error?: { code: string; message: string } }> {
-    const delayMs = opts.delayMs ?? 1200
+    const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
     const maxMinutes = opts.maxMinutes ?? 0
     const stalePageLimit = opts.stalePageLimit ?? 3
     const checkpointEvery = 25
@@ -493,7 +493,7 @@ export class SyncEngine {
     opts: SyncOptions,
     startedAt: number,
   ): Promise<ConnectorSyncResult> {
-    const delayMs = opts.delayMs ?? 600
+    const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
     const maxMinutes = opts.maxMinutes ?? 0
     const sourceId = getSourceId(this.db)
 
