@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { Duration, Effect, ManagedRuntime, TestClock, TestContext } from 'effect'
 import Database from 'better-sqlite3'
 import { SyncScheduler } from './sync-scheduler.js'
 import { ConnectorRegistry } from './registry.js'
 import { SyncError, SyncErrorCode } from './types.js'
-import type { Connector, AuthStatus, FetchContext, PageResult, SchedulerEvent } from './types.js'
+import type { Connector, AuthStatus, FetchContext, PageResult } from './types.js'
 import { createTestDB, makeItem, setState } from './test-helpers.js'
 
 // ── Test Helpers ────────────────────────────────────────────────────────────
 
-function createTestConnector(id: string, fetchPageFn?: (ctx: FetchContext) => Promise<PageResult>): Connector {
+function createTestConnector(
+  id: string,
+  fetchPageFn?: (ctx: FetchContext) => Promise<PageResult>,
+): Connector {
   return {
     id,
     platform: 'test',
@@ -17,27 +21,52 @@ function createTestConnector(id: string, fetchPageFn?: (ctx: FetchContext) => Pr
     color: '#000',
     ephemeral: false,
     async checkAuth(): Promise<AuthStatus> { return { ok: true } },
-    fetchPage: fetchPageFn ?? (async () => ({ items: [makeItem(`${id}-1`)], nextCursor: null })),
+    fetchPage:
+      fetchPageFn ?? (async () => ({ items: [makeItem(`${id}-1`)], nextCursor: null })),
+  }
+}
+
+/**
+ * Build a test runtime whose default Clock is TestClock. The scheduler's
+ * tick fiber and per-job runJob fibers all run in this runtime so
+ * `runtime.runPromise(TestClock.adjust(...))` advances time deterministically.
+ */
+function makeTestRuntime() {
+  return ManagedRuntime.make(TestContext.TestContext)
+}
+
+/**
+ * TestClock advance + microtask drain. The scheduler forks real Promise-based
+ * fetchPage calls, so after advancing virtual time we need to yield to the JS
+ * microtask/macrotask queues a few times so the forked runJob fibers can
+ * progress through their await boundaries before we assert.
+ */
+async function flush(runtime: ReturnType<typeof makeTestRuntime>, ms: number): Promise<void> {
+  await runtime.runPromise(TestClock.adjust(Duration.millis(ms)))
+  for (let i = 0; i < 5; i++) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    await runtime.runPromise(Effect.sleep(Duration.zero))
   }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('SyncScheduler contract', () => {
+describe('SyncScheduler contract (effect)', () => {
   let db: InstanceType<typeof Database>
   let registry: ConnectorRegistry
   let scheduler: SyncScheduler | undefined
+  let runtime: ReturnType<typeof makeTestRuntime>
 
   beforeEach(() => {
-    vi.useFakeTimers()
     db = createTestDB()
     registry = new ConnectorRegistry()
+    runtime = makeTestRuntime()
     scheduler = undefined
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     scheduler?.stop()
-    vi.useRealTimers()
+    await runtime.dispose()
   })
 
   describe('Backoff', () => {
@@ -50,21 +79,24 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'auth-fail' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 1_000,
-        retryBackoffMs: [1_000],
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 1_000,
+          retryBackoffMs: [1_000],
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires first sync which fails with AUTH error
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
       expect(fetchCalls).toHaveLength(1)
 
-      // AUTH errors should never be retried
-      await vi.advanceTimersByTimeAsync(120_000)
-
+      // AUTH errors never retry — advance far past any configured backoff
+      await flush(runtime, 120_000)
       expect(fetchCalls).toHaveLength(1)
     })
 
@@ -77,29 +109,33 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'backoff-test' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 1_000,
-        backfillIntervalMs: 999_999_999,
-        retryBackoffMs: [5_000, 60_000],
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 1_000,
+          backfillIntervalMs: 999_999_999,
+          retryBackoffMs: [5_000, 60_000],
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires immediately
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
       expect(fetchCalls).toHaveLength(1)
 
-      // t=30s: tick fires, backoff=5s has elapsed (30>5), retry → consecutiveErrors=2
-      await vi.advanceTimersByTimeAsync(30_000)
+      // t=30s: tick fires, backoff=5s has elapsed (30>5), retry → errors=2
+      await flush(runtime, 30_000)
       expect(fetchCalls).toHaveLength(2)
 
-      // t=60s: tick fires, 30s since last error, backoff=60s → 30<60, skip
-      await vi.advanceTimersByTimeAsync(30_000)
+      // t=60s: 30s since last error, backoff=60s → skip
+      await flush(runtime, 30_000)
       expect(fetchCalls).toHaveLength(2)
 
-      // t=90s: tick fires, 60s since last error at t=30s → 60>=60, retry
-      await vi.advanceTimersByTimeAsync(30_000)
+      // t=90s: 60s since last error → retry
+      await flush(runtime, 30_000)
       expect(fetchCalls).toHaveLength(3)
     })
 
@@ -112,24 +148,28 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'backoff-base' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 1_000,
-        retryBackoffMs: [60_000],
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 1_000,
+          retryBackoffMs: [60_000],
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires first sync
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
       expect(fetchCalls).toHaveLength(1)
 
       // t=30s: only 30s since lastErrorAt, backoff=60s → skip
-      await vi.advanceTimersByTimeAsync(30_000)
+      await flush(runtime, 30_000)
       expect(fetchCalls).toHaveLength(1)
 
       // t=60s: 60s since lastErrorAt → retry
-      await vi.advanceTimersByTimeAsync(30_000)
+      await flush(runtime, 30_000)
       expect(fetchCalls).toHaveLength(2)
     })
 
@@ -142,24 +182,29 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'recovery' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 1_000,
-        retryBackoffMs: [5_000],
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 1_000,
+          retryBackoffMs: [5_000],
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup sync fails
-      await vi.advanceTimersByTimeAsync(100)
-
-      // Switch to success before next tick
+      await flush(runtime, 100)
       shouldFail = false
 
       // t=30s: backoff=5s elapsed, retry fires — now succeeds
-      await vi.advanceTimersByTimeAsync(30_000)
+      await flush(runtime, 30_000)
 
-      const state = db.prepare('SELECT consecutive_errors, last_error_at FROM connector_sync_state WHERE connector_id = ?')
+      const state = db
+        .prepare(
+          'SELECT consecutive_errors, last_error_at FROM connector_sync_state WHERE connector_id = ?',
+        )
         .get('recovery') as { consecutive_errors: number; last_error_at: string | null }
       expect(state.consecutive_errors).toBe(0)
       expect(state.last_error_at).toBeNull()
@@ -176,22 +221,26 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'interval-test' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 10_000,
-        backfillIntervalMs: 999_999_999,
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 10_000,
+          backfillIntervalMs: 999_999_999,
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires immediately
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
       expect(fetchCalls.length).toBeGreaterThanOrEqual(1)
 
       fetchCalls.length = 0
 
-      // t=30s: tick fires, 30s > 10s forwardIntervalMs → forward due
-      await vi.advanceTimersByTimeAsync(30_000)
+      // t=30s: 30s > 10s forwardIntervalMs → forward due
+      await flush(runtime, 30_000)
       expect(fetchCalls.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -207,20 +256,23 @@ describe('SyncScheduler contract', () => {
         tailComplete: true,
       })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 999_999_999,
-        backfillIntervalMs: 1_000,
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 999_999_999,
+          backfillIntervalMs: 1_000,
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires 'both', engine skips backfill when tailComplete
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
+      await flush(runtime, 90_000)
 
-      await vi.advanceTimersByTimeAsync(90_000)
-
-      const backfillCalls = phases.filter(p => p === 'backfill')
+      const backfillCalls = phases.filter((p) => p === 'backfill')
       expect(backfillCalls).toHaveLength(0)
     })
 
@@ -233,20 +285,23 @@ describe('SyncScheduler contract', () => {
       registry.register(connector)
       setState(db, { connectorId: 'manual' })
 
-      scheduler = new SyncScheduler(db, registry, {
-        forwardIntervalMs: 999_999_999,
-        pageDelayMs: 0,
-        maxMinutesPerRun: 1,
-      })
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 999_999_999,
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+        },
+        runtime,
+      )
       scheduler.start()
 
-      // Startup fires
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
       const afterStartup = fetchCalls.length
 
-      // Manual trigger
       scheduler.triggerNow('manual', 'forward')
-      await vi.advanceTimersByTimeAsync(100)
+      await flush(runtime, 100)
 
       expect(fetchCalls.length).toBeGreaterThan(afterStartup)
     })
