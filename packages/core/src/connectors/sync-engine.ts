@@ -300,14 +300,18 @@ export class SyncEngine {
       }
       yield* Effect.sync(() => saveSyncState(db, state))
       return result
+      // Effect.scoped discharges the Scope required by bridgeAbortSignal's
+      // acquireRelease, guaranteeing removeEventListener runs on every exit
+      // path (success, failure, interruption).
     }).pipe(Effect.scoped)
   }
 
   async sync(connector: Connector, opts: SyncOptions = {}): Promise<ConnectorSyncResult> {
-    // NOTE: opts.signal is deliberately NOT passed to runPromise here.
-    // The loop polls signal.aborted at iteration boundaries to preserve
-    // partial-progress + stopReason='cancelled' semantics. Runtime
-    // interruption would skip state persistence and surface as an error.
+    // opts.signal is bridged into an internal Deferred by syncEffect —
+    // NOT passed to runPromise, because runtime interruption would
+    // skip state persistence and surface as an error. Cancellation must
+    // be observable inside the loop (via Deferred.isDone) so the loop
+    // can return gracefully with stopReason='cancelled' + partial progress.
     try {
       return await Effect.runPromise(this.syncEffect(connector, opts))
     } catch (err) {
