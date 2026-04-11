@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
-import { Duration, Effect } from 'effect'
+import { Clock, Deferred, Duration, Effect, Scope } from 'effect'
 import type {
   Connector,
   FetchContext,
@@ -13,23 +13,46 @@ import { SyncError, SyncErrorCode, DEFAULT_SCHEDULE } from './types.js'
 import type { CapturedItem } from '../types.js'
 
 /**
- * Sleep `ms` milliseconds, but wake early if `signal` fires. The loop top
- * still polls `signal.aborted` for a graceful return with stopReason='cancelled',
- * so this racer just gets us out of the sleep faster — it does NOT short-circuit
- * the loop by itself.
+ * The internal "please stop" signal. Resolved once → the loop returns
+ * gracefully with stopReason='cancelled' on its next iteration, and any
+ * in-flight sleep is interrupted via Effect.race below. Driven by
+ * `opts.signal` (via `bridgeAbortSignal` at the top of `syncEffect`) or
+ * by direct resolution in tests.
  */
-function interruptibleSleep(ms: number, signal: AbortSignal | undefined): Effect.Effect<void> {
-  const sleep = Effect.sleep(Duration.millis(ms))
-  if (!signal) return sleep
-  if (signal.aborted) return Effect.void
-  return Effect.race(
-    sleep,
-    Effect.async<void>((resume) => {
-      const onAbort = () => resume(Effect.void)
-      signal.addEventListener('abort', onAbort, { once: true })
-      return Effect.sync(() => signal.removeEventListener('abort', onAbort))
+type CancelSignal = Deferred.Deferred<void>
+
+/**
+ * Bridge an optional AbortSignal into a CancelSignal registered in the
+ * ambient Scope. The listener is cleaned up by the scope's finalizer.
+ */
+function bridgeAbortSignal(
+  signal: AbortSignal | undefined,
+  cancel: CancelSignal,
+): Effect.Effect<void, never, Scope.Scope> {
+  if (!signal) return Effect.void
+  if (signal.aborted) return Deferred.succeed(cancel, undefined).pipe(Effect.asVoid)
+  return Effect.acquireRelease(
+    Effect.sync(() => {
+      const handler = () => {
+        Deferred.unsafeDone(cancel, Effect.void)
+      }
+      signal.addEventListener('abort', handler, { once: true })
+      return handler
     }),
-  )
+    (handler) => Effect.sync(() => signal.removeEventListener('abort', handler)),
+  ).pipe(Effect.asVoid)
+}
+
+/**
+ * Sleep `ms` milliseconds but wake immediately if the cancel signal fires.
+ * The loop top still polls the cancel signal for a graceful
+ * `stopReason='cancelled'` return; this racer just cuts the sleep short.
+ */
+function interruptibleSleep(ms: number, cancel: CancelSignal): Effect.Effect<void> {
+  return Effect.race(
+    Effect.sleep(Duration.millis(ms)),
+    Deferred.await(cancel),
+  ).pipe(Effect.asVoid)
 }
 
 function tagConnectorId(items: CapturedItem[], connectorId: string): void {
@@ -37,6 +60,11 @@ function tagConnectorId(items: CapturedItem[], connectorId: string): void {
     (item.metadata as Record<string, unknown>)['connectorId'] = connectorId
   }
 }
+
+const nowIso: Effect.Effect<string> = Effect.map(
+  Clock.currentTimeMillis,
+  (ms) => new Date(ms).toISOString(),
+)
 
 // ── Sync State Persistence ──────────────────────────────────────────────────
 
@@ -238,37 +266,41 @@ export class SyncEngine {
     opts: SyncOptions = {},
   ): Effect.Effect<ConnectorSyncResult> {
     const db = this.db
-    const state = loadSyncState(db, connector.id)
-    const startedAt = Date.now()
+    const self = this
 
-    const body = connector.ephemeral
-      ? this.syncEphemeralEffect(connector, state, opts, startedAt)
-      : this.syncPersistentEffect(connector, state, opts, startedAt)
+    return Effect.gen(function* () {
+      const state = yield* Effect.sync(() => loadSyncState(db, connector.id))
+      const startedAt = yield* Clock.currentTimeMillis
+      const cancel = yield* Deferred.make<void>()
+      yield* bridgeAbortSignal(opts.signal, cancel)
 
-    return body.pipe(
-      Effect.withSpan('sync.cycle', {
-        attributes: {
-          'connector.id': connector.id,
-          'sync.direction': opts.direction ?? 'both',
-        },
-      }),
-      Effect.tap((result) =>
-        Effect.sync(() => {
-          if (result.error) {
-            state.consecutiveErrors += 1
-            state.lastErrorAt = new Date().toISOString()
-            state.lastErrorCode = result.error.code as SyncErrorCode
-            state.lastErrorMessage = result.error.message
-          } else {
-            state.consecutiveErrors = 0
-            state.lastErrorAt = null
-            state.lastErrorCode = null
-            state.lastErrorMessage = null
-          }
-          saveSyncState(db, state)
+      const body = connector.ephemeral
+        ? self.syncEphemeralEffect(connector, state, opts, startedAt, cancel)
+        : self.syncPersistentEffect(connector, state, opts, startedAt, cancel)
+
+      const result = yield* body.pipe(
+        Effect.withSpan('sync.cycle', {
+          attributes: {
+            'connector.id': connector.id,
+            'sync.direction': opts.direction ?? 'both',
+          },
         }),
-      ),
-    )
+      )
+
+      if (result.error) {
+        state.consecutiveErrors += 1
+        state.lastErrorAt = yield* nowIso
+        state.lastErrorCode = result.error.code as SyncErrorCode
+        state.lastErrorMessage = result.error.message
+      } else {
+        state.consecutiveErrors = 0
+        state.lastErrorAt = null
+        state.lastErrorCode = null
+        state.lastErrorMessage = null
+      }
+      yield* Effect.sync(() => saveSyncState(db, state))
+      return result
+    }).pipe(Effect.scoped)
   }
 
   async sync(connector: Connector, opts: SyncOptions = {}): Promise<ConnectorSyncResult> {
@@ -310,6 +342,7 @@ export class SyncEngine {
     sourceId: number,
     startCursor: string | null,
     startedAt: number,
+    cancel: CancelSignal,
   ): Effect.Effect<FetchLoopResult> {
     const db = this.db
     const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
@@ -339,10 +372,11 @@ export class SyncEngine {
       let stalePages = 0
 
       while (true) {
-        if (Date.now() >= deadline) {
+        const now = yield* Clock.currentTimeMillis
+        if (now >= deadline) {
           return { added, pages, stopReason: 'timeout' }
         }
-        if (opts.signal?.aborted) {
+        if (yield* Deferred.isDone(cancel)) {
           return { added, pages, stopReason: 'cancelled' }
         }
 
@@ -484,10 +518,11 @@ export class SyncEngine {
 
         // Cap the inter-page delay at the remaining deadline so maxMinutes
         // has ms-level precision instead of being gated on polling frequency.
-        const remaining = deadline - Date.now()
+        const nowAfter = yield* Clock.currentTimeMillis
+        const remaining = deadline - nowAfter
         const actualDelay = Math.max(0, Math.min(delayMs, remaining))
         if (actualDelay > 0) {
-          yield* interruptibleSleep(actualDelay, opts.signal)
+          yield* interruptibleSleep(actualDelay, cancel)
         }
       }
     })
@@ -498,6 +533,7 @@ export class SyncEngine {
     state: SyncState,
     opts: SyncOptions,
     startedAt: number,
+    cancel: CancelSignal,
   ): Effect.Effect<ConnectorSyncResult> {
     const db = this.db
     const direction = opts.direction ?? 'both'
@@ -520,6 +556,7 @@ export class SyncEngine {
             sourceId,
             state.headCursor ?? null,
             startedAt,
+            cancel,
           )
           .pipe(Effect.withSpan('sync.forward'))
 
@@ -527,7 +564,7 @@ export class SyncEngine {
         totalPages += fwd.pages
         stopReason = fwd.stopReason
         if (fwd.error) lastError = fwd.error
-        state.lastForwardSyncAt = new Date().toISOString()
+        state.lastForwardSyncAt = yield* nowIso
 
         // Anchor invalidation recovery (Q3): if forward ran to completion
         // (not interrupted) but never hit the since-anchor, the anchor is stale
@@ -552,6 +589,7 @@ export class SyncEngine {
             sourceId,
             state.tailCursor,
             startedAt,
+            cancel,
           )
           .pipe(Effect.withSpan('sync.backfill'))
 
@@ -559,7 +597,7 @@ export class SyncEngine {
         totalPages += bf.pages
         stopReason = bf.stopReason
         if (bf.error) lastError = bf.error
-        state.lastBackfillSyncAt = new Date().toISOString()
+        state.lastBackfillSyncAt = yield* nowIso
       }
 
       state.totalSynced += totalAdded
@@ -601,6 +639,7 @@ export class SyncEngine {
     state: SyncState,
     opts: SyncOptions,
     startedAt: number,
+    cancel: CancelSignal,
   ): Effect.Effect<ConnectorSyncResult> {
     const db = this.db
     const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
@@ -619,11 +658,12 @@ export class SyncEngine {
       let stopReason = 'complete'
 
       while (true) {
-        if (Date.now() >= deadline) {
+        const now = yield* Clock.currentTimeMillis
+        if (now >= deadline) {
           stopReason = 'timeout'
           break
         }
-        if (opts.signal?.aborted) {
+        if (yield* Deferred.isDone(cancel)) {
           stopReason = 'cancelled'
           break
         }
@@ -649,7 +689,7 @@ export class SyncEngine {
             `[sync-engine] ${connector.id} forward page ${totalPages + 1} error: ${err.message}`,
           )
           state.totalSynced = totalAdded
-          state.lastForwardSyncAt = new Date().toISOString()
+          state.lastForwardSyncAt = yield* nowIso
           yield* Effect.sync(() => saveSyncState(db, state))
           return {
             connectorId: connector.id,
@@ -679,15 +719,16 @@ export class SyncEngine {
         if (!result.nextCursor) break
         cursor = result.nextCursor
 
-        const remaining = deadline - Date.now()
+        const nowAfter = yield* Clock.currentTimeMillis
+        const remaining = deadline - nowAfter
         const actualDelay = Math.max(0, Math.min(delayMs, remaining))
         if (actualDelay > 0) {
-          yield* interruptibleSleep(actualDelay, opts.signal)
+          yield* interruptibleSleep(actualDelay, cancel)
         }
       }
 
       state.totalSynced = totalAdded
-      state.lastForwardSyncAt = new Date().toISOString()
+      state.lastForwardSyncAt = yield* nowIso
       yield* Effect.sync(() => saveSyncState(db, state))
 
       return {
