@@ -381,8 +381,8 @@ describe('SyncScheduler contract (effect)', () => {
       await flush(runtime, 100)
       expect(maxInFlight).toBe(2) // still capped
 
-      // Release remaining so afterEach can clean up
-      for (const [, r] of gates) r()
+      // Release second wave
+      for (const id of Array.from(inFlight)) gates.get(id)!()
       await flush(runtime, 100)
     })
   })
@@ -393,10 +393,6 @@ describe('SyncScheduler contract (effect)', () => {
       let page = 0
       const connector = createTestConnector('cancel-me', async () => {
         page++
-        // Page 1: returns with nextCursor so the engine continues into the
-        // inter-page delay. Page 2+: never called — the inter-page
-        // interruptibleSleep observes the cancel Deferred and the next loop
-        // iteration returns cancelled before fetchPage runs again.
         return {
           items: [makeItem(`c-${page}`)],
           nextCursor: `cursor-${page + 1}`,
@@ -410,9 +406,7 @@ describe('SyncScheduler contract (effect)', () => {
         registry,
         {
           forwardIntervalMs: 999_999_999,
-          // Large enough that the inter-page sleep is still pending when
-          // stop() fires. flush(100) below doesn't advance virtual time past
-          // this, so the race in interruptibleSleep is waiting on Deferred.
+          // long enough that the inter-page sleep is still pending when stop() fires
           pageDelayMs: 60_000,
           maxMinutesPerRun: 5,
         },
@@ -421,14 +415,10 @@ describe('SyncScheduler contract (effect)', () => {
       scheduler.on((event) => events.push(event))
       scheduler.start()
 
-      // Let page 1 run, upsert, then enter interruptibleSleep(60_000).
       await flush(runtime, 100)
       expect(page).toBeGreaterThanOrEqual(1)
 
       scheduler.stop()
-      // Drain: Deferred.succeed wakes the sleep race, loop iteration checks
-      // Deferred.isDone, returns cancelled, persistent sync wraps result,
-      // runJob emits sync-complete via Effect.sync before the fiber finishes.
       await flush(runtime, 100)
 
       const completes = events.filter((e) => e.type === 'sync-complete')
