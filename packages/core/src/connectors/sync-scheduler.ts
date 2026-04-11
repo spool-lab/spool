@@ -1,4 +1,5 @@
 import type {
+  ConnectorSyncResult,
   SyncJob,
   SyncJobPriority,
   ScheduleConfig,
@@ -23,10 +24,12 @@ import {
   Schedule,
 } from 'effect'
 
+type Direction = SyncJob['direction']
+
 export type SchedulerEvent =
   | { type: 'sync-start'; connectorId: string }
   | { type: 'sync-progress'; progress: SyncProgress }
-  | { type: 'sync-complete'; result: import('./types.js').ConnectorSyncResult }
+  | { type: 'sync-complete'; result: ConnectorSyncResult }
   | { type: 'sync-error'; connectorId: string; code: SyncErrorCode; message: string }
 
 export type SchedulerEventHandler = (event: SchedulerEvent) => void
@@ -39,14 +42,10 @@ export class SyncScheduler {
   // cooperatively (engine checks Deferred.isDone at every loop yield point).
   private running = new Map<string, Deferred.Deferred<void>>()
   private tickFiber: Fiber.RuntimeFiber<void, never> | null = null
-  private started = false
   private eventHandlers: SchedulerEventHandler[] = []
-  // Effect runtime. Production: Layer.empty (default clock). Tests inject
-  // ManagedRuntime.make(TestContext.TestContext) to gain TestClock.
+  // Production: Layer.empty. Tests inject TestContext.TestContext for TestClock.
   private runtime: ManagedRuntime.ManagedRuntime<never, never>
-  // Concurrency gate. Created on start() so config.concurrency is honored
-  // even if the config were swapped between start/stop cycles.
-  private semaphore: Effect.Semaphore | null = null
+  private semaphore: Effect.Semaphore
 
   constructor(
     private db: Database.Database,
@@ -57,22 +56,18 @@ export class SyncScheduler {
     this.engine = new SyncEngine(db)
     this.config = { ...DEFAULT_SCHEDULE, ...config }
     this.runtime = runtime ?? ManagedRuntime.make(Layer.empty)
+    this.semaphore = Effect.runSync(Effect.makeSemaphore(this.config.concurrency))
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   start(): void {
-    if (this.started) return
-    this.started = true
+    if (this.tickFiber) return
 
-    this.semaphore = Effect.runSync(Effect.makeSemaphore(this.config.concurrency))
-
-    // Queue immediate forward sync for all enabled connectors synchronously
-    // so observers of the queue right after start() see it populated.
+    // Queue immediate forward sync synchronously so observers of the queue
+    // right after start() see it populated.
     this.queueAll('both', 80)
 
-    // Tick fiber: first run happens inside a bootstrap so the 30s Schedule
-    // doesn't delay startup, then Effect.repeat drives the cadence.
     const tickProgram = pipe(
       this.tickOnceEffect(),
       Effect.repeat(Schedule.spaced(Duration.seconds(30))),
@@ -87,11 +82,9 @@ export class SyncScheduler {
   }
 
   stop(): void {
-    this.started = false
     if (this.tickFiber) {
-      // Fire-and-forget interrupt. The fiber respects Effect interruption at
-      // its next yield point. runJob fibers are siblings (not children), so
-      // this does NOT cascade to in-flight syncs — they unwind via the
+      // Fire-and-forget interrupt. runJob fibers are siblings (not children),
+      // so this does NOT cascade to in-flight syncs — they unwind via the
       // per-job Deferred below.
       this.runtime.runFork(Fiber.interrupt(this.tickFiber))
       this.tickFiber = null
@@ -101,19 +94,18 @@ export class SyncScheduler {
     }
     this.running.clear()
     this.queue = []
-    this.semaphore = null
   }
 
   /** Manually trigger sync for a specific connector. */
-  triggerNow(connectorId: string, direction: 'forward' | 'backfill' | 'both' = 'both'): void {
+  triggerNow(connectorId: string, direction: Direction = 'both'): void {
     this.enqueue({ connectorId, direction, priority: 100, queuedAt: Date.now() })
-    this.runtime.runFork(this.tickOnceEffect())
+    this.poke()
   }
 
   /** Notify the scheduler that the system woke from sleep. */
   onWake(): void {
     this.queueAll('forward', 60)
-    this.runtime.runFork(this.tickOnceEffect())
+    this.poke()
   }
 
   /** Subscribe to scheduler events. */
@@ -141,7 +133,7 @@ export class SyncScheduler {
       }
     })
 
-    return { running: this.started, connectors }
+    return { running: this.tickFiber !== null, connectors }
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
@@ -152,7 +144,11 @@ export class SyncScheduler {
     }
   }
 
-  private queueAll(direction: 'forward' | 'backfill' | 'both', priority: SyncJobPriority): void {
+  private poke(): void {
+    this.runtime.runFork(this.tickOnceEffect())
+  }
+
+  private queueAll(direction: Direction, priority: SyncJobPriority): void {
     for (const connector of this.registry.list()) {
       const state = loadSyncState(this.db, connector.id)
       if (!state.enabled) continue
@@ -161,10 +157,8 @@ export class SyncScheduler {
   }
 
   private enqueue(job: SyncJob): void {
-    // Don't queue if already queued or running
     if (this.running.has(job.connectorId)) return
     if (this.queue.some(j => j.connectorId === job.connectorId)) {
-      // Replace with higher priority if applicable
       this.queue = this.queue.map(j =>
         j.connectorId === job.connectorId && job.priority > j.priority ? job : j,
       )
@@ -174,16 +168,10 @@ export class SyncScheduler {
     this.queue.sort((a, b) => b.priority - a.priority)
   }
 
-  /**
-   * One pass of the scheduling decision loop: read Clock, scan connectors for
-   * due syncs, enqueue them, and fork runJob fibers for as many queued jobs as
-   * the semaphore will allow. Called from the tick fiber's repeat loop and
-   * from triggerNow()/onWake() as an immediate poke.
-   */
   private tickOnceEffect(): Effect.Effect<void> {
     const self = this
     return Effect.gen(function* () {
-      if (!self.started) return
+      if (self.tickFiber === null) return
 
       const now = yield* Clock.currentTimeMillis
 
@@ -191,13 +179,11 @@ export class SyncScheduler {
         const state = loadSyncState(self.db, connector.id)
         if (!state.enabled) continue
 
-        // Skip if in backoff due to errors.
         if (state.consecutiveErrors > 0 && state.lastErrorAt) {
           const backoffMs = self.getBackoffMs(state.consecutiveErrors)
           if (now - new Date(state.lastErrorAt).getTime() < backoffMs) continue
         }
 
-        // Skip if needsReauth
         if (state.lastErrorCode?.startsWith('AUTH_')) continue
 
         const lastForward = state.lastForwardSyncAt
@@ -227,28 +213,23 @@ export class SyncScheduler {
         }
       }
 
-      // Drain queue up to concurrency limit. The semaphore is the *real* gate
-      // on how many jobs run simultaneously; this loop just submits as many
-      // fibers as we have queued work for.
-      while (self.queue.length > 0 && self.running.size < self.config.concurrency) {
-        const job = self.queue.shift()!
-        // Fork as a sibling of the tick fiber, NOT a child — stop()'s
-        // interrupt of the tick fiber must not cascade and short-circuit
-        // in-flight sync state persistence.
-        yield* Effect.sync(() => self.runtime.runFork(self.runJobEffect(job)))
-      }
+      yield* Effect.sync(() => self.drainQueue())
     })
   }
 
-  /**
-   * Build the Effect that runs a single sync job. Wraps the inner body with
-   * `semaphore.withPermits(1)` so at most `config.concurrency` jobs execute in
-   * parallel.
-   */
+  // Drain queued work up to concurrency. The semaphore is the *real* gate on
+  // how many jobs run simultaneously; this loop just submits fibers.
+  // Fork as siblings of the tick fiber, NOT children — stop()'s interrupt of
+  // the tick fiber must not cascade and short-circuit in-flight state persistence.
+  private drainQueue(): void {
+    while (this.queue.length > 0 && this.running.size < this.config.concurrency) {
+      const job = this.queue.shift()!
+      this.runtime.runFork(this.runJobEffect(job))
+    }
+  }
+
   private runJobEffect(job: SyncJob): Effect.Effect<void> {
     const self = this
-    const semaphore = this.semaphore
-    if (!semaphore) return Effect.void
 
     const body = Effect.gen(function* () {
       if (!self.registry.has(job.connectorId)) return
@@ -287,18 +268,17 @@ export class SyncScheduler {
     })
 
     return pipe(
-      semaphore.withPermits(1)(body),
+      this.semaphore.withPermits(1)(body),
       Effect.ensuring(
         Effect.sync(() => {
           self.running.delete(job.connectorId)
-          // When a permit frees up, immediately try to drain more queued work
-          // instead of waiting 30s for the next periodic tick.
-          if (self.queue.length > 0 && self.started) {
-            self.runtime.runFork(self.tickOnceEffect())
+          // Drain remaining queue immediately rather than waiting 30s for the
+          // next periodic tick. Skips the connector rescan in tickOnceEffect.
+          if (self.queue.length > 0 && self.tickFiber !== null) {
+            self.drainQueue()
           }
         }),
       ),
-      // Defect in the forked fiber must not take down the runtime.
       Effect.catchAllCause((cause) =>
         Cause.isInterruptedOnly(cause)
           ? Effect.void

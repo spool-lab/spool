@@ -231,11 +231,10 @@ export interface SyncOptions {
   /** AbortSignal for cancellation. */
   signal?: AbortSignal
   /**
-   * Optional externally-managed cancellation signal. When provided,
-   * syncEffect uses this Deferred instead of creating its own, so callers
-   * (e.g. SyncScheduler) can cancel from outside the Effect. If both
-   * `signal` and `cancel` are provided, `signal` is bridged into `cancel`
-   * (both paths fire cancellation).
+   * Caller-owned cancellation Deferred. When provided, syncEffect uses this
+   * instead of creating its own — allowing callers like SyncScheduler to
+   * cancel from outside. If `signal` is also set, it is bridged into this
+   * Deferred.
    */
   cancel?: Deferred.Deferred<void>
   /** Progress callback. */
