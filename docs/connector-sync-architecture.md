@@ -1,6 +1,6 @@
 # Connector Architecture
 
-> Plugin-based data sync framework for Spool. Each connector is an installable npm package that fetches data from one platform.
+> Plugin-based data sync framework for Spool. A connector is an installable npm package that knows how to read items from one source — a remote API, a local database, a set of files — and hand them to Spool's sync engine as `CapturedItem`s.
 
 ---
 
@@ -8,9 +8,14 @@
 
 ### What is a Connector?
 
-A connector is a self-contained module that knows how to authenticate with and fetch paginated data from one specific platform source. It does NOT know about scheduling, sync state, or storage — those are handled by the framework.
+A connector is a self-contained module that knows how to check whether its data source is available and fetch paginated items from it. It does NOT know about scheduling, sync state, or storage — those are handled by the framework.
 
-Examples: `spool-lab-connector-twitter-bookmarks`, `spool-lab-connector-github-stars`, `spool-lab-connector-reddit-saved`.
+Examples:
+- Remote APIs: `@spool-lab/connector-twitter-bookmarks`, `@spool-lab/connector-github-stars`
+- Local databases: a connector that reads a macOS app's SQLite store
+- Local files: a connector that indexes a directory of notes
+
+A connector only has to implement two methods (`checkAuth` and `fetchPage`). Whether the data comes from HTTP, SQLite, or the filesystem is entirely the connector's concern — the framework treats them uniformly.
 
 ### Data Ownership Model
 
@@ -330,24 +335,15 @@ type SchedulerEvent =
 
 ## Connector Plugin System
 
-Connectors are distributed as npm packages and installed to a local directory. The app discovers and loads them at startup.
+Connectors are distributed as npm packages and installed to a local directory. The app discovers and loads them at startup. Packages can be authored by anyone — the Spool team ships first-party connectors under the `@spool-lab/*` npm scope, and community authors can publish under any name they choose.
 
 ### Package Convention
 
-Each connector is an npm package named `spool-lab-connector-<name>`:
-
-```
-spool-lab-connector-twitter-bookmarks/
-├── package.json
-├── index.js          # default export: Connector class or factory
-└── ...
-```
-
-The `package.json` declares connector metadata via a `spool` field:
+A connector package is identified by a `spool` manifest field in its `package.json`, **not** by its npm name. Any npm package can declare itself a connector by adding this field:
 
 ```json
 {
-  "name": "spool-lab-connector-twitter-bookmarks",
+  "name": "@spool-lab/connector-twitter-bookmarks",
   "version": "1.0.0",
   "main": "dist/index.js",
   "spool": {
@@ -362,7 +358,52 @@ The `package.json` declares connector metadata via a `spool` field:
 }
 ```
 
-The `spool` manifest enables the app to read connector metadata (for the connector directory page, install UI, etc.) without loading the module. The actual `Connector` interface implementation is loaded only after installation.
+- `spool.type` must be `"connector"` (reserved for future non-connector Spool plugin types)
+- `id` / `platform` / `label` / `description` / `color` / `ephemeral` must match the corresponding fields on the `Connector` interface implementation exported from the package
+- `@spool-lab/` is the scope reserved for first-party packages; any other scope (or unscoped name) is a community package
+
+The manifest lets the app read connector metadata (for the directory page, install UI, etc.) without loading the module — and lets the app decide whether to trust the package before running any of its code.
+
+### Trust model
+
+Because connector code runs with file-system and network access, the app distinguishes two trust tiers:
+
+| Tier | Rule | Default behavior |
+|---|---|---|
+| **First-party** | npm scope is `@spool-lab/*` and the package is also listed in Spool's bundled official-connector allow-list | Loaded automatically on startup |
+| **Community** | Any other package that has `spool.type === 'connector'` | Requires explicit user approval at first load, then cached in `~/.spool/config.json` |
+
+On first load of a community connector, Spool shows a consent dialog listing the capabilities the package has declared (see "Capability model" below) and the npm name + version. The user's answer is persisted — subsequent launches load it without re-prompting. The user can revoke trust at any time from Settings, which removes the consent record and disables the connector.
+
+This model keeps `@spool-lab/*` fast-path while still allowing a real community ecosystem. It is **not** a sandbox — a connector the user has trusted can still read files and make network requests. The consent gate is a warning, not a prison.
+
+> **Spec status:** the trust model is specified at the level of the consent flow and allow-list. Capability enforcement is specified below but not yet implemented. Worker-thread isolation is an optional hardening step reserved for a later phase.
+
+### Capability model
+
+> **Spec status: placeholder.** The detailed capability API is under design and will ship with the plugin loader. This section describes the intended shape so third-party authors can plan accordingly.
+
+A connector does not `import 'node:fs'` or `import 'node:http'` directly. Instead, the SDK exposes a constrained set of capabilities that the framework injects into the connector at construction time:
+
+- `fetch(url, init)` — HTTP fetch routed through Spool's network layer (proxy-aware, respects offline/online state). Equivalent to `globalThis.fetch` in shape
+- `storage` — scoped key-value storage keyed by the connector's `id`, for things like cached API tokens or cursor checkpoints the connector wants to own (the framework already manages the per-sync `SyncState`)
+- `cookies` — scoped Chrome/browser cookie reader for connectors that need cookie-based auth (subject to user consent for the specific browser profile)
+- `log` — structured logger that attributes log lines to the connector
+
+Any capability a connector uses must be declared in the `spool.capabilities` array in `package.json`:
+
+```json
+{
+  "spool": {
+    "type": "connector",
+    "capabilities": ["fetch", "cookies:chrome"]
+  }
+}
+```
+
+The consent dialog shown to users on first load lists these capabilities in plain language ("This connector will make network requests and read your Chrome cookies"). A connector that tries to use an undeclared capability at runtime is terminated with a `CONNECTOR_ERROR` and surfaced to the user.
+
+The exact capability set (names, signatures, consent strings) is frozen as part of the SDK v1 release. Until then this section is a design target, not a contract.
 
 ### Installation & Discovery
 
@@ -371,59 +412,99 @@ The `spool` manifest enables the app to read connector metadata (for the connect
 ```
 ~/.spool/connectors/
 ├── node_modules/
-│   ├── spool-lab-connector-twitter-bookmarks/
-│   ├── spool-lab-connector-github-stars/
-│   └── ...
+│   ├── @spool-lab/
+│   │   └── connector-twitter-bookmarks/   # shipped with the app, first-run extracted
+│   ├── some-community-scope/
+│   │   └── my-custom-connector/
+│   └── unscoped-connector-package/
 └── package.json     # auto-managed, tracks installed connectors
 ```
 
-**Install flow:**
-1. User browses connector directory on spool.pro (or triggers install from app UI)
-2. App runs `npm install spool-lab-connector-xxx` in `~/.spool/connectors/`
-3. App scans `node_modules/spool-lab-connector-*` and loads each package
-4. Each package's default export is instantiated and registered with `ConnectorRegistry`
+**Install sources — all paths go through the same dynamic loader:**
+
+| Source | How | Backend |
+|---|---|---|
+| **First-run bundle** | The app ships `@spool-lab/connector-*` npm tarballs inside its resource directory. On first launch, if `~/.spool/connectors/` is empty, the app extracts them into place. | File copy |
+| **Deep link from spool.pro** | spool.pro's connector directory buttons open `spool://install/<package-name>`, which the app handles by running the install flow for that package | `npm install` |
+| **Manual paste** | Settings → Install Connector → user pastes an npm package name | `npm install` |
+| **Local development** | `spool connector install --from ./path/to/local/package` CLI flag for connector authors developing a new plugin | `npm install <path>` |
+
+There is **no separate "built-in" code path**. Every connector the app loads — including first-party ones the Spool team maintains — goes through the same `~/.spool/connectors/` directory and the same dynamic loader. This is a deliberate choice: it means the first-party code is the first and most-tested consumer of the SDK, any capability a first-party connector needs is also available to community authors, and the plugin loading path is exercised from every launch of the app (not just once after the first community install).
+
+**Install flow for user-initiated installs:**
+1. User clicks "Install" on spool.pro directory, or pastes an npm package name into the app's Settings → Install Connector field
+2. App resolves the source (deep link or direct input) and runs `npm install <package>` in `~/.spool/connectors/`
+3. App scans every installed package for a `spool` manifest field
+4. For community packages not yet trusted, the app prompts for consent (see "Trust model" above)
+5. Each trusted package's default export is instantiated and registered with `ConnectorRegistry`
 
 **Discovery at startup:**
 ```typescript
-// Pseudocode for connector loading
-async function loadConnectors(registry: ConnectorRegistry) {
+// Pseudocode — real loader lives in packages/core/src/connectors/loader.ts
+async function loadConnectors(registry: ConnectorRegistry, trust: TrustStore) {
   const connectorsDir = path.join(homedir(), '.spool', 'connectors')
-  const pkgJsonPath = path.join(connectorsDir, 'package.json')
 
-  if (!existsSync(pkgJsonPath)) return
+  // First-run bootstrap: extract bundled first-party connectors if the
+  // user's connectors directory is empty.
+  await extractBundledConnectorsIfNeeded(connectorsDir)
 
-  const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
-  const deps = Object.keys(pkgJson.dependencies ?? {})
+  if (!existsSync(path.join(connectorsDir, 'package.json'))) return
 
-  for (const dep of deps) {
-    if (!dep.startsWith('spool-lab-connector-')) continue
-    const mod = require(path.join(connectorsDir, 'node_modules', dep))
-    const ConnectorClass = mod.default ?? mod
-    const connector = new ConnectorClass()
-    registry.register(connector)
+  // Walk every installed package — not just those with a known name prefix.
+  for (const pkgDir of walkNodeModules(path.join(connectorsDir, 'node_modules'))) {
+    const pkgJson = readPackageJson(pkgDir)
+    if (pkgJson?.spool?.type !== 'connector') continue
+
+    if (!trust.isAllowed(pkgJson.name)) {
+      // Community package not yet approved — surface in UI, skip loading.
+      trust.recordPending(pkgJson)
+      continue
+    }
+
+    try {
+      const mod = await import(pkgDir)
+      const ConnectorClass = mod.default ?? mod
+      const connector = new ConnectorClass(/* capabilities injected here */)
+      registry.register(connector)
+    } catch (err) {
+      // Crash isolation: a broken connector must not take down the loader.
+      log.error(`failed to load ${pkgJson.name}: ${err}`)
+    }
   }
 }
 ```
 
-**Uninstall:** `npm uninstall spool-lab-connector-xxx` in `~/.spool/connectors/`, then remove connector's sync state and captures from DB.
+The loader treats every package as untrusted by default and only loads those in the trust store. First-party packages shipped with the app are added to the trust store automatically as part of the bundle-extraction step. Load failures are isolated so one bad connector cannot prevent the others from registering.
 
-### Built-in vs. External Connectors
+**Uninstall:** `npm uninstall <package>` in `~/.spool/connectors/`, then remove connector's sync state and captures from DB. The next launch will re-extract first-party bundles if the user has removed them, unless they explicitly set a "do not restore" flag.
 
-During the transition period, high-priority connectors (e.g. Twitter Bookmarks) may ship bundled in `@spool/core`. These are registered directly in the app startup code alongside dynamically loaded external connectors. Over time, even bundled connectors should migrate to the plugin package format.
+### Deep-link install flow
 
-```typescript
-// App startup
-const registry = new ConnectorRegistry()
+spool.pro's connector directory page has an "Install in Spool" button next to each listed package. Clicking it opens a `spool://install/<package-name>` URL. The Spool app registers itself as the handler for the `spool://` protocol on install.
 
-// Built-in (temporary, will migrate to plugin)
-registry.register(new TwitterBookmarksConnector())
-
-// External plugins
-await loadConnectors(registry)
-
-const scheduler = new SyncScheduler(db, registry)
-scheduler.start()
 ```
+https://spool.pro/connectors
+      │
+      │ user clicks "Install" on @spool-lab/connector-github-stars
+      ▼
+spool://install/@spool-lab/connector-github-stars
+      │
+      │ OS hands off to Spool (custom protocol handler)
+      ▼
+App receives the deep link, shows a confirmation dialog:
+  "Install @spool-lab/connector-github-stars from npm?"
+      │
+      │ user confirms
+      ▼
+App runs `npm install @spool-lab/connector-github-stars` in ~/.spool/connectors/
+      │
+      ▼
+Loader picks it up, consent prompt if community, registers with ConnectorRegistry
+```
+
+Deep-link handling uses Electron's `app.setAsDefaultProtocolClient('spool')` in main, the `open-url` event on macOS, and command-line argument parsing on Windows/Linux. The `spool://` scheme is reserved for Spool's own use — any query parameters or additional paths are treated as opaque and validated server-side against the expected shape (`install/<package>`, `open/<resource>`, etc.).
+
+**Security note:** deep-link triggers do **not** auto-install. Every install, regardless of source, shows the user a confirmation dialog with the package name and (for community packages) the declared capabilities. A malicious link cannot silently push code onto a user's machine.
 
 ---
 
@@ -486,15 +567,15 @@ Note: The legacy `opencli_sources` and `opencli_setup` tables are removed. All c
 ┌──────────────────────────────────────────────────────────┐
 │                    spool.pro                              │
 │              Connector Directory Page                     │
-│         (lists all available connectors)                  │
+│      (curated listing of first-party + community)        │
 └───────────────────────┬──────────────────────────────────┘
-                        │ npm install
+                        │ npm install <any package>
                         ▼
 ┌──────────────────────────────────────────────────────────┐
 │              ~/.spool/connectors/                         │
-│    node_modules/spool-lab-connector-*/                    │
+│    node_modules/**/package.json with `spool.type`         │
 └───────────────────────┬──────────────────────────────────┘
-                        │ require() at startup
+                        │ trust check → dynamic import()
                         ▼
 ┌──────────────────────────────────────────────────────────┐
 │              ConnectorRegistry                            │
@@ -575,22 +656,31 @@ spool connector uninstall <package-name>          # remove a connector
 ## File Structure
 
 ```
-packages/core/src/connectors/
+packages/core/src/connectors/    # Framework — NOT any individual connector
 ├── types.ts                     # Connector, AuthStatus, PageResult, SyncState, errors
 ├── registry.ts                  # ConnectorRegistry
 ├── sync-engine.ts               # SyncEngine (dual-frontier logic)
 ├── sync-scheduler.ts            # SyncScheduler (timing, orchestration)
-├── loader.ts                    # Plugin discovery & dynamic loading
-└── twitter-bookmarks/           # Built-in reference connector (will migrate to plugin)
-    ├── index.ts                 # TwitterBookmarksConnector
-    ├── chrome-cookies.ts        # Chrome cookie extraction
-    └── graphql-fetch.ts         # X GraphQL API client
+└── loader.ts                    # Plugin discovery & dynamic loading
 
-~/.spool/connectors/             # User-installed connector plugins
+packages/connector-twitter-bookmarks/   # First-party connector, workspace package
+├── package.json                # with `spool.type: 'connector'` manifest
+├── src/
+│   ├── index.ts                # TwitterBookmarksConnector (default export)
+│   ├── chrome-cookies.ts       # uses injected cookies capability
+│   └── graphql-fetch.ts        # uses injected fetch capability
+└── dist/                       # built output, packaged as npm tarball and
+                                # shipped inside the app's resource directory
+                                # for first-run extraction
+
+~/.spool/connectors/            # User-visible connector install directory
 ├── package.json
 └── node_modules/
-    └── spool-lab-connector-*/
+    ├── @spool-lab/connector-*/ # First-party (bundled with app, auto-trusted)
+    └── <any-other-name>/       # Community (trusted after user consent)
 ```
+
+The framework code lives in `packages/core/src/connectors/`. **No connector implementation lives there** — even the first-party Twitter Bookmarks connector has its own workspace package (`packages/connector-twitter-bookmarks/`), is built into an npm tarball, and is loaded through the same dynamic-import path as community connectors. This keeps the SDK honest: if the framework ever needs a feature to support Twitter, that feature has to be exposed on the SDK surface, not hidden in the core package.
 
 ---
 
@@ -640,7 +730,82 @@ export default class MyConnector implements Connector {
 }
 ```
 
-Package it as `spool-lab-connector-my-platform-bookmarks` with the `spool` manifest in `package.json`, publish to npm, and users can install it.
+Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) with the `spool` manifest in `package.json`, publish to npm, and users can install it from the app's Settings → Install Connector field or from the spool.pro directory.
+
+### Local source connectors
+
+Not every connector fetches data over the network. A connector that reads a local SQLite database, a directory of markdown files, or another app's export file implements exactly the same `Connector` interface — the framework does not distinguish "remote" from "local" sources.
+
+The technique for making a local source look like a paginated stream is to **synthesize a cursor from a natural ordering** in the data. For a table with a `created_at` column:
+
+```typescript
+async fetchPage({ cursor }: FetchContext): Promise<PageResult> {
+  // cursor is the created_at of the last row on the previous page, or null
+  // for the first page. Query for 25 rows strictly older than it.
+  const db = openMyLocalDb()
+  try {
+    const rows = queryRows(db, { before: cursor, limit: 25 })
+    const items = rows.map(rowToCapturedItem)
+    const nextCursor = rows.length === 25
+      ? rows[rows.length - 1].created_at
+      : null
+    return { items, nextCursor }
+  } finally {
+    db.close()
+  }
+}
+```
+
+`checkAuth()` for a local source is typically "is the file readable?":
+
+```typescript
+async checkAuth(): Promise<AuthStatus> {
+  try {
+    const db = openMyLocalDb()
+    db.close()
+    return { ok: true }
+  } catch (err) {
+    return {
+      ok: false,
+      error: SyncErrorCode.CONNECTOR_ERROR,
+      message: err instanceof Error ? err.message : String(err),
+      hint: 'MyApp not found. Install MyApp, create at least one entry, then retry.',
+    }
+  }
+}
+```
+
+Notes for local connectors:
+
+- The dual-frontier model (forward + backfill) still applies: forward finds items added since the last sync, backfill walks history. With a stable local ordering, "forward" converges after the first cycle and subsequent syncs just pick up deltas.
+- Page delay (`pageDelayMs`) defaults are tuned for remote API rate limits. A local connector can pass `pageDelayMs: 0` via its constructor config if the default 1200ms is wasteful.
+- Error codes like `API_RATE_LIMITED` or `NETWORK_OFFLINE` don't apply. Use `CONNECTOR_ERROR` with a descriptive `hint` for local-specific failures (file missing, database locked, parse failure).
+- `checkAuth()`'s name is legacy — semantically it means "is the source usable right now?" The framework treats any non-`ok` answer the same way.
+
+### Future consideration: source-type taxonomy
+
+The current `Connector` interface is shaped around "paginated pull-based reads from a temporally-ordered source." That model covers:
+
+- Remote cursor-walking APIs (Twitter, GraphQL)
+- Remote `since`-parameterized APIs (GitHub, REST)
+- Local databases with a natural `ORDER BY created_at DESC` ordering
+- Local file directories where mtime serves as the ordering
+
+It does **not** naturally fit:
+
+- Push-based ingestion (filesystem watchers, IPC events from another process)
+- Non-temporal data (configs, static reference material)
+- Sources where the entire state must be re-read each time because no cursor exists (small local files, key-value stores)
+
+Spool currently handles push-based local-file ingestion (Claude Code sessions, Codex history) in a separate subsystem (`packages/core/src/sync/` — the `SpoolWatcher` + `Syncer`), not through the `Connector` framework. This split is intentional: forcing every integration into the paginated model would have produced awkward adapters for sources that don't have a natural pagination story.
+
+If in the future enough local or push-based connectors exist to warrant a unified abstraction, the framework may introduce a **source-type taxonomy** — something like `connector.kind: 'paginated' | 'snapshot' | 'watcher'` — with distinct interface shapes for each kind. This is deliberately **not** done yet because:
+
+1. The current interface has only two local samples (Typeless is a candidate community connector; Claude Code / Codex live outside the framework in `sync/`). Two samples are not enough to generalize a taxonomy correctly.
+2. A premature kind-based split would likely need to be revised once more local samples exist, which would be a breaking public-API change at exactly the wrong time (after community authors have started shipping against v1).
+3. The current interface **already works** for local sources via cursor synthesis — the awkwardness is in naming (`checkAuth` for a file-existence check) and default values (`pageDelayMs` for zero-latency reads), neither of which is a blocker.
+
+The shape of the eventual taxonomy will be decided when there is enough evidence to design it, not before. Until then, local-source authors should use the patterns shown above and accept the HTTP-shaped vocabulary of the current interface.
 
 ---
 
