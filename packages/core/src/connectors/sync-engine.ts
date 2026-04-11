@@ -223,33 +223,64 @@ export class SyncEngine {
     return loadSyncState(this.db, connectorId)
   }
 
-  async sync(connector: Connector, opts: SyncOptions = {}): Promise<ConnectorSyncResult> {
-    const state = loadSyncState(this.db, connector.id)
+  /**
+   * Effect-native entry point. Returns an Effect that, when run, executes a
+   * full sync cycle (ephemeral or dual-frontier persistent) and records the
+   * outcome in connector_sync_state. The Effect is `Effect<ConnectorSyncResult, never>`
+   * because all SyncErrors are caught internally and encoded in `result.error`.
+   *
+   * Preferred by callers that already live in the Effect world (the Scheduler
+   * Effect migration, tests that want to inject Logger / Tracer layers via
+   * `Effect.provide`). Promise-based callers should use `sync()` instead.
+   */
+  syncEffect(
+    connector: Connector,
+    opts: SyncOptions = {},
+  ): Effect.Effect<ConnectorSyncResult> {
+    const db = this.db
+    const state = loadSyncState(db, connector.id)
     const startedAt = Date.now()
 
-    const program = (connector.ephemeral
+    const body = connector.ephemeral
       ? this.syncEphemeralEffect(connector, state, opts, startedAt)
       : this.syncPersistentEffect(connector, state, opts, startedAt)
-    ).pipe(
+
+    return body.pipe(
       Effect.withSpan('sync.cycle', {
         attributes: {
           'connector.id': connector.id,
           'sync.direction': opts.direction ?? 'both',
         },
       }),
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          if (result.error) {
+            state.consecutiveErrors += 1
+            state.lastErrorAt = new Date().toISOString()
+            state.lastErrorCode = result.error.code as SyncErrorCode
+            state.lastErrorMessage = result.error.message
+          } else {
+            state.consecutiveErrors = 0
+            state.lastErrorAt = null
+            state.lastErrorCode = null
+            state.lastErrorMessage = null
+          }
+          saveSyncState(db, state)
+        }),
+      ),
     )
+  }
 
-    let result: ConnectorSyncResult
+  async sync(connector: Connector, opts: SyncOptions = {}): Promise<ConnectorSyncResult> {
+    // NOTE: opts.signal is deliberately NOT passed to runPromise here.
+    // The loop polls signal.aborted at iteration boundaries to preserve
+    // partial-progress + stopReason='cancelled' semantics. Runtime
+    // interruption would skip state persistence and surface as an error.
     try {
-      // NOTE: opts.signal is deliberately NOT passed to runPromise here.
-      // The loop polls signal.aborted at iteration boundaries to preserve
-      // partial-progress + stopReason='cancelled' semantics. Runtime
-      // interruption would skip state persistence and surface as an error.
-      result = await Effect.runPromise(program)
+      return await Effect.runPromise(this.syncEffect(connector, opts))
     } catch (err) {
-      // Fiber interruption (signal abort or unhandled exception) surfaces here.
-      // Treat it as a cancellation with no partial progress recorded, matching
-      // the legacy behavior of the Promise-based loop.
+      // Defect surfaced past the typed error channel — defensive fallback.
+      const state = loadSyncState(this.db, connector.id)
       const syncErr = SyncError.from(err)
       state.consecutiveErrors += 1
       state.lastErrorAt = new Date().toISOString()
@@ -266,20 +297,6 @@ export class SyncEngine {
         error: { code: syncErr.code, message: syncErr.message },
       }
     }
-
-    if (result.error) {
-      state.consecutiveErrors += 1
-      state.lastErrorAt = new Date().toISOString()
-      state.lastErrorCode = result.error.code as SyncErrorCode
-      state.lastErrorMessage = result.error.message
-    } else {
-      state.consecutiveErrors = 0
-      state.lastErrorAt = null
-      state.lastErrorCode = null
-      state.lastErrorMessage = null
-    }
-    saveSyncState(this.db, state)
-    return result
   }
 
   /**
