@@ -115,6 +115,15 @@ export class SyncError extends Data.TaggedError('SyncError')<{
     super({ code, message: message ?? SYNC_ERROR_HINTS[code], cause })
   }
 
+  static from(e: unknown): SyncError {
+    if (e instanceof SyncError) return e
+    return new SyncError(
+      SyncErrorCode.CONNECTOR_ERROR,
+      e instanceof Error ? e.message : String(e),
+      e,
+    )
+  }
+
   /** Whether this error indicates the connector needs re-authentication. */
   get needsReauth(): boolean {
     return this.code.startsWith('AUTH_')
