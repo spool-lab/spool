@@ -1,8 +1,7 @@
 import type {
-  Connector,
+  ConnectorSyncResult,
   SyncJob,
   SyncJobPriority,
-  ConnectorSyncResult,
   ScheduleConfig,
   SchedulerStatus,
   ConnectorStatus,
@@ -12,6 +11,20 @@ import { DEFAULT_SCHEDULE, SyncErrorCode } from './types.js'
 import type { ConnectorRegistry } from './registry.js'
 import { SyncEngine, loadSyncState } from './sync-engine.js'
 import type Database from 'better-sqlite3'
+import {
+  Cause,
+  Clock,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  Layer,
+  ManagedRuntime,
+  pipe,
+  Schedule,
+} from 'effect'
+
+type Direction = SyncJob['direction']
 
 export type SchedulerEvent =
   | { type: 'sync-start'; connectorId: string }
@@ -25,59 +38,74 @@ export class SyncScheduler {
   private engine: SyncEngine
   private config: ScheduleConfig
   private queue: SyncJob[] = []
-  private running = new Map<string, AbortController>()
-  private timer: ReturnType<typeof setInterval> | null = null
-  private started = false
+  // Per-job cancel tokens. Fired by stop() so in-flight syncs wind down
+  // cooperatively (engine checks Deferred.isDone at every loop yield point).
+  private running = new Map<string, Deferred.Deferred<void>>()
+  private tickFiber: Fiber.RuntimeFiber<void, never> | null = null
   private eventHandlers: SchedulerEventHandler[] = []
+  // Production: Layer.empty. Tests inject TestContext.TestContext for TestClock.
+  private runtime: ManagedRuntime.ManagedRuntime<never, never>
+  private semaphore: Effect.Semaphore
 
   constructor(
     private db: Database.Database,
     private registry: ConnectorRegistry,
     config?: Partial<ScheduleConfig>,
+    runtime?: ManagedRuntime.ManagedRuntime<never, never>,
   ) {
     this.engine = new SyncEngine(db)
     this.config = { ...DEFAULT_SCHEDULE, ...config }
+    this.runtime = runtime ?? ManagedRuntime.make(Layer.empty)
+    this.semaphore = Effect.runSync(Effect.makeSemaphore(this.config.concurrency))
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   start(): void {
-    if (this.started) return
-    this.started = true
+    if (this.tickFiber) return
 
-    // Queue immediate forward sync for all enabled connectors
+    // Queue immediate forward sync synchronously so observers of the queue
+    // right after start() see it populated.
     this.queueAll('both', 80)
 
-    // Start the tick loop (check every 30 seconds)
-    this.timer = setInterval(() => this.tick(), 30_000)
-    // Run first tick immediately
-    this.tick()
+    const tickProgram = pipe(
+      this.tickOnceEffect(),
+      Effect.repeat(Schedule.spaced(Duration.seconds(30))),
+      Effect.asVoid,
+      Effect.catchAllCause((cause) =>
+        Cause.isInterruptedOnly(cause)
+          ? Effect.void
+          : Effect.logError('scheduler tick fiber crashed', cause),
+      ),
+    )
+    this.tickFiber = this.runtime.runFork(tickProgram)
   }
 
   stop(): void {
-    this.started = false
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
+    if (this.tickFiber) {
+      // Fire-and-forget interrupt. runJob fibers are siblings (not children),
+      // so this does NOT cascade to in-flight syncs — they unwind via the
+      // per-job Deferred below.
+      this.runtime.runFork(Fiber.interrupt(this.tickFiber))
+      this.tickFiber = null
     }
-    // Abort all running syncs
-    for (const [, controller] of this.running) {
-      controller.abort()
+    for (const [, deferred] of this.running) {
+      Effect.runSync(Deferred.succeed(deferred, void 0))
     }
     this.running.clear()
     this.queue = []
   }
 
   /** Manually trigger sync for a specific connector. */
-  triggerNow(connectorId: string, direction: 'forward' | 'backfill' | 'both' = 'both'): void {
+  triggerNow(connectorId: string, direction: Direction = 'both'): void {
     this.enqueue({ connectorId, direction, priority: 100, queuedAt: Date.now() })
-    this.tick()
+    this.poke()
   }
 
   /** Notify the scheduler that the system woke from sleep. */
   onWake(): void {
     this.queueAll('forward', 60)
-    this.tick()
+    this.poke()
   }
 
   /** Subscribe to scheduler events. */
@@ -105,7 +133,7 @@ export class SyncScheduler {
       }
     })
 
-    return { running: this.started, connectors }
+    return { running: this.tickFiber !== null, connectors }
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
@@ -116,7 +144,11 @@ export class SyncScheduler {
     }
   }
 
-  private queueAll(direction: 'forward' | 'backfill' | 'both', priority: SyncJobPriority): void {
+  private poke(): void {
+    this.runtime.runFork(this.tickOnceEffect())
+  }
+
+  private queueAll(direction: Direction, priority: SyncJobPriority): void {
     for (const connector of this.registry.list()) {
       const state = loadSyncState(this.db, connector.id)
       if (!state.enabled) continue
@@ -125,10 +157,8 @@ export class SyncScheduler {
   }
 
   private enqueue(job: SyncJob): void {
-    // Don't queue if already queued or running
     if (this.running.has(job.connectorId)) return
     if (this.queue.some(j => j.connectorId === job.connectorId)) {
-      // Replace with higher priority if applicable
       this.queue = this.queue.map(j =>
         j.connectorId === job.connectorId && job.priority > j.priority ? job : j,
       )
@@ -138,110 +168,130 @@ export class SyncScheduler {
     this.queue.sort((a, b) => b.priority - a.priority)
   }
 
-  private tick(): void {
-    if (!this.started) return
+  private tickOnceEffect(): Effect.Effect<void> {
+    const self = this
+    return Effect.gen(function* () {
+      if (self.tickFiber === null) return
 
-    // Check if any connectors are due for scheduled sync
-    const now = Date.now()
-    for (const connector of this.registry.list()) {
-      const state = loadSyncState(this.db, connector.id)
-      if (!state.enabled) continue
+      const now = yield* Clock.currentTimeMillis
 
-      // Skip if in backoff due to errors.
-      // Use lastErrorAt (when the error occurred) as the backoff base, not
-      // lastForwardSyncAt/lastBackfillSyncAt (which may be from an earlier
-      // successful sync and would under-count the backoff window).
-      if (state.consecutiveErrors > 0 && state.lastErrorAt) {
-        const backoffMs = this.getBackoffMs(state.consecutiveErrors)
-        if (now - new Date(state.lastErrorAt).getTime() < backoffMs) {
-          continue
+      for (const connector of self.registry.list()) {
+        const state = loadSyncState(self.db, connector.id)
+        if (!state.enabled) continue
+
+        if (state.consecutiveErrors > 0 && state.lastErrorAt) {
+          const backoffMs = self.getBackoffMs(state.consecutiveErrors)
+          if (now - new Date(state.lastErrorAt).getTime() < backoffMs) continue
         }
-      }
 
-      // Skip if needsReauth
-      if (state.lastErrorCode?.startsWith('AUTH_')) continue
+        if (state.lastErrorCode?.startsWith('AUTH_')) continue
 
-      // Forward sync due?
-      const lastForward = state.lastForwardSyncAt
-        ? new Date(state.lastForwardSyncAt).getTime()
-        : 0
-      if (now - lastForward >= this.config.forwardIntervalMs) {
-        this.enqueue({
-          connectorId: connector.id,
-          direction: 'forward',
-          priority: 40,
-          queuedAt: now,
-        })
-      }
-
-      // Backfill due?
-      if (!state.tailComplete) {
-        const lastBackfill = state.lastBackfillSyncAt
-          ? new Date(state.lastBackfillSyncAt).getTime()
+        const lastForward = state.lastForwardSyncAt
+          ? new Date(state.lastForwardSyncAt).getTime()
           : 0
-        if (now - lastBackfill >= this.config.backfillIntervalMs) {
-          this.enqueue({
+        if (now - lastForward >= self.config.forwardIntervalMs) {
+          self.enqueue({
             connectorId: connector.id,
-            direction: 'backfill',
-            priority: 20,
+            direction: 'forward',
+            priority: 40,
             queuedAt: now,
           })
         }
-      }
-    }
 
-    // Run jobs up to concurrency limit
-    while (this.running.size < this.config.concurrency && this.queue.length > 0) {
+        if (!state.tailComplete) {
+          const lastBackfill = state.lastBackfillSyncAt
+            ? new Date(state.lastBackfillSyncAt).getTime()
+            : 0
+          if (now - lastBackfill >= self.config.backfillIntervalMs) {
+            self.enqueue({
+              connectorId: connector.id,
+              direction: 'backfill',
+              priority: 20,
+              queuedAt: now,
+            })
+          }
+        }
+      }
+
+      yield* Effect.sync(() => self.drainQueue())
+    })
+  }
+
+  // Drain queued work up to concurrency. The semaphore is the *real* gate on
+  // how many jobs run simultaneously; this loop just submits fibers.
+  // Fork as siblings of the tick fiber, NOT children — stop()'s interrupt of
+  // the tick fiber must not cascade and short-circuit in-flight state persistence.
+  private drainQueue(): void {
+    while (this.queue.length > 0 && this.running.size < this.config.concurrency) {
       const job = this.queue.shift()!
-      this.runJob(job)
+      this.runtime.runFork(this.runJobEffect(job))
     }
   }
 
-  private async runJob(job: SyncJob): Promise<void> {
-    if (!this.registry.has(job.connectorId)) return
+  private runJobEffect(job: SyncJob): Effect.Effect<void> {
+    const self = this
 
-    const connector = this.registry.get(job.connectorId)
-    const controller = new AbortController()
-    this.running.set(job.connectorId, controller)
+    const body = Effect.gen(function* () {
+      if (!self.registry.has(job.connectorId)) return
+      const connector = self.registry.get(job.connectorId)
 
-    this.emit({ type: 'sync-start', connectorId: job.connectorId })
+      const cancel = yield* Deferred.make<void>()
+      yield* Effect.sync(() => {
+        self.running.set(job.connectorId, cancel)
+      })
 
-    try {
-      const result = await this.engine.sync(connector, {
+      yield* Effect.sync(() =>
+        self.emit({ type: 'sync-start', connectorId: job.connectorId }),
+      )
+
+      const result = yield* self.engine.syncEffect(connector, {
         direction: job.direction,
-        delayMs: this.config.pageDelayMs,
-        maxMinutes: this.config.maxMinutesPerRun,
-        signal: controller.signal,
+        delayMs: self.config.pageDelayMs,
+        maxMinutes: self.config.maxMinutesPerRun,
+        cancel,
         onProgress: (progress) => {
-          this.emit({ type: 'sync-progress', progress })
+          self.emit({ type: 'sync-progress', progress })
         },
       })
 
-      this.emit({ type: 'sync-complete', result })
-
-      if (result.error) {
-        this.emit({
-          type: 'sync-error',
-          connectorId: job.connectorId,
-          code: result.error.code as SyncErrorCode,
-          message: result.error.message,
-        })
-      }
-    } catch (err) {
-      this.emit({
-        type: 'sync-error',
-        connectorId: job.connectorId,
-        code: SyncErrorCode.CONNECTOR_ERROR,
-        message: err instanceof Error ? err.message : String(err),
+      yield* Effect.sync(() => {
+        self.emit({ type: 'sync-complete', result })
+        if (result.error) {
+          self.emit({
+            type: 'sync-error',
+            connectorId: job.connectorId,
+            code: result.error.code as SyncErrorCode,
+            message: result.error.message,
+          })
+        }
       })
-    } finally {
-      this.running.delete(job.connectorId)
-      // Trigger next tick to pick up queued jobs
-      if (this.queue.length > 0) {
-        // Use setTimeout to avoid stack overflow from recursive tick
-        setTimeout(() => this.tick(), 0)
-      }
-    }
+    })
+
+    return pipe(
+      this.semaphore.withPermits(1)(body),
+      Effect.ensuring(
+        Effect.sync(() => {
+          self.running.delete(job.connectorId)
+          // Drain remaining queue immediately rather than waiting 30s for the
+          // next periodic tick. Skips the connector rescan in tickOnceEffect.
+          if (self.queue.length > 0 && self.tickFiber !== null) {
+            self.drainQueue()
+          }
+        }),
+      ),
+      Effect.catchAllCause((cause) =>
+        Cause.isInterruptedOnly(cause)
+          ? Effect.void
+          : Effect.sync(() => {
+              self.emit({
+                type: 'sync-error',
+                connectorId: job.connectorId,
+                code: SyncErrorCode.CONNECTOR_ERROR,
+                message: `runJob defect: ${Cause.pretty(cause)}`,
+              })
+            }),
+      ),
+    )
   }
 
   private getBackoffMs(consecutiveErrors: number): number {
