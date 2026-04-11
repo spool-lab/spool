@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Duration, Effect, ManagedRuntime, TestClock, TestContext } from 'effect'
 import Database from 'better-sqlite3'
-import { SyncScheduler } from './sync-scheduler.js'
+import { SyncScheduler, type SchedulerEvent } from './sync-scheduler.js'
 import { ConnectorRegistry } from './registry.js'
 import { SyncError, SyncErrorCode } from './types.js'
 import type { Connector, AuthStatus, FetchContext, PageResult } from './types.js'
@@ -276,6 +276,37 @@ describe('SyncScheduler contract (effect)', () => {
       expect(backfillCalls).toHaveLength(0)
     })
 
+    it('triggerNow during running sync is a no-op (enqueue dedupes)', async () => {
+      let fetchCount = 0
+      let release: () => void = () => {}
+      const connector = createTestConnector('dedupe', async () => {
+        fetchCount++
+        await new Promise<void>((resolve) => { release = resolve })
+        return { items: [makeItem('d-1')], nextCursor: null }
+      })
+      registry.register(connector)
+      setState(db, { connectorId: 'dedupe', tailComplete: true })
+
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        { forwardIntervalMs: 999_999_999, pageDelayMs: 0, maxMinutesPerRun: 1 },
+        runtime,
+      )
+      scheduler.start()
+      await flush(runtime, 100)
+
+      expect(fetchCount).toBe(1) // startup sync in flight, parked
+
+      scheduler.triggerNow('dedupe', 'forward')
+      await flush(runtime, 100)
+
+      expect(fetchCount).toBe(1) // no new sync — enqueue sees running.has(id) and no-ops
+
+      release()
+      await flush(runtime, 100) // let cleanup run
+    })
+
     it('triggerNow runs immediately with highest priority', async () => {
       const fetchCalls: number[] = []
       const connector = createTestConnector('manual', async () => {
@@ -304,6 +335,109 @@ describe('SyncScheduler contract (effect)', () => {
       await flush(runtime, 100)
 
       expect(fetchCalls.length).toBeGreaterThan(afterStartup)
+    })
+  })
+
+  describe('Concurrency', () => {
+    it('semaphore caps simultaneous syncs at config.concurrency', async () => {
+      const inFlight = new Set<string>()
+      let maxInFlight = 0
+      const gates = new Map<string, () => void>()
+      const makeSlow = (id: string): Connector =>
+        createTestConnector(id, async () => {
+          inFlight.add(id)
+          maxInFlight = Math.max(maxInFlight, inFlight.size)
+          await new Promise<void>((resolve) => gates.set(id, resolve))
+          inFlight.delete(id)
+          return { items: [makeItem(`${id}-1`)], nextCursor: null }
+        })
+
+      for (const id of ['c1', 'c2', 'c3', 'c4']) {
+        registry.register(makeSlow(id))
+        setState(db, { connectorId: id, tailComplete: true })
+      }
+
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 1_000,
+          pageDelayMs: 0,
+          maxMinutesPerRun: 1,
+          concurrency: 2,
+        },
+        runtime,
+      )
+      scheduler.start()
+
+      // Let all 4 runJob fibers be forked and block on fetchPage
+      await flush(runtime, 100)
+
+      expect(maxInFlight).toBe(2)
+      expect(inFlight.size).toBe(2)
+
+      // Release the 2 currently in flight — next 2 should pick up permits
+      for (const id of Array.from(inFlight)) gates.get(id)!()
+      await flush(runtime, 100)
+      expect(maxInFlight).toBe(2) // still capped
+
+      // Release remaining so afterEach can clean up
+      for (const [, r] of gates) r()
+      await flush(runtime, 100)
+    })
+  })
+
+  describe('Cancellation', () => {
+    it('stop() causes in-flight sync to return with stopReason=cancelled and no sync-error', async () => {
+      const events: SchedulerEvent[] = []
+      let page = 0
+      const connector = createTestConnector('cancel-me', async () => {
+        page++
+        // Page 1: returns with nextCursor so the engine continues into the
+        // inter-page delay. Page 2+: never called — the inter-page
+        // interruptibleSleep observes the cancel Deferred and the next loop
+        // iteration returns cancelled before fetchPage runs again.
+        return {
+          items: [makeItem(`c-${page}`)],
+          nextCursor: `cursor-${page + 1}`,
+        }
+      })
+      registry.register(connector)
+      setState(db, { connectorId: 'cancel-me', tailComplete: true })
+
+      scheduler = new SyncScheduler(
+        db,
+        registry,
+        {
+          forwardIntervalMs: 999_999_999,
+          // Large enough that the inter-page sleep is still pending when
+          // stop() fires. flush(100) below doesn't advance virtual time past
+          // this, so the race in interruptibleSleep is waiting on Deferred.
+          pageDelayMs: 60_000,
+          maxMinutesPerRun: 5,
+        },
+        runtime,
+      )
+      scheduler.on((event) => events.push(event))
+      scheduler.start()
+
+      // Let page 1 run, upsert, then enter interruptibleSleep(60_000).
+      await flush(runtime, 100)
+      expect(page).toBeGreaterThanOrEqual(1)
+
+      scheduler.stop()
+      // Drain: Deferred.succeed wakes the sleep race, loop iteration checks
+      // Deferred.isDone, returns cancelled, persistent sync wraps result,
+      // runJob emits sync-complete via Effect.sync before the fiber finishes.
+      await flush(runtime, 100)
+
+      const completes = events.filter((e) => e.type === 'sync-complete')
+      const errors = events.filter((e) => e.type === 'sync-error')
+      expect(completes).toHaveLength(1)
+      expect(
+        completes[0]!.type === 'sync-complete' && completes[0]!.result.stopReason,
+      ).toBe('cancelled')
+      expect(errors).toHaveLength(0)
     })
   })
 })
