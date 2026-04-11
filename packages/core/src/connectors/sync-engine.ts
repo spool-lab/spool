@@ -271,7 +271,7 @@ export class SyncEngine {
     return Effect.gen(function* () {
       const state = yield* Effect.sync(() => loadSyncState(db, connector.id))
       const startedAt = yield* Clock.currentTimeMillis
-      const cancel = yield* Deferred.make<void>()
+      const cancel = opts.cancel ?? (yield* Deferred.make<void>())
       yield* bridgeAbortSignal(opts.signal, cancel)
 
       const body = connector.ephemeral

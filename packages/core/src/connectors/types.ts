@@ -1,4 +1,5 @@
 import { Data } from 'effect'
+import type { Deferred } from 'effect'
 import type { CapturedItem } from '../types.js'
 
 // ── Error Types ─────────────────────────────────────────────────────────────
@@ -229,6 +230,14 @@ export interface SyncOptions {
   stalePageLimit?: number
   /** AbortSignal for cancellation. */
   signal?: AbortSignal
+  /**
+   * Optional externally-managed cancellation signal. When provided,
+   * syncEffect uses this Deferred instead of creating its own, so callers
+   * (e.g. SyncScheduler) can cancel from outside the Effect. If both
+   * `signal` and `cancel` are provided, `signal` is bridged into `cancel`
+   * (both paths fire cancellation).
+   */
+  cancel?: Deferred.Deferred<void>
   /** Progress callback. */
   onProgress?: (progress: SyncProgress) => void
 }
