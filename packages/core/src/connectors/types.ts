@@ -1,3 +1,4 @@
+import { Data } from 'effect'
 import type { CapturedItem } from '../types.js'
 
 // ── Error Types ─────────────────────────────────────────────────────────────
@@ -95,19 +96,23 @@ export const SYNC_ERROR_HINTS: Record<SyncErrorCode, string> = {
     'The connector encountered an error. Check the error details below.',
 }
 
-export class SyncError extends Error {
-  public readonly code: SyncErrorCode
-  public override readonly cause?: unknown
+const RETRYABLE_CODES = new Set<SyncErrorCode>([
+  SyncErrorCode.API_RATE_LIMITED,
+  SyncErrorCode.API_SERVER_ERROR,
+  SyncErrorCode.NETWORK_OFFLINE,
+  SyncErrorCode.NETWORK_TIMEOUT,
+  SyncErrorCode.SYNC_MAX_PAGES,
+  SyncErrorCode.SYNC_TIMEOUT,
+  SyncErrorCode.SYNC_CANCELLED,
+])
 
-  constructor(
-    code: SyncErrorCode,
-    message?: string,
-    cause?: unknown,
-  ) {
-    super(message ?? SYNC_ERROR_HINTS[code])
-    this.name = 'SyncError'
-    this.code = code
-    this.cause = cause
+export class SyncError extends Data.TaggedError('SyncError')<{
+  readonly code: SyncErrorCode
+  readonly message: string
+  readonly cause?: unknown
+}> {
+  constructor(code: SyncErrorCode, message?: string, cause?: unknown) {
+    super({ code, message: message ?? SYNC_ERROR_HINTS[code], cause })
   }
 
   /** Whether this error indicates the connector needs re-authentication. */
@@ -117,18 +122,7 @@ export class SyncError extends Error {
 
   /** Whether this error is transient and the sync can be retried. */
   get retryable(): boolean {
-    switch (this.code) {
-      case SyncErrorCode.API_RATE_LIMITED:
-      case SyncErrorCode.API_SERVER_ERROR:
-      case SyncErrorCode.NETWORK_OFFLINE:
-      case SyncErrorCode.NETWORK_TIMEOUT:
-      case SyncErrorCode.SYNC_MAX_PAGES:
-      case SyncErrorCode.SYNC_TIMEOUT:
-      case SyncErrorCode.SYNC_CANCELLED:
-        return true
-      default:
-        return false
-    }
+    return RETRYABLE_CODES.has(this.code)
   }
 }
 
