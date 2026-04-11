@@ -11,6 +11,7 @@ import type { ConnectorRegistry } from './registry.js'
 import { SyncEngine, loadSyncState } from './sync-engine.js'
 import type Database from 'better-sqlite3'
 import {
+  Cause,
   Clock,
   Deferred,
   Duration,
@@ -77,7 +78,9 @@ export class SyncScheduler {
       Effect.repeat(Schedule.spaced(Duration.seconds(30))),
       Effect.asVoid,
       Effect.catchAllCause((cause) =>
-        Effect.logError('scheduler tick fiber crashed', cause),
+        Cause.isInterruptedOnly(cause)
+          ? Effect.void
+          : Effect.logError('scheduler tick fiber crashed', cause),
       ),
     )
     this.tickFiber = this.runtime.runFork(tickProgram)
@@ -297,14 +300,16 @@ export class SyncScheduler {
       ),
       // Defect in the forked fiber must not take down the runtime.
       Effect.catchAllCause((cause) =>
-        Effect.sync(() => {
-          self.emit({
-            type: 'sync-error',
-            connectorId: job.connectorId,
-            code: SyncErrorCode.CONNECTOR_ERROR,
-            message: `runJob defect: ${cause.toString()}`,
-          })
-        }),
+        Cause.isInterruptedOnly(cause)
+          ? Effect.void
+          : Effect.sync(() => {
+              self.emit({
+                type: 'sync-error',
+                connectorId: job.connectorId,
+                code: SyncErrorCode.CONNECTOR_ERROR,
+                message: `runJob defect: ${Cause.pretty(cause)}`,
+              })
+            }),
       ),
     )
   }
