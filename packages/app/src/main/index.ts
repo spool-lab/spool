@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, net } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import {
@@ -223,6 +223,12 @@ app.whenReady().then(() => {
   })
   syncScheduler.start()
 
+  // Wake from sleep: reschedule a forward pass immediately instead of waiting
+  // up to 30s for the next periodic tick.
+  powerMonitor.on('resume', () => {
+    syncScheduler?.onWake()
+  })
+
   // Initial sync in worker thread (non-blocking)
   runSyncWorker().then(() => {
     watcher.start()
@@ -262,6 +268,14 @@ app.on('window-all-closed', () => {
   }
   // On macOS, keep app running in tray
   app.dock?.hide()
+})
+
+// Graceful shutdown: cancel in-flight syncs cooperatively so the engine can
+// record stopReason='cancelled' and partial progress before the runtime tears
+// down. Without this the tick fiber and runJob fibers are abandoned at process
+// death and state updates for the current cycle are lost.
+app.on('before-quit', () => {
+  syncScheduler?.stop()
 })
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
