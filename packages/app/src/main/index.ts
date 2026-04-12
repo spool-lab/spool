@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { Worker } from 'node:worker_threads'
@@ -8,7 +8,7 @@ import {
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor,
-  TrustStore, downloadAndInstall,
+  TrustStore, downloadAndInstall, resolveNpmPackage,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -179,32 +179,76 @@ async function handleSpoolUrl(url: string): Promise<void> {
 
   const isFirstParty = parsed.packageName.startsWith('@spool-lab/')
 
-  // Check if already installed by looking for the package in node_modules
-  const { existsSync } = await import('node:fs')
+  // Fetch metadata from npm first — get human-readable label + latest version
+  let info: Awaited<ReturnType<typeof resolveNpmPackage>>
+  try {
+    info = await resolveNpmPackage(parsed.packageName, fetch)
+  } catch (err) {
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      message: 'Connector not found',
+      detail: `Could not find "${parsed.packageName}" on npm.`,
+    })
+    return
+  }
+
+  if (!info.isConnector) {
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      message: 'Not a connector',
+      detail: `"${parsed.packageName}" is not a Spool connector.`,
+    })
+    return
+  }
+
+  const displayName = info.label ?? parsed.packageName
+
+  // Check installed version
+  const { existsSync, readFileSync } = await import('node:fs')
   const nameSegments = parsed.packageName.startsWith('@') ? parsed.packageName.split('/') : [parsed.packageName]
-  const installedPath = join(spoolDir, 'connectors', 'node_modules', ...nameSegments, 'package.json')
-  const alreadyInstalled = existsSync(installedPath)
+  const installedPkgPath = join(spoolDir, 'connectors', 'node_modules', ...nameSegments, 'package.json')
+  let installedVersion: string | null = null
+  if (existsSync(installedPkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(installedPkgPath, 'utf8'))
+      installedVersion = typeof pkg.version === 'string' ? pkg.version : null
+    } catch {}
+  }
 
-  const message = alreadyInstalled
-    ? `"${parsed.packageName}" is already installed. Reinstall?`
-    : `Install connector "${parsed.packageName}"?`
+  // Build dialog content
+  let message: string
+  let detail: string
+  let actionLabel: string
 
-  const detail = alreadyInstalled
-    ? 'This will download and replace the current version.'
-    : isFirstParty
-      ? 'This is an official Spool connector.'
-      : 'This is a community connector. It will run code on your machine. Only install connectors you trust.'
+  if (installedVersion && installedVersion === info.version) {
+    message = `${displayName} is already up to date`
+    detail = `Version ${installedVersion} is installed. Reinstall anyway?`
+    actionLabel = 'Reinstall'
+  } else if (installedVersion) {
+    message = `Update ${displayName}?`
+    detail = `${installedVersion} → ${info.version}`
+    actionLabel = 'Update'
+  } else {
+    message = `Install ${displayName}?`
+    detail = isFirstParty
+      ? `Official Spool connector · v${info.version}`
+      : `Community connector · v${info.version}\nThis will run third-party code on your machine.`
+    actionLabel = 'Install'
+  }
 
   const { response } = await dialog.showMessageBox(mainWindow!, {
-    type: alreadyInstalled ? 'question' : isFirstParty ? 'question' : 'warning',
-    buttons: [alreadyInstalled ? 'Reinstall' : 'Install', 'Cancel'],
+    type: !isFirstParty && !installedVersion ? 'warning' : 'question',
+    buttons: [actionLabel, 'Cancel'],
     defaultId: 1,
-    title: alreadyInstalled ? 'Reinstall Connector' : 'Install Connector',
+    title: `${actionLabel} Connector`,
     message,
     detail,
   })
 
   if (response !== 0) return
+
+  // Show progress on window title bar
+  mainWindow?.setProgressBar(0.5)
 
   try {
     const connectorsDir = join(spoolDir, 'connectors')
@@ -234,20 +278,22 @@ async function handleSpoolUrl(url: string): Promise<void> {
       trustStore: trustStore!,
     })
 
+    mainWindow?.setProgressBar(-1) // clear progress
     mainWindow?.webContents.send('connector:installed', {
       name: result.name,
       version: result.version,
     })
 
-    dialog.showMessageBox(mainWindow!, {
-      type: 'info',
-      message: `Installed ${result.name} v${result.version}`,
-      detail: 'The connector is now available.',
-    })
+    // Non-blocking notification instead of modal dialog
+    new Notification({
+      title: `${displayName} installed`,
+      body: `v${result.version} is ready to use.`,
+    }).show()
   } catch (err) {
+    mainWindow?.setProgressBar(-1)
     dialog.showMessageBox(mainWindow!, {
       type: 'error',
-      message: 'Installation failed',
+      message: `Failed to install ${displayName}`,
       detail: err instanceof Error ? err.message : String(err),
     })
   }

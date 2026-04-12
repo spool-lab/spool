@@ -9,6 +9,8 @@ export interface NpmPackageInfo {
   version: string
   tarballUrl: string
   isConnector: boolean
+  label: string | null
+  description: string | null
 }
 
 export interface InstallResult {
@@ -41,7 +43,10 @@ export async function resolveNpmPackage(
   const spool = data['spool'] as Record<string, unknown> | undefined
   const isConnector = spool?.['type'] === 'connector'
 
-  return { name, version, tarballUrl, isConnector }
+  const label = typeof spool?.['label'] === 'string' ? spool['label'] : null
+  const description = typeof spool?.['description'] === 'string' ? spool['description'] : null
+
+  return { name, version, tarballUrl, isConnector, label, description }
 }
 
 export async function downloadAndInstall(
