@@ -78,6 +78,8 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount, geminiC
           return next
         })
         loadConnectors()
+      } else if (event.type === 'installed') {
+        loadConnectors()
       }
     })
     return off
