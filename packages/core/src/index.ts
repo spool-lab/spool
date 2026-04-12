@@ -14,7 +14,6 @@ export { ConnectorRegistry } from './connectors/registry.js'
 export { SyncEngine, loadSyncState, saveSyncState } from './connectors/sync-engine.js'
 export { SyncScheduler } from './connectors/sync-scheduler.js'
 export type { SchedulerEvent, SchedulerEventHandler } from './connectors/sync-scheduler.js'
-export { TwitterBookmarksConnector } from './connectors/twitter-bookmarks/index.js'
 export {
   SyncError,
   SyncErrorCode,
@@ -35,3 +34,12 @@ export type {
   ConnectorStatus,
   SchedulerStatus,
 } from './connectors/types.js'
+
+// ── Plugin loader ──────────────────────────────────────────────────────────
+export { loadConnectors, STAGE_D_FIRST_PARTY_ALLOWLIST } from './connectors/loader.js'
+export type { LoadDeps, LoadReport, LoadResult, CapabilityImpls } from './connectors/loader.js'
+export {
+  makeFetchCapability,
+  makeChromeCookiesCapability,
+  makeLogCapabilityFor,
+} from './connectors/capabilities/index.js'

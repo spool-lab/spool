@@ -1,9 +1,14 @@
 import { Command } from 'commander'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import {
   getDB,
   ConnectorRegistry,
   SyncEngine,
-  TwitterBookmarksConnector,
+  loadConnectors,
+  makeFetchCapability,
+  makeChromeCookiesCapability,
+  makeLogCapabilityFor,
   loadSyncState,
   saveSyncState,
 } from '@spool/core'
@@ -17,7 +22,18 @@ export const connectorSyncCommand = new Command('connector-sync')
   .action(async (connectorId: string, opts: { reset?: boolean; delay?: string }) => {
     const db = getDB()
     const registry = new ConnectorRegistry()
-    registry.register(new TwitterBookmarksConnector())
+
+    await loadConnectors({
+      bundledConnectorsDir: join(__dirname, '../../resources/bundled-connectors'),
+      connectorsDir: join(homedir(), '.spool', 'connectors'),
+      capabilityImpls: {
+        fetch: makeFetchCapability(),
+        cookies: makeChromeCookiesCapability(),
+        logFor: (id: string) => makeLogCapabilityFor(id),
+      },
+      registry,
+      log: { info: () => {}, warn: console.warn, error: console.error },
+    })
 
     if (!registry.has(connectorId)) {
       console.error(`Unknown connector: ${connectorId}`)

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { saveSyncState } from './sync-engine.js'
 import type { SyncState } from './types.js'
-import type { CapturedItem } from '../types.js'
+import type { CapturedItem } from './types.js'
 
 export function createTestDB(): InstanceType<typeof Database> {
   const db = new Database(':memory:')

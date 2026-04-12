@@ -1,12 +1,5 @@
-/**
- * Twitter/X GraphQL Bookmarks API client.
- *
- * Adapted from fieldtheory-cli (https://github.com/afar1/fieldtheory-cli).
- * Uses X's internal GraphQL API (same as x.com browser) to fetch bookmarks.
- */
-
-import { SyncError, SyncErrorCode } from '../types.js'
-import type { CapturedItem } from '../../types.js'
+import type { FetchCapability, CapturedItem } from '@spool/connector-sdk'
+import { SyncError, SyncErrorCode, abortableSleep } from '@spool/connector-sdk'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -67,12 +60,11 @@ function buildHeaders(csrfToken: string, cookieHeader?: string): Record<string, 
 
 // ── Response Parsing ────────────────────────────────────────────────────────
 
-interface BookmarkPageResult {
+export interface BookmarkPageResult {
   items: CapturedItem[]
   nextCursor: string | null
 }
 
-/** Convert a single tweet result from GraphQL to CapturedItem. */
 function convertTweetToItem(tweetResult: any, now: string): CapturedItem | null {
   const tweet = tweetResult.tweet ?? tweetResult
   const legacy = tweet?.legacy
@@ -91,7 +83,6 @@ function convertTweetToItem(tweetResult: any, now: string): CapturedItem | null 
     userResult?.legacy?.profile_image_url_https ??
     userResult?.legacy?.profile_image_url
 
-  // Extract media URLs
   const mediaEntities =
     legacy?.extended_entities?.media ?? legacy?.entities?.media ?? []
   const media: string[] = mediaEntities
@@ -106,13 +97,11 @@ function convertTweetToItem(tweetResult: any, now: string): CapturedItem | null 
     altText: m.ext_alt_text,
   }))
 
-  // Extract expanded URLs (skip t.co wrappers)
   const urlEntities = legacy?.entities?.urls ?? []
   const links: string[] = urlEntities
     .map((u: any) => u.expanded_url)
     .filter((u: string | undefined) => u && !u.includes('t.co'))
 
-  // Build author snapshot for metadata
   const authorSnapshot = userResult
     ? {
         id: userResult.rest_id,
@@ -173,7 +162,6 @@ function convertTweetToItem(tweetResult: any, now: string): CapturedItem | null 
   }
 }
 
-/** Parse the full GraphQL bookmarks response. */
 export function parseBookmarksResponse(json: any, now?: string): BookmarkPageResult {
   const ts = now ?? new Date().toISOString()
   const instructions =
@@ -209,23 +197,30 @@ export function parseBookmarksResponse(json: any, now?: string): BookmarkPageRes
 export async function fetchBookmarkPage(
   csrfToken: string,
   cursor: string | null,
-  opts?: {
-    cookieHeader?: string
-    fetchFn?: typeof globalThis.fetch
+  opts: {
+    cookieHeader: string
+    fetch: FetchCapability
+    signal: AbortSignal
   },
 ): Promise<BookmarkPageResult> {
-  const { cookieHeader, fetchFn = globalThis.fetch } = opts ?? {}
+  const { cookieHeader, fetch: fetchFn, signal } = opts
   let lastError: Error | undefined
 
   for (let attempt = 0; attempt < 4; attempt++) {
+    if (signal.aborted) {
+      throw signal.reason
+    }
+
     let response: Response
     try {
       response = await fetchFn(
         buildUrl(cursor ?? undefined),
-        { headers: buildHeaders(csrfToken, cookieHeader) },
+        { headers: buildHeaders(csrfToken, cookieHeader), signal },
       )
     } catch (err) {
-      // Network-level error
+      if (signal.aborted) {
+        throw signal.reason
+      }
       const message = err instanceof Error ? err.message : String(err)
       if (message.includes('ENOTFOUND') || message.includes('ENETUNREACH')) {
         throw new SyncError(SyncErrorCode.NETWORK_OFFLINE, message, err)
@@ -239,13 +234,13 @@ export async function fetchBookmarkPage(
     if (response.status === 429) {
       const waitSec = Math.min(15 * Math.pow(2, attempt), 120)
       lastError = new Error(`Rate limited (429) on attempt ${attempt + 1}`)
-      await new Promise(r => setTimeout(r, waitSec * 1000))
+      await abortableSleep(waitSec * 1000, signal)
       continue
     }
 
     if (response.status >= 500) {
       lastError = new Error(`Server error (${response.status}) on attempt ${attempt + 1}`)
-      await new Promise(r => setTimeout(r, 5000 * (attempt + 1)))
+      await abortableSleep(5000 * (attempt + 1), signal)
       continue
     }
 
@@ -286,7 +281,6 @@ export async function fetchBookmarkPage(
     }
   }
 
-  // All retries exhausted
   if (lastError?.message.includes('429')) {
     throw new SyncError(SyncErrorCode.API_RATE_LIMITED, 'Rate limited after 4 retry attempts.')
   }

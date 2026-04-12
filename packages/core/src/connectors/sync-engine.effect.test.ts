@@ -1,7 +1,7 @@
 import { it } from '@effect/vitest'
 import { describe, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { Duration, Effect, Fiber, TestClock } from 'effect'
+import { Deferred, Duration, Effect, Fiber, TestClock } from 'effect'
 import { SyncEngine } from './sync-engine.js'
 import type { Connector, FetchContext, PageResult, AuthStatus } from './types.js'
 import { createTestDB, makeItem } from './test-helpers.js'
@@ -129,6 +129,52 @@ describe('SyncEngine — Effect.gen behavioral regressions', () => {
 
       expect(result.stopReason).toBe('cancelled')
       expect(fetchCalls).toBe(0)
+    }),
+  )
+
+  it.effect('passes an AbortSignal via FetchContext that fires when cancel Deferred resolves', () =>
+    Effect.gen(function* () {
+      let receivedSignal: AbortSignal | undefined
+      let pageCount = 0
+
+      const connector = connectorFromHandler(async (ctx) => {
+        pageCount++
+        receivedSignal = ctx.signal
+        if (pageCount === 1) {
+          return { items: [makeItem('#sig-1')], nextCursor: 'c1' }
+        }
+        // Second page: block until signal fires, then return data + more cursor
+        // so the engine would continue if not for the cancel check at loop top.
+        await new Promise<void>((resolve) => {
+          if (ctx.signal?.aborted) return resolve()
+          ctx.signal?.addEventListener('abort', () => resolve(), { once: true })
+        })
+        return { items: [makeItem('#sig-2')], nextCursor: 'c2' }
+      })
+
+      const cancel = yield* Deferred.make<void>()
+      const fiber = yield* Effect.fork(
+        engine.syncEffect(connector, {
+          direction: 'forward',
+          delayMs: 0,
+          cancel,
+        }),
+      )
+
+      // Let the fiber reach the second fetchPage (page 1 returns immediately)
+      yield* TestClock.adjust(Duration.zero)
+
+      expect(receivedSignal).toBeDefined()
+      expect(receivedSignal!.aborted).toBe(false)
+
+      // Fire cancel Deferred — unblocks the second fetchPage AND sets the
+      // cancel flag so the loop returns 'cancelled' on its next iteration.
+      yield* Deferred.succeed(cancel, undefined)
+
+      const result = yield* Fiber.join(fiber)
+
+      expect(result.stopReason).toBe('cancelled')
+      expect(receivedSignal!.aborted).toBe(true)
     }),
   )
 })
