@@ -678,9 +678,12 @@ ipcMain.handle('spool:install-update', () => {
 // ── Connector Handlers ──────────────────────────────────────────────────
 
 ipcMain.handle('connector:list', (): ConnectorStatus[] => {
+  const installed = getInstalledConnectorPackages()
+  const versionMap = new Map(installed.map(p => [p.connectorId, p.currentVersion]))
   return syncScheduler.getStatus().connectors.map(c => ({
     ...c,
     bundled: bundledConnectorIds.has(c.id),
+    version: versionMap.get(c.id) ?? '0.0.0',
   }))
 })
 
