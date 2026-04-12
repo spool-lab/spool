@@ -69,10 +69,13 @@ interface FetchContext {
                                 // optimize (e.g. stop early). null during backfill
                                 // or when no anchor exists yet.
   phase: 'forward' | 'backfill' // Which sync phase is requesting this page.
+  signal: AbortSignal           // fires when the sync engine wants to stop
 }
 ```
 
 A connector only needs to implement two methods: `checkAuth()` and `fetchPage()`. Everything else — persistence, scheduling, retries, UI — is handled by the framework. The `sinceItemId` and `phase` fields in `FetchContext` are informational — a connector can safely ignore them and just use `cursor`. The engine has its own early-exit logic that works regardless of whether the connector acts on these hints.
+
+Connectors should pass `signal` through to `caps.fetch(url, { signal })` and to `abortableSleep(ms, signal)` in retry backoff loops to ensure cancel propagates promptly.
 
 ### Key Supporting Types
 
@@ -388,9 +391,10 @@ This model keeps `@spool-lab/*` fast-path while still allowing a real community 
 A connector does not `import 'node:fs'` or `import 'node:http'` directly. Instead, the SDK exposes a constrained set of capabilities that the framework injects into the connector at construction time:
 
 - `fetch(url, init)` — HTTP fetch routed through Spool's network layer (proxy-aware, respects offline/online state). Equivalent to `globalThis.fetch` in shape
-- `storage` — scoped key-value storage keyed by the connector's `id`, for things like cached API tokens or cursor checkpoints the connector wants to own (the framework already manages the per-sync `SyncState`)
 - `cookies` — scoped Chrome/browser cookie reader for connectors that need cookie-based auth (subject to user consent for the specific browser profile)
 - `log` — structured logger that attributes log lines to the connector
+
+> `storage` is reserved for a future SDK v1.1 extension; v1 connectors manage their own state via the engine's `SyncState`.
 
 Any capability a connector uses must be declared in the `spool.capabilities` array in `package.json`:
 
@@ -405,7 +409,7 @@ Any capability a connector uses must be declared in the `spool.capabilities` arr
 
 The consent dialog shown to users on first load lists these capabilities in plain language ("This connector will make network requests and read your Chrome cookies"). A connector that tries to use an undeclared capability at runtime is terminated with a `CONNECTOR_ERROR` and surfaced to the user.
 
-The exact capability set (names, signatures, consent strings) is frozen as part of the SDK v1 release. Until then this section is a design target, not a contract.
+The v1 capability set is `"fetch" | "cookies:chrome" | "log"`. These names, signatures, and consent strings are frozen as part of the SDK v1 release. Until then this section is a design target, not a contract.
 
 ### Discovery on spool.pro
 
@@ -818,7 +822,7 @@ Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) wi
     "description": "Your saved items on My Platform",
     "color": "#FF6600",
     "ephemeral": false,
-    "capabilities": ["fetch", "storage", "log"]
+    "capabilities": ["fetch", "log"]
   }
 }
 ```
@@ -826,6 +830,10 @@ Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) wi
 - `keywords: ["spool-connector"]` is how spool.pro's backend discovers your package on npm
 - `spool.type: "connector"` is how the Spool app's loader identifies your package at runtime
 - `spool.capabilities` declares which SDK-injected capabilities your connector needs — this list is shown to users in the first-load consent dialog
+
+### Useful SDK exports
+
+**`abortableSleep(ms, signal)`** — use this inside any retry/backoff loop in `fetchPage`. Unlike plain `setTimeout`, it rejects with the signal's reason when the engine cancels, so `scheduler.stop()` takes effect within one event-loop tick.
 
 ### Local source connectors
 
