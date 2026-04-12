@@ -203,6 +203,31 @@ const connectors = registry.connectors
     }
 
     .install-btn:hover { opacity: 0.85; }
+
+    .included-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .included-label .check {
+      color: #4ADE80;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .badge.bundled {
+      background: var(--surface2);
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -223,12 +248,23 @@ const connectors = registry.connectors
             <span class="color-dot" style={`background: ${c.color}`}></span>
             <span class="card-title">{c.label}</span>
             <span class="badge category">{c.category}</span>
-            {c.firstParty && <span class="badge">official</span>}
+            {c.bundled
+              ? <span class="badge bundled">built-in</span>
+              : c.firstParty && <span class="badge">official</span>}
           </div>
           <p class="card-desc">{c.description}</p>
           <div class="card-footer">
-            <span class="cli-hint">spool install {c.name}</span>
-            <a href={`spool://install/${c.name}`} class="install-btn">Install</a>
+            {c.bundled ? (
+              <>
+                <span class="cli-hint">Included with Spool</span>
+                <span class="included-label"><span class="check">&#10003;</span> Included</span>
+              </>
+            ) : (
+              <>
+                <span class="cli-hint">spool install {c.name}</span>
+                <a href={`spool://install/${c.name}`} class="install-btn">Install</a>
+              </>
+            )}
           </div>
         </div>
       ))}
