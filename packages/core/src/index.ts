@@ -35,6 +35,8 @@ export type {
   SchedulerStatus,
 } from './connectors/types.js'
 
+export { downloadAndInstall, resolveNpmPackage, registryUrl } from './connectors/npm-install.js'
+
 // ── Plugin loader ──────────────────────────────────────────────────────────
 export { loadConnectors } from './connectors/loader.js'
 export type { LoadDeps, LoadReport, LoadResult, CapabilityImpls } from './connectors/loader.js'
