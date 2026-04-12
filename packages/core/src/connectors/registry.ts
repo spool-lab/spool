@@ -23,6 +23,10 @@ export class ConnectorRegistry {
     return this.connectors.has(id)
   }
 
+  remove(id: string): boolean {
+    return this.connectors.delete(id)
+  }
+
   list(): Connector[] {
     return Array.from(this.connectors.values())
   }
