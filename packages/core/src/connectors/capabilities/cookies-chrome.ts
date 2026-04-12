@@ -12,6 +12,11 @@ import { join } from 'node:path'
 import { tmpdir, platform, homedir } from 'node:os'
 import { pbkdf2Sync, createDecipheriv, randomUUID } from 'node:crypto'
 import { SyncError, SyncErrorCode } from '../types.js'
+import type { CookiesCapability, Cookie, CookieQuery } from '@spool/connector-sdk'
+import {
+  SyncError as SdkSyncError,
+  SyncErrorCode as SdkSyncErrorCode,
+} from '@spool/connector-sdk'
 
 export interface ChromeCookieResult {
   csrfToken: string
@@ -228,4 +233,138 @@ export function extractChromeXCookies(
   const cookieHeader = cookieParts.join('; ')
 
   return { csrfToken: sanitizeCookieValue('ct0', ct0), cookieHeader }
+}
+
+// ── CookiesCapability wrapper ──────────────────────────────────────────────
+
+interface RawCookieFull {
+  name: string
+  host_key: string
+  path: string
+  encrypted_value_hex: string
+  value: string
+  expires_utc: string
+  is_secure: string
+  is_httponly: string
+}
+
+function queryAllCookiesForDomain(
+  dbPath: string,
+  domain: string,
+): { cookies: RawCookieFull[]; dbVersion: number } {
+  if (!existsSync(dbPath)) {
+    throw new SdkSyncError(
+      SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+      `Chrome Cookies database not found at: ${dbPath}`,
+    )
+  }
+
+  const safeDomain = domain.replace(/'/g, "''")
+  const sql = `SELECT name, host_key, path, hex(encrypted_value) as encrypted_value_hex, value, expires_utc, is_secure, is_httponly FROM cookies WHERE host_key LIKE '%${safeDomain}';`
+
+  const tryQuery = (path: string): string =>
+    execFileSync('sqlite3', ['-json', path, sql], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 10000,
+    }).trim()
+
+  let output: string
+  try {
+    output = tryQuery(dbPath)
+  } catch {
+    const tmpDb = join(tmpdir(), `spool-cookies-${randomUUID()}.db`)
+    try {
+      copyFileSync(dbPath, tmpDb)
+      output = tryQuery(tmpDb)
+    } catch (e2: unknown) {
+      throw new SdkSyncError(
+        SdkSyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
+        `Could not read Chrome Cookies database at ${dbPath}. ${e2 instanceof Error ? e2.message : ''}`,
+        e2,
+      )
+    } finally {
+      try { unlinkSync(tmpDb) } catch {}
+    }
+  }
+
+  const dbVersion = queryDbVersion(dbPath)
+
+  if (!output || output === '[]') return { cookies: [], dbVersion }
+  try {
+    return { cookies: JSON.parse(output), dbVersion }
+  } catch {
+    return { cookies: [], dbVersion }
+  }
+}
+
+const CHROMIUM_EPOCH_DELTA = 11644473600
+
+function chromiumExpiresToUnix(expiresUtc: string | number): number | null {
+  const raw = typeof expiresUtc === 'string' ? parseInt(expiresUtc, 10) : expiresUtc
+  if (!raw || raw === 0) return null
+  return raw / 1_000_000 - CHROMIUM_EPOCH_DELTA
+}
+
+function domainFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url
+  }
+}
+
+export function makeChromeCookiesCapability(): CookiesCapability {
+  return {
+    async get(query: CookieQuery): Promise<Cookie[]> {
+      if (query.browser !== 'chrome') {
+        throw new SdkSyncError(
+          SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+          `Unsupported browser: ${query.browser}. Only 'chrome' is supported.`,
+        )
+      }
+
+      const os = platform()
+      if (os !== 'darwin') {
+        throw new SdkSyncError(
+          SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+          `Direct cookie extraction is currently supported on macOS only (detected: ${os}).`,
+        )
+      }
+
+      const profile = query.profile ?? 'Default'
+      const dataDir = detectChromeUserDataDir()
+      const dbPath = join(dataDir, profile, 'Cookies')
+      const key = getMacOSChromeKey()
+
+      const host = domainFromUrl(query.url)
+      const dotHost = host.startsWith('.') ? host : `.${host}`
+      const result = queryAllCookiesForDomain(dbPath, dotHost)
+
+      const cookies: Cookie[] = []
+      for (const raw of result.cookies) {
+        let value: string
+        const hexVal = raw.encrypted_value_hex
+        if (hexVal && hexVal.length > 0) {
+          const buf = Buffer.from(hexVal, 'hex')
+          const decrypted = decryptCookieValue(buf, key, result.dbVersion)
+          value = decrypted.replace(/\0+$/g, '').trim()
+        } else {
+          value = raw.value ?? ''
+        }
+
+        cookies.push({
+          name: raw.name,
+          value,
+          domain: raw.host_key,
+          path: raw.path || '/',
+          expires: chromiumExpiresToUnix(raw.expires_utc),
+          secure: raw.is_secure === '1' || raw.is_secure === 'true',
+          httpOnly: raw.is_httponly === '1' || raw.is_httponly === 'true',
+        })
+      }
+
+      return cookies
+    },
+  }
 }

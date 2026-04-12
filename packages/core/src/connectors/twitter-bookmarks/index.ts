@@ -1,8 +1,8 @@
 import type { Connector, AuthStatus, PageResult, FetchContext } from '../types.js'
 import { SyncError, SyncErrorCode } from '../types.js'
-import { extractChromeXCookies, detectChromeUserDataDir } from './chrome-cookies.js'
+import { extractChromeXCookies, detectChromeUserDataDir } from '../capabilities/cookies-chrome.js'
 import { fetchBookmarkPage } from './graphql-fetch.js'
-import type { ChromeCookieResult } from './chrome-cookies.js'
+import type { ChromeCookieResult } from '../capabilities/cookies-chrome.js'
 
 export class TwitterBookmarksConnector implements Connector {
   readonly id = 'twitter-bookmarks'
