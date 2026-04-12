@@ -30,8 +30,8 @@
   "devDependencies": {
     "@effect/vitest": "^0.29.0",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.15.3",
+    "@types/node": "^22.19.17",
     "@types/semver": "^7.7.1",
-    "vitest": "^3.1.2"
+    "vitest": "^3.2.4"
   }
 }

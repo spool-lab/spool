@@ -13,11 +13,11 @@
   "dependencies": {
     "@astrojs/rss": "^4.0.0",
     "@astrojs/sitemap": "^3.3.0",
-    "@astrojs/starlight": "^0.37.0",
+    "@astrojs/starlight": "^0.37.7",
     "astro": "^5.18.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.81.1"
   }
 }
