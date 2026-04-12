@@ -15,6 +15,7 @@ import { extractBundledConnectorsIfNeeded, type BundleLogger, type BundleReport 
 export const STAGE_D_FIRST_PARTY_ALLOWLIST = new Set<string>([
   '@spool-lab/connector-twitter-bookmarks',
   '@spool-lab/connector-typeless',
+  '@spool-lab/connector-hackernews-hot',
 ])
 
 export interface CapabilityImpls {
