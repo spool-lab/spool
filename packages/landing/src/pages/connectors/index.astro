@@ -1,0 +1,238 @@
+---
+import registry from '../../../public/registry.json'
+const connectors = registry.connectors
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connectors — Spool</title>
+  <meta name="description" content="Browse and install Spool connectors to index your data sources.">
+  <meta name="theme-color" content="#141410" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://spool.pro/connectors/">
+  <meta property="og:title" content="Connectors — Spool">
+  <meta property="og:description" content="Browse and install Spool connectors to index your data sources.">
+  <meta property="og:site_name" content="Spool">
+
+  <link rel="canonical" href="https://spool.pro/connectors/">
+  <meta name="robots" content="index, follow">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FAFAF8;
+      --surface: #F4F4F0;
+      --surface2: #EEEEE9;
+      --border: #E8E8E2;
+      --border2: #D8D8D0;
+      --text: #1C1C18;
+      --muted: #6B6B60;
+      --faint: #ADADAA;
+      --accent: #C85A00;
+      --accent-bg: #FFF3E8;
+      --accent-subtle: rgba(200, 90, 0, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #141410;
+        --surface: #1C1C18;
+        --surface2: #242420;
+        --border: #2E2E28;
+        --border2: #3A3A34;
+        --text: #F2F2EC;
+        --muted: #8A8A80;
+        --faint: #505048;
+        --accent: #F07020;
+        --accent-bg: #2A1800;
+        --accent-subtle: rgba(240, 112, 32, 0.1);
+      }
+    }
+
+    body {
+      font-family: 'Geist', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+
+    nav a:hover { color: var(--text); }
+
+    nav a.home {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    nav .sep {
+      color: var(--faint);
+      font-size: 14px;
+      user-select: none;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 36px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--accent-subtle);
+      color: var(--accent);
+    }
+
+    .badge.category {
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .cli-hint {
+      font-family: 'Geist Mono', monospace;
+      font-size: 11px;
+      color: var(--faint);
+    }
+
+    .install-btn {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .install-btn:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="home">Spool</a>
+    <span class="sep">/</span>
+    <a href="/connectors/">Connectors</a>
+  </nav>
+
+  <main>
+    <h1>Connectors</h1>
+    <p class="subtitle">Install connectors to index your data sources into Spool.</p>
+
+    <div class="grid">
+      {connectors.map(c => (
+        <div class="card">
+          <div class="card-header">
+            <span class="color-dot" style={`background: ${c.color}`}></span>
+            <span class="card-title">{c.label}</span>
+            <span class="badge category">{c.category}</span>
+            {c.firstParty && <span class="badge">official</span>}
+          </div>
+          <p class="card-desc">{c.description}</p>
+          <div class="card-footer">
+            <span class="cli-hint">spool install {c.name}</span>
+            <a href={`spool://install/${c.name}`} class="install-btn">Install</a>
+          </div>
+        </div>
+      ))}
+    </div>
+  </main>
+</body>
+</html>
