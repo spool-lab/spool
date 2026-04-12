@@ -284,11 +284,12 @@ async function handleSpoolUrl(url: string): Promise<void> {
       version: result.version,
     })
 
-    // Non-blocking notification instead of modal dialog
-    new Notification({
-      title: `${displayName} installed`,
-      body: `v${result.version} is ready to use.`,
-    }).show()
+    // Non-blocking success dialog (not awaited)
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      message: `${displayName} installed`,
+      detail: `v${result.version} is ready to use.`,
+    })
   } catch (err) {
     mainWindow?.setProgressBar(-1)
     dialog.showMessageBox(mainWindow!, {
