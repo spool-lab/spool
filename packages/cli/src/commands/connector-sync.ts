@@ -10,6 +10,7 @@ import {
   makeFetchCapability,
   makeChromeCookiesCapability,
   makeLogCapabilityFor,
+  makeSqliteCapability,
   loadSyncState,
   saveSyncState,
 } from '@spool/core'
@@ -31,6 +32,7 @@ export const connectorSyncCommand = new Command('connector-sync')
       capabilityImpls: {
         fetch: makeFetchCapability(),
         cookies: makeChromeCookiesCapability(),
+        sqlite: makeSqliteCapability(),
         logFor: (id: string) => makeLogCapabilityFor(id),
       },
       registry,
