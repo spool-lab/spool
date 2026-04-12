@@ -138,9 +138,12 @@ export default function App() {
         setConnectorToast(`${event.name} v${event.version} installed`)
         if (toastTimer.current) clearTimeout(toastTimer.current)
         toastTimer.current = setTimeout(() => setConnectorToast(null), 4000)
+        setSettingsTab('connectors')
+        setShowSettings(true)
+        refreshCaptureSources()
       }
     })
-  }, [])
+  }, [refreshCaptureSources])
 
   // Listen for AI streaming chunks and tool calls
   useEffect(() => {
