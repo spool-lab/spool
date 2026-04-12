@@ -150,7 +150,7 @@ const api = {
     getCaptureCount: (connectorId: string): Promise<number> =>
       ipcRenderer.invoke('connector:get-capture-count', { connectorId }),
 
-    onEvent: (cb: (event: { type: string; connectorId?: string; progress?: unknown; result?: unknown; code?: string; message?: string }) => void) => {
+    onEvent: (cb: (event: { type: string; connectorId?: string; progress?: unknown; result?: unknown; code?: string; message?: string; name?: string; version?: string }) => void) => {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as any)
       ipcRenderer.on('connector:event', handler)
       return () => ipcRenderer.removeListener('connector:event', handler)

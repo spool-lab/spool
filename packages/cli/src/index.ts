@@ -5,6 +5,7 @@ import { listCommand } from './commands/list.js'
 import { statusCommand } from './commands/status.js'
 import { showCommand } from './commands/show.js'
 import { connectorSyncCommand } from './commands/connector-sync.js'
+import { connectorCommand } from './commands/connector.js'
 
 program
   .name('spool')
@@ -17,5 +18,6 @@ program.addCommand(listCommand)
 program.addCommand(statusCommand)
 program.addCommand(showCommand)
 program.addCommand(connectorSyncCommand)
+program.addCommand(connectorCommand)
 
 program.parse()

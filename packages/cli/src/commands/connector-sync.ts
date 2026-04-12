@@ -5,6 +5,7 @@ import {
   getDB,
   ConnectorRegistry,
   SyncEngine,
+  TrustStore,
   loadConnectors,
   makeFetchCapability,
   makeChromeCookiesCapability,
@@ -22,10 +23,11 @@ export const connectorSyncCommand = new Command('connector-sync')
   .action(async (connectorId: string, opts: { reset?: boolean; delay?: string }) => {
     const db = getDB()
     const registry = new ConnectorRegistry()
+    const spoolDir = join(homedir(), '.spool')
 
     await loadConnectors({
       bundledConnectorsDir: join(__dirname, '../../resources/bundled-connectors'),
-      connectorsDir: join(homedir(), '.spool', 'connectors'),
+      connectorsDir: join(spoolDir, 'connectors'),
       capabilityImpls: {
         fetch: makeFetchCapability(),
         cookies: makeChromeCookiesCapability(),
@@ -33,6 +35,7 @@ export const connectorSyncCommand = new Command('connector-sync')
       },
       registry,
       log: { info: () => {}, warn: console.warn, error: console.error },
+      trustStore: new TrustStore(spoolDir),
     })
 
     if (!registry.has(connectorId)) {
