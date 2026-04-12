@@ -37,6 +37,8 @@ export type {
 
 export { downloadAndInstall, uninstallConnector, resolveNpmPackage, registryUrl, checkForUpdates } from './connectors/npm-install.js'
 export type { UpdateInfo } from './connectors/npm-install.js'
+export { fetchRegistry } from './connectors/registry-fetch.js'
+export type { RegistryConnector } from './connectors/registry-fetch.js'
 
 // ── Plugin loader ──────────────────────────────────────────────────────────
 export { loadConnectors } from './connectors/loader.js'
