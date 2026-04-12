@@ -18,3 +18,6 @@ export type {
   KnownCapabilityV1,
 } from './capabilities.js'
 export { KNOWN_CAPABILITIES_V1 } from './capabilities.js'
+
+// Utilities
+export { abortableSleep } from './utils.js'
