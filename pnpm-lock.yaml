@@ -146,6 +146,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@spool/connector-sdk':
+        specifier: workspace:^
+        version: link:../connector-sdk
       better-sqlite3:
         specifier: ^11.10.0
         version: 11.10.0

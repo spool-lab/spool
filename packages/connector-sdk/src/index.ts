@@ -1,6 +1,7 @@
-// @spool/connector-sdk — public plugin contract for Spool connectors.
-// All exports are re-exported from focused modules below.
-// This file is the only public entry point; import from '@spool/connector-sdk'.
+// Public plugin contract types
+export type { Connector, AuthStatus, PageResult, FetchContext } from './connector.js'
+export type { CapturedItem } from './captured-item.js'
+export type { SyncState } from './sync-state.js'
 
-// Exports are added by Task 2, Task 3, and Task 4.
-export {}
+// Error types
+export { SyncError, SyncErrorCode, SYNC_ERROR_HINTS } from './errors.js'

@@ -20,6 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@spool/connector-sdk": "workspace:^",
     "better-sqlite3": "^11.10.0",
     "chokidar": "^4.0.3",
     "effect": "^3.21.0"
