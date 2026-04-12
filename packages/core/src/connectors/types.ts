@@ -156,6 +156,7 @@ export interface ConnectorStatus {
   color: string
   enabled: boolean
   syncing: boolean
+  bundled: boolean
   state: SyncState
 }
 

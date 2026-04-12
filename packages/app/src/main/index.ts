@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
@@ -8,7 +9,7 @@ import {
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability,
-  TrustStore, downloadAndInstall, resolveNpmPackage,
+  TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -63,6 +64,7 @@ let trustStore: TrustStore | null = null
 let isSyncActive = false
 let proxyFetch: typeof globalThis.fetch
 let spoolDir: string
+const bundledConnectorIds = new Set<string>()
 
 type CachedSearchValue = SearchResult[] | FragmentResult[]
 
@@ -375,7 +377,7 @@ app.whenReady().then(async () => {
   spoolDir = join(homedir(), '.spool')
   trustStore = new TrustStore(spoolDir)
 
-  await loadConnectors({
+  const loadReport = await loadConnectors({
     bundledConnectorsDir,
     connectorsDir: join(spoolDir, 'connectors'),
     capabilityImpls: {
@@ -392,6 +394,20 @@ app.whenReady().then(async () => {
     },
     trustStore,
   })
+
+  // Track which connectors came from bundled tarballs
+  const bundledNames = new Set([...loadReport.bundleReport.extracted, ...loadReport.bundleReport.skipped])
+  for (const result of loadReport.loadResults) {
+    if (result.status === 'loaded' && bundledNames.has(result.name)) {
+      // Find the connector ID from the installed package
+      const segs = result.name.startsWith('@') ? result.name.split('/') : [result.name]
+      const pkgPath = join(spoolDir, 'connectors', 'node_modules', ...segs, 'package.json')
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+        if (pkg.spool?.id) bundledConnectorIds.add(pkg.spool.id)
+      } catch {}
+    }
+  }
 
   syncScheduler = new SyncScheduler(db, connectorRegistry)
   syncScheduler.on((event: SchedulerEvent) => {
@@ -617,7 +633,10 @@ ipcMain.handle('spool:install-update', () => {
 // ── Connector Handlers ──────────────────────────────────────────────────
 
 ipcMain.handle('connector:list', (): ConnectorStatus[] => {
-  return syncScheduler.getStatus().connectors
+  return syncScheduler.getStatus().connectors.map(c => ({
+    ...c,
+    bundled: bundledConnectorIds.has(c.id),
+  }))
 })
 
 ipcMain.handle('connector:check-auth', async (_e, { id }: { id: string }): Promise<AuthStatus> => {
@@ -640,6 +659,64 @@ ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enab
   if (enabled) {
     syncScheduler.triggerNow(id, 'both')
   }
+  return { ok: true }
+})
+
+ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
+  const connectorsDir = join(spoolDir, 'connectors')
+
+  // Find the package name by scanning installed packages
+  const nodeModules = join(connectorsDir, 'node_modules')
+  let packageName: string | null = null
+
+  if (existsSync(nodeModules)) {
+    for (const entry of readdirSync(nodeModules)) {
+      if (entry.startsWith('.')) continue
+      const dirs = entry.startsWith('@')
+        ? readdirSync(join(nodeModules, entry)).map(s => join(entry, s))
+        : [entry]
+      for (const dir of dirs) {
+        const pkgPath = join(nodeModules, dir, 'package.json')
+        if (!existsSync(pkgPath)) continue
+        try {
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+          if (pkg.spool?.id === id) {
+            packageName = pkg.name
+            break
+          }
+        } catch {}
+      }
+      if (packageName) break
+    }
+  }
+
+  if (!packageName) {
+    return { ok: false, error: `No installed package found for connector "${id}"` }
+  }
+
+  // Get platform before removing from registry
+  if (!connectorRegistry.has(id)) {
+    return { ok: false, error: `Connector "${id}" not found in registry` }
+  }
+  const platform = connectorRegistry.get(id).platform
+
+  // Remove from registry (stops scheduler from picking it up)
+  connectorRegistry.remove(id)
+
+  // Delete files and mark .do-not-restore
+  uninstallConnector(packageName, connectorsDir)
+
+  // Clean up DB atomically
+  db.transaction(() => {
+    db.prepare(
+      "DELETE FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
+    ).run(platform, id)
+    db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(id)
+  })()
+
+  // Notify renderer
+  mainWindow?.webContents.send('connector:event', { type: 'uninstalled', connectorId: id })
+
   return { ok: true }
 })
 

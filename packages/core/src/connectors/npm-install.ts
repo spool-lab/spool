@@ -1,4 +1,4 @@
-import { mkdirSync, createWriteStream } from 'node:fs'
+import { mkdirSync, createWriteStream, existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { tmpdir } from 'node:os'
@@ -76,4 +76,23 @@ export async function downloadAndInstall(
   await tar.extract({ file: tmpPath, cwd: installPath, strip: 1 })
 
   return { name: info.name, version: info.version, installPath }
+}
+
+export function uninstallConnector(
+  packageName: string,
+  connectorsDir: string,
+): void {
+  const nameSegments = packageName.startsWith('@') ? packageName.split('/') : [packageName]
+  const installPath = join(connectorsDir, 'node_modules', ...nameSegments)
+
+  rmSync(installPath, { recursive: true, force: true })
+
+  // Prevent bundled connectors from being re-extracted on next startup
+  const doNotRestorePath = join(connectorsDir, '.do-not-restore')
+  const lines = existsSync(doNotRestorePath)
+    ? readFileSync(doNotRestorePath, 'utf8').split('\n').map(l => l.trim()).filter(Boolean)
+    : []
+  const entries = new Set(lines)
+  entries.add(packageName)
+  writeFileSync(doNotRestorePath, [...entries].join('\n') + '\n')
 }

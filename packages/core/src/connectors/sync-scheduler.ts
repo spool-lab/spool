@@ -129,6 +129,7 @@ export class SyncScheduler {
         color: c.color,
         enabled: state.enabled,
         syncing: this.running.has(c.id),
+        bundled: false,
         state,
       }
     })

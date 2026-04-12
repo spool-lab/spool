@@ -140,6 +140,8 @@ export default function App() {
         if (toastTimer.current) clearTimeout(toastTimer.current)
         toastTimer.current = setTimeout(() => setConnectorToast(null), 4000)
         refreshCaptureSourcesRef.current()
+      } else if (event.type === 'uninstalled') {
+        refreshCaptureSourcesRef.current()
       }
     })
   }, [])

@@ -475,6 +475,25 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
             <p className="text-xs text-red-500">{syncError}</p>
           </div>
         )}
+
+        {/* Uninstall (hidden for bundled connectors) */}
+        {!selected.bundled && (
+          <button
+            onClick={async () => {
+              const count = connectorCounts[selected.id] ?? 0
+              const msg = count > 0
+                ? `Uninstall "${selected.label}"?\n\nThis will permanently delete ${count} synced item${count === 1 ? '' : 's'} and remove the connector. You can reinstall it later from spool.pro/connectors.`
+                : `Uninstall "${selected.label}"?\n\nThis will remove the connector. You can reinstall it later from spool.pro/connectors.`
+              if (!confirm(msg)) return
+              await window.spool?.connectors.uninstall(selected.id)
+              setSelectedId(null)
+              await loadConnectors()
+            }}
+            className="w-full py-2 text-xs font-medium text-red-500 border border-red-500/20 rounded-[8px] hover:bg-red-500/10 transition-colors"
+          >
+            Uninstall
+          </button>
+        )}
       </div>
     )
   }
