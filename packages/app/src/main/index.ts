@@ -166,7 +166,7 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 const VALID_NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
 function parseSpoolUrl(url: string): { action: string; packageName: string } | null {
-  const match = url.match(/^spool:\/\/install\/(.+)$/)
+  const match = url.match(/^spool:\/\/connector\/install\/(.+)$/)
   if (!match) return null
   const packageName = decodeURIComponent(match[1]!)
   if (!VALID_NPM_NAME.test(packageName)) return null

@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { downloadAndInstall, TrustStore } from '@spool/core'
 import * as readline from 'node:readline'
 
-export const installCommand = new Command('install')
+const installSubcommand = new Command('install')
   .description('Install a connector plugin from npm')
   .argument('<package>', 'npm package name (e.g. @spool-lab/connector-hackernews-hot)')
   .option('-y, --yes', 'Skip confirmation prompt')
@@ -43,6 +43,10 @@ export const installCommand = new Command('install')
       process.exit(1)
     }
   })
+
+export const connectorCommand = new Command('connector')
+  .description('Manage connector plugins')
+  .addCommand(installSubcommand)
 
 function confirm(question: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })

@@ -438,7 +438,7 @@ Every card shows:
 - Declared capabilities, translated to plain language ("Makes network requests · Reads Chrome cookies")
 - Download count, last-published date
 - Trust badge
-- **"Install in Spool" button** → generates a `spool://install/<package-name>` deep link (see "Deep-link install flow" below)
+- **"Install in Spool" button** → generates a `spool://connector/install/<package-name>` deep link (see "Deep-link install flow" below)
 
 **What spool.pro's MVP does NOT do:**
 
@@ -476,7 +476,7 @@ The MVP ships with only Official vs Community. The curation layer is a second it
 | Source | How | Backend |
 |---|---|---|
 | **First-run bundle** | The app ships `@spool-lab/connector-*` npm tarballs inside its resource directory. On first launch, if `~/.spool/connectors/` is empty, the app extracts them into place. | File copy |
-| **Deep link from spool.pro** | spool.pro's connector directory buttons open `spool://install/<package-name>`, which the app handles by running the install flow for that package | `npm install` |
+| **Deep link from spool.pro** | spool.pro's connector directory buttons open `spool://connector/install/<package-name>`, which the app handles by running the install flow for that package | `npm install` |
 | **Manual paste** | Settings → Install Connector → user pastes an npm package name | `npm install` |
 | **Local development** | `spool connector install --from ./path/to/local/package` CLI flag for connector authors developing a new plugin | `npm install <path>` |
 
@@ -531,14 +531,14 @@ The loader treats every package as untrusted by default and only loads those in 
 
 ### Deep-link install flow
 
-spool.pro's connector directory page has an "Install in Spool" button next to each listed package. Clicking it opens a `spool://install/<package-name>` URL. The Spool app registers itself as the handler for the `spool://` protocol on install.
+spool.pro's connector directory page has an "Install in Spool" button next to each listed package. Clicking it opens a `spool://connector/install/<package-name>` URL. The Spool app registers itself as the handler for the `spool://` protocol on install.
 
 ```
 https://spool.pro/connectors
       │
       │ user clicks "Install" on @spool-lab/connector-github-stars
       ▼
-spool://install/@spool-lab/connector-github-stars
+spool://connector/install/@spool-lab/connector-github-stars
       │
       │ OS hands off to Spool (custom protocol handler)
       ▼
