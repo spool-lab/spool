@@ -1,11 +1,14 @@
 {
   "name": "@spool-lab/connector-hackernews-hot",
   "version": "0.1.0",
+  "description": "Top stories on Hacker News right now for Spool",
+  "keywords": ["spool-connector", "hackernews"],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": ["dist"],
   "scripts": {
+    "prepack": "pnpm run build",
     "build": "tsc",
     "clean": "rm -rf dist"
   },

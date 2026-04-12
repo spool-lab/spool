@@ -14,7 +14,7 @@ const TOP_N = 30
 interface HNStory {
   id: number
   type: string
-  by: string
+  by?: string
   time: number
   title: string
   url?: string
@@ -75,7 +75,14 @@ export default class HackerNewsHotConnector implements Connector {
     const results = await Promise.allSettled(
       ids.map(async (id) => {
         const res = await this.caps.fetch(`${HN_API}/item/${id}.json`, { signal })
-        if (!res.ok) return null
+        if (!res.ok) {
+          this.caps.log.warn('failed to fetch HN item', {
+            id,
+            status: res.status,
+            error: res.status === 429 ? 'rate limited' : `HTTP ${res.status}`,
+          })
+          return null
+        }
         return await res.json() as HNStory
       }),
     )
