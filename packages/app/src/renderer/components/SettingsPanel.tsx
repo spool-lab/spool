@@ -321,6 +321,15 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const [availableUpdates, setAvailableUpdates] = useState<Record<string, { current: string; latest: string }>>({})
   const [updatingConnector, setUpdatingConnector] = useState<string | null>(null)
   const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
+  const [registryConnectors, setRegistryConnectors] = useState<Array<{
+    name: string; id: string; platform: string; label: string;
+    description: string; color: string; author: string; category: string;
+    firstParty: boolean; bundled?: boolean; npm: string;
+  }>>([])
+  const [registryLoading, setRegistryLoading] = useState(true)
+  const [registryError, setRegistryError] = useState(false)
+  const [installingPackage, setInstallingPackage] = useState<string | null>(null)
+  const [installErrors, setInstallErrors] = useState<Record<string, string>>({})
 
   const loadConnectors = useCallback(async () => {
     if (!window.spool?.connectors) return
@@ -356,10 +365,24 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       } else if (event.type === 'updated') {
         loadConnectors()
         window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
+      } else if (event.type === 'installed') {
+        loadConnectors()
       }
     })
     return off
   }, [loadConnectors])
+
+  useEffect(() => {
+    if (!window.spool?.connectors?.fetchRegistry) return
+    setRegistryLoading(true)
+    window.spool.connectors.fetchRegistry()
+      .then(setRegistryConnectors)
+      .catch(() => setRegistryError(true))
+      .finally(() => setRegistryLoading(false))
+  }, [])
+
+  const installedIds = new Set(connectors.map(c => c.id))
+  const discoverConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
 
   const handleSync = async (connectorId: string) => {
     if (!window.spool?.connectors) return
@@ -388,6 +411,22 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       setUpdateErrors(prev => ({ ...prev, [connectorId]: err instanceof Error ? err.message : String(err) }))
     } finally {
       setUpdatingConnector(null)
+    }
+  }
+
+  const handleInstall = async (packageName: string) => {
+    if (!window.spool?.connectors?.install) return
+    setInstallingPackage(packageName)
+    setInstallErrors(prev => { const next = { ...prev }; delete next[packageName]; return next })
+    try {
+      const result = await window.spool.connectors.install(packageName)
+      if (!result.ok) {
+        setInstallErrors(prev => ({ ...prev, [packageName]: result.error ?? 'Install failed' }))
+      }
+    } catch (err) {
+      setInstallErrors(prev => ({ ...prev, [packageName]: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setInstallingPackage(null)
     }
   }
 
@@ -549,7 +588,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
 
       <Section title="Data Sources">
         {connectors.length === 0 && (
-          <p className="text-xs text-warm-faint dark:text-dark-muted">No connectors available.</p>
+          <p className="text-xs text-warm-faint dark:text-dark-muted">No connectors installed yet</p>
         )}
         {connectors.map(c => {
           const isSyncing = syncingConnector === c.id || c.syncing
@@ -590,6 +629,48 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           )
         })}
       </Section>
+
+        {!registryLoading && !registryError && discoverConnectors.length > 0 && (
+          <Section title="Discover">
+            {discoverConnectors.map(rc => (
+              <div
+                key={rc.name}
+                className="flex items-center gap-2.5 py-2.5 px-2 rounded-[6px] border border-dashed border-warm-border dark:border-dark-border"
+              >
+                <span
+                  className="w-2 h-2 rounded-full flex-none opacity-50"
+                  style={{ background: rc.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] font-medium text-warm-muted dark:text-dark-muted">{rc.label}</span>
+                  <span className="text-[10px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
+                  {installErrors[rc.name] && installingPackage !== rc.name && (
+                    <div className="text-[10px] text-red-400 mt-0.5">{installErrors[rc.name]}</div>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleInstall(rc.name)}
+                  disabled={installingPackage === rc.name}
+                  className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
+                >
+                  {installingPackage === rc.name ? 'Installing\u2026' : 'Install'}
+                </button>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {registryLoading && (
+          <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
+            Loading connector directory\u2026
+          </div>
+        )}
+
+        {registryError && !registryLoading && (
+          <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
+            Couldn't load connector directory
+          </div>
+        )}
 
       {syncError && (
         <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
