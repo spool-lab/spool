@@ -318,6 +318,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const [syncingConnector, setSyncingConnector] = useState<string | null>(null)
   const [syncProgress, setSyncProgress] = useState<Record<string, { added: number; phase: string }>>({})
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [availableUpdates, setAvailableUpdates] = useState<Record<string, { current: string; latest: string }>>({})
+  const [updatingConnector, setUpdatingConnector] = useState<string | null>(null)
+  const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
 
   const loadConnectors = useCallback(async () => {
     if (!window.spool?.connectors) return
@@ -331,6 +334,10 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   }, [])
 
   useEffect(() => { loadConnectors() }, [loadConnectors])
+
+  useEffect(() => {
+    window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
+  }, [])
 
   // Listen for connector sync events
   useEffect(() => {
@@ -346,6 +353,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         setSyncingConnector(null)
         if (event.connectorId) setSyncProgress(prev => { const next = { ...prev }; delete next[event.connectorId!]; return next })
         loadConnectors()
+      } else if (event.type === 'updated') {
+        loadConnectors()
+        window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
       }
     })
     return off
@@ -365,6 +375,20 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
     if (!window.spool?.connectors) return
     await window.spool.connectors.setEnabled(connectorId, enabled)
     await loadConnectors()
+  }
+
+  const handleUpdate = async (connectorId: string) => {
+    if (!window.spool?.connectors) return
+    setUpdatingConnector(connectorId)
+    setUpdateErrors(prev => { const next = { ...prev }; delete next[connectorId]; return next })
+    try {
+      const result = await window.spool.connectors.update(connectorId)
+      if (!result.ok) setUpdateErrors(prev => ({ ...prev, [connectorId]: result.error ?? 'Update failed' }))
+    } catch (err) {
+      setUpdateErrors(prev => ({ ...prev, [connectorId]: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setUpdatingConnector(null)
+    }
   }
 
   const selected = connectors.find(c => c.id === selectedId)
@@ -473,6 +497,28 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         {syncError && (
           <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
             <p className="text-xs text-red-500">{syncError}</p>
+          </div>
+        )}
+
+        {/* Update available */}
+        {availableUpdates[selected.id] && (
+          <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-accent/30 dark:border-accent-dark/30 rounded-[8px] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-warm-muted dark:text-dark-muted">Update available</span>
+              <span className="text-[11px] font-mono text-warm-text dark:text-dark-text">
+                {availableUpdates[selected.id]!.current} → {availableUpdates[selected.id]!.latest}
+              </span>
+            </div>
+            <button
+              onClick={() => handleUpdate(selected.id)}
+              disabled={updatingConnector === selected.id}
+              className="w-full py-1.5 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[6px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
+            >
+              {updatingConnector === selected.id ? 'Updating…' : 'Update'}
+            </button>
+            {updateErrors[selected.id] && updatingConnector !== selected.id && (
+              <p className="text-[11px] text-red-400">{updateErrors[selected.id]}</p>
+            )}
           </div>
         )}
 

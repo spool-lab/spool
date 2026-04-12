@@ -9,8 +9,9 @@ import {
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability,
-  TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage,
+  TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
 } from '@spool/core'
+import type { UpdateInfo } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
@@ -65,6 +66,7 @@ let isSyncActive = false
 let proxyFetch: typeof globalThis.fetch
 let spoolDir: string
 const bundledConnectorIds = new Set<string>()
+let updateCache = new Map<string, UpdateInfo>()
 
 type CachedSearchValue = SearchResult[] | FragmentResult[]
 
@@ -260,26 +262,7 @@ async function handleSpoolUrl(url: string): Promise<void> {
       trustStore.add(parsed.packageName)
     }
 
-    // Reload connectors into registry
-    await loadConnectors({
-      bundledConnectorsDir: !app.isPackaged
-        ? join(process.cwd(), 'dist/bundled-connectors')
-        : join(process.resourcesPath, 'bundled-connectors'),
-      connectorsDir,
-      capabilityImpls: {
-        fetch: makeFetchCapability(proxyFetch),
-        cookies: makeChromeCookiesCapability(),
-        sqlite: makeSqliteCapability(),
-        logFor: (id: string) => makeLogCapabilityFor(id),
-      },
-      registry: connectorRegistry,
-      log: {
-        info: (msg, fields) => console.log(`[loader] ${msg}`, fields ?? ''),
-        warn: (msg, fields) => console.warn(`[loader] ${msg}`, fields ?? ''),
-        error: (msg, fields) => console.error(`[loader] ${msg}`, fields ?? ''),
-      },
-      trustStore: trustStore!,
-    })
+    await reloadConnectors()
 
     mainWindow?.setProgressBar(-1) // clear progress
     mainWindow?.webContents.send('connector:event', {
@@ -421,6 +404,11 @@ app.whenReady().then(async () => {
     syncScheduler?.onWake()
   })
 
+  // Check for connector updates (async, non-blocking)
+  runConnectorUpdateCheck().catch((err) => {
+    console.error('[connector-updates] check failed:', err)
+  })
+
   // Initial sync in worker thread (non-blocking)
   runSyncWorker().then(() => {
     watcher.start()
@@ -469,6 +457,63 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   syncScheduler?.stop()
 })
+
+// ── Connector helpers ─────────────────────────────────────────────────────────
+
+function getInstalledConnectorPackages(): Array<{ packageName: string; currentVersion: string; connectorId: string }> {
+  const connectorsDir = join(spoolDir, 'connectors')
+  const nodeModules = join(connectorsDir, 'node_modules')
+  if (!existsSync(nodeModules)) return []
+
+  const results: Array<{ packageName: string; currentVersion: string; connectorId: string }> = []
+  for (const entry of readdirSync(nodeModules)) {
+    if (entry.startsWith('.')) continue
+    const dirs = entry.startsWith('@')
+      ? readdirSync(join(nodeModules, entry)).map(s => join(entry, s))
+      : [entry]
+    for (const dir of dirs) {
+      const pkgPath = join(nodeModules, dir, 'package.json')
+      if (!existsSync(pkgPath)) continue
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+        if (pkg.spool?.type === 'connector' && pkg.spool?.id && !bundledConnectorIds.has(pkg.spool.id)) {
+          results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: pkg.spool.id })
+        }
+      } catch {}
+    }
+  }
+  return results
+}
+
+async function reloadConnectors(): Promise<void> {
+  const connectorsDir = join(spoolDir, 'connectors')
+  await loadConnectors({
+    bundledConnectorsDir: !app.isPackaged
+      ? join(process.cwd(), 'dist/bundled-connectors')
+      : join(process.resourcesPath, 'bundled-connectors'),
+    connectorsDir,
+    capabilityImpls: {
+      fetch: makeFetchCapability(proxyFetch),
+      cookies: makeChromeCookiesCapability(),
+      sqlite: makeSqliteCapability(),
+      logFor: (id: string) => makeLogCapabilityFor(id),
+    },
+    registry: connectorRegistry,
+    log: {
+      info: (msg, fields) => console.log(`[loader] ${msg}`, fields ?? ''),
+      warn: (msg, fields) => console.warn(`[loader] ${msg}`, fields ?? ''),
+      error: (msg, fields) => console.error(`[loader] ${msg}`, fields ?? ''),
+    },
+    trustStore: trustStore!,
+  })
+}
+
+async function runConnectorUpdateCheck(): Promise<{ updates: Map<string, UpdateInfo>; installed: Array<{ packageName: string; currentVersion: string; connectorId: string }> }> {
+  const installed = getInstalledConnectorPackages()
+  if (installed.length === 0) return { updates: new Map(), installed }
+  updateCache = await checkForUpdates(installed, fetch)
+  return { updates: updateCache, installed }
+}
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
@@ -665,34 +710,11 @@ ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enab
 ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   const connectorsDir = join(spoolDir, 'connectors')
 
-  // Find the package name by scanning installed packages
-  const nodeModules = join(connectorsDir, 'node_modules')
-  let packageName: string | null = null
-
-  if (existsSync(nodeModules)) {
-    for (const entry of readdirSync(nodeModules)) {
-      if (entry.startsWith('.')) continue
-      const dirs = entry.startsWith('@')
-        ? readdirSync(join(nodeModules, entry)).map(s => join(entry, s))
-        : [entry]
-      for (const dir of dirs) {
-        const pkgPath = join(nodeModules, dir, 'package.json')
-        if (!existsSync(pkgPath)) continue
-        try {
-          const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-          if (pkg.spool?.id === id) {
-            packageName = pkg.name
-            break
-          }
-        } catch {}
-      }
-      if (packageName) break
-    }
-  }
-
-  if (!packageName) {
+  const pkg = getInstalledConnectorPackages().find(p => p.connectorId === id)
+  if (!pkg) {
     return { ok: false, error: `No installed package found for connector "${id}"` }
   }
+  const packageName = pkg.packageName
 
   // Get platform before removing from registry
   if (!connectorRegistry.has(id)) {
@@ -718,6 +740,40 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   mainWindow?.webContents.send('connector:event', { type: 'uninstalled', connectorId: id })
 
   return { ok: true }
+})
+
+ipcMain.handle('connector:check-updates', async () => {
+  const { updates, installed } = await runConnectorUpdateCheck()
+  const byConnectorId: Record<string, { current: string; latest: string }> = {}
+  for (const pkg of installed) {
+    const update = updates.get(pkg.packageName)
+    if (update) byConnectorId[pkg.connectorId] = update
+  }
+  return byConnectorId
+})
+
+ipcMain.handle('connector:update', async (_e, { id }: { id: string }) => {
+  const installed = getInstalledConnectorPackages()
+  const pkg = installed.find(p => p.connectorId === id)
+  if (!pkg) return { ok: false, error: `No installed package found for connector "${id}"` }
+
+  try {
+    const connectorsDir = join(spoolDir, 'connectors')
+    const result = await downloadAndInstall(pkg.packageName, connectorsDir, fetch)
+
+    await reloadConnectors()
+    updateCache.delete(pkg.packageName)
+
+    mainWindow?.webContents.send('connector:event', {
+      type: 'updated',
+      name: result.name,
+      version: result.version,
+    })
+
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 })
 
 ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorId: string }) => {

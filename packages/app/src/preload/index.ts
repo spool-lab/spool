@@ -153,6 +153,12 @@ const api = {
     uninstall: (id: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('connector:uninstall', { id }),
 
+    checkUpdates: (): Promise<Record<string, { current: string; latest: string }>> =>
+      ipcRenderer.invoke('connector:check-updates'),
+
+    update: (id: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('connector:update', { id }),
+
     onEvent: (cb: (event: { type: string; connectorId?: string; progress?: unknown; result?: unknown; code?: string; message?: string; name?: string; version?: string }) => void) => {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as any)
       ipcRenderer.on('connector:event', handler)

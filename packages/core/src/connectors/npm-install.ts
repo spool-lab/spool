@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { tmpdir } from 'node:os'
 import * as tar from 'tar'
+import * as semver from 'semver'
 
 export interface NpmPackageInfo {
   name: string
@@ -17,6 +18,11 @@ export interface InstallResult {
   name: string
   version: string
   installPath: string
+}
+
+export interface UpdateInfo {
+  current: string
+  latest: string
 }
 
 export function registryUrl(packageName: string): string {
@@ -76,6 +82,25 @@ export async function downloadAndInstall(
   await tar.extract({ file: tmpPath, cwd: installPath, strip: 1 })
 
   return { name: info.name, version: info.version, installPath }
+}
+
+export async function checkForUpdates(
+  connectors: Array<{ packageName: string; currentVersion: string }>,
+  fetchFn: typeof globalThis.fetch,
+): Promise<Map<string, UpdateInfo>> {
+  const results = new Map<string, UpdateInfo>()
+  const checks = connectors.map(async ({ packageName, currentVersion }) => {
+    try {
+      const info = await resolveNpmPackage(packageName, fetchFn)
+      if (semver.gt(info.version, currentVersion)) {
+        results.set(packageName, { current: currentVersion, latest: info.version })
+      }
+    } catch {
+      // Network error or delisted package — skip silently
+    }
+  })
+  await Promise.all(checks)
+  return results
 }
 
 export function uninstallConnector(
