@@ -318,6 +318,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const [syncingConnector, setSyncingConnector] = useState<string | null>(null)
   const [syncProgress, setSyncProgress] = useState<Record<string, { added: number; phase: string }>>({})
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [availableUpdates, setAvailableUpdates] = useState<Record<string, { current: string; latest: string }>>({})
+  const [updatingConnector, setUpdatingConnector] = useState<string | null>(null)
+  const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
 
   const loadConnectors = useCallback(async () => {
     if (!window.spool?.connectors) return
@@ -331,6 +334,10 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   }, [])
 
   useEffect(() => { loadConnectors() }, [loadConnectors])
+
+  useEffect(() => {
+    window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
+  }, [])
 
   // Listen for connector sync events
   useEffect(() => {
@@ -346,6 +353,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         setSyncingConnector(null)
         if (event.connectorId) setSyncProgress(prev => { const next = { ...prev }; delete next[event.connectorId!]; return next })
         loadConnectors()
+      } else if (event.type === 'updated') {
+        loadConnectors()
+        window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
       }
     })
     return off
@@ -365,6 +375,20 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
     if (!window.spool?.connectors) return
     await window.spool.connectors.setEnabled(connectorId, enabled)
     await loadConnectors()
+  }
+
+  const handleUpdate = async (connectorId: string) => {
+    if (!window.spool?.connectors) return
+    setUpdatingConnector(connectorId)
+    setUpdateErrors(prev => { const next = { ...prev }; delete next[connectorId]; return next })
+    try {
+      const result = await window.spool.connectors.update(connectorId)
+      if (!result.ok) setUpdateErrors(prev => ({ ...prev, [connectorId]: result.error ?? 'Update failed' }))
+    } catch (err) {
+      setUpdateErrors(prev => ({ ...prev, [connectorId]: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setUpdatingConnector(null)
+    }
   }
 
   const selected = connectors.find(c => c.id === selectedId)
@@ -387,14 +411,48 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         </button>
 
         {/* Connector header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <span
-            className={`w-3 h-3 rounded-full flex-none ${isSyncing ? 'animate-pulse' : ''}`}
+            className={`w-3 h-3 rounded-full flex-none mt-0.5 ${isSyncing ? 'animate-pulse' : ''}`}
             style={{ background: selected.enabled ? selected.color : '#888' }}
           />
-          <div>
+          <div className="flex-1 min-w-0">
             <h4 className="text-xs font-medium text-warm-text dark:text-dark-text">{selected.label}</h4>
             <p className="text-[11px] text-warm-faint dark:text-dark-muted">{selected.description}</p>
+            {!selected.bundled && <div className="flex items-center mt-1.5 text-[11px]">
+              <span className="font-mono text-warm-faint dark:text-dark-muted">v{selected.version}</span>
+              <div className="flex items-center gap-2 ml-auto">
+                {availableUpdates[selected.id] && (
+                  <button
+                    onClick={() => handleUpdate(selected.id)}
+                    disabled={updatingConnector === selected.id}
+                    className="font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50"
+                  >
+                    {updatingConnector === selected.id ? 'Updating…' : 'Update'}
+                  </button>
+                )}
+                {!selected.bundled && (
+                  <button
+                    onClick={async () => {
+                      const count = connectorCounts[selected.id] ?? 0
+                      const msg = count > 0
+                        ? `Uninstall "${selected.label}"?\n\nThis will permanently delete ${count} synced item${count === 1 ? '' : 's'} and remove the connector. You can reinstall it later from spool.pro/connectors.`
+                        : `Uninstall "${selected.label}"?\n\nThis will remove the connector. You can reinstall it later from spool.pro/connectors.`
+                      if (!confirm(msg)) return
+                      await window.spool?.connectors.uninstall(selected.id)
+                      setSelectedId(null)
+                      await loadConnectors()
+                    }}
+                    className="font-medium text-warm-faint dark:text-dark-muted hover:text-red-400 hover:underline"
+                  >
+                    Uninstall
+                  </button>
+                )}
+              </div>
+            </div>}
+            {updateErrors[selected.id] && updatingConnector !== selected.id && (
+              <p className="text-[11px] text-red-400 mt-1">{updateErrors[selected.id]}</p>
+            )}
           </div>
         </div>
 
@@ -476,24 +534,6 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           </div>
         )}
 
-        {/* Uninstall (hidden for bundled connectors) */}
-        {!selected.bundled && (
-          <button
-            onClick={async () => {
-              const count = connectorCounts[selected.id] ?? 0
-              const msg = count > 0
-                ? `Uninstall "${selected.label}"?\n\nThis will permanently delete ${count} synced item${count === 1 ? '' : 's'} and remove the connector. You can reinstall it later from spool.pro/connectors.`
-                : `Uninstall "${selected.label}"?\n\nThis will remove the connector. You can reinstall it later from spool.pro/connectors.`
-              if (!confirm(msg)) return
-              await window.spool?.connectors.uninstall(selected.id)
-              setSelectedId(null)
-              await loadConnectors()
-            }}
-            className="w-full py-2 text-xs font-medium text-red-500 border border-red-500/20 rounded-[8px] hover:bg-red-500/10 transition-colors"
-          >
-            Uninstall
-          </button>
-        )}
       </div>
     )
   }

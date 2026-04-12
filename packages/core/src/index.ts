@@ -35,7 +35,8 @@ export type {
   SchedulerStatus,
 } from './connectors/types.js'
 
-export { downloadAndInstall, uninstallConnector, resolveNpmPackage, registryUrl } from './connectors/npm-install.js'
+export { downloadAndInstall, uninstallConnector, resolveNpmPackage, registryUrl, checkForUpdates } from './connectors/npm-install.js'
+export type { UpdateInfo } from './connectors/npm-install.js'
 
 // ── Plugin loader ──────────────────────────────────────────────────────────
 export { loadConnectors } from './connectors/loader.js'

@@ -157,6 +157,7 @@ export interface ConnectorStatus {
   enabled: boolean
   syncing: boolean
   bundled: boolean
+  version: string
   state: SyncState
 }
 
