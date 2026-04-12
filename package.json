@@ -15,7 +15,7 @@
     "clean": "turbo clean"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
+    "turbo": "^2.9.6",
     "typescript": "^5.7.3"
   },
   "pnpm": {
