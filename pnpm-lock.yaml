@@ -170,6 +170,12 @@ importers:
       effect:
         specifier: ^3.21.0
         version: 3.21.0
+      semver:
+        specifier: ^7.7.4
+        version: 7.7.4
+      tar:
+        specifier: ^7.5.13
+        version: 7.5.13
     devDependencies:
       '@effect/vitest':
         specifier: ^0.29.0
@@ -180,6 +186,9 @@ importers:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.15
+      '@types/semver':
+        specifier: ^7.7.1
+        version: 7.7.1
       vitest:
         specifier: ^3.1.2
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)
@@ -1551,6 +1560,9 @@ packages:
 
   '@types/sax@1.2.7':
     resolution: {integrity: sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==}
+
+  '@types/semver@7.7.1':
+    resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
 
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
@@ -5772,6 +5784,8 @@ snapshots:
   '@types/sax@1.2.7':
     dependencies:
       '@types/node': 22.19.15
+
+  '@types/semver@7.7.1': {}
 
   '@types/unist@2.0.11': {}
 

@@ -23,12 +23,15 @@
     "@spool/connector-sdk": "workspace:^",
     "better-sqlite3": "^11.10.0",
     "chokidar": "^4.0.3",
-    "effect": "^3.21.0"
+    "effect": "^3.21.0",
+    "semver": "^7.7.4",
+    "tar": "^7.5.13"
   },
   "devDependencies": {
     "@effect/vitest": "^0.29.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.3",
+    "@types/semver": "^7.7.1",
     "vitest": "^3.1.2"
   }
 }
