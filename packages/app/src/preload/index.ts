@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ConnectorStatus, AuthStatus, SchedulerStatus } from '@spool/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ConnectorStatus, AuthStatus, SchedulerStatus, RegistryConnector } from '@spool/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 
@@ -164,6 +164,12 @@ const api = {
       ipcRenderer.on('connector:event', handler)
       return () => ipcRenderer.removeListener('connector:event', handler)
     },
+
+    fetchRegistry: (): Promise<RegistryConnector[]> =>
+      ipcRenderer.invoke('connector:fetch-registry'),
+
+    install: (packageName: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('connector:install', { packageName }),
   },
 
   // Auto-update

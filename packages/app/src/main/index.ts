@@ -10,6 +10,7 @@ import {
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability,
   TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
+  fetchRegistry,
 } from '@spool/core'
 import type { UpdateInfo } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
@@ -169,6 +170,32 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 
 const VALID_NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
+async function installConnectorPackage(
+  packageName: string,
+): Promise<{ ok: true; name: string; version: string } | { ok: false; error: string }> {
+  try {
+    const connectorsDir = join(spoolDir, 'connectors')
+    const result = await downloadAndInstall(packageName, connectorsDir, fetch)
+
+    const isFirstParty = packageName.startsWith('@spool-lab/')
+    if (!isFirstParty && trustStore) {
+      trustStore.add(packageName)
+    }
+
+    await reloadConnectors()
+
+    mainWindow?.webContents.send('connector:event', {
+      type: 'installed',
+      name: result.name,
+      version: result.version,
+    })
+
+    return { ok: true, name: result.name, version: result.version }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 function parseSpoolUrl(url: string): { action: string; packageName: string } | null {
   const match = url.match(/^spool:\/\/connector\/install\/(.+)$/)
   if (!match) return null
@@ -251,31 +278,17 @@ async function handleSpoolUrl(url: string): Promise<void> {
 
   if (response !== 0) return
 
-  // Show progress on window title bar
   mainWindow?.setProgressBar(0.5)
 
-  try {
-    const connectorsDir = join(spoolDir, 'connectors')
-    const result = await downloadAndInstall(parsed.packageName, connectorsDir, fetch)
+  const installResult = await installConnectorPackage(parsed.packageName)
 
-    if (!isFirstParty && trustStore) {
-      trustStore.add(parsed.packageName)
-    }
+  mainWindow?.setProgressBar(-1)
 
-    await reloadConnectors()
-
-    mainWindow?.setProgressBar(-1) // clear progress
-    mainWindow?.webContents.send('connector:event', {
-      type: 'installed',
-      name: result.name,
-      version: result.version,
-    })
-  } catch (err) {
-    mainWindow?.setProgressBar(-1)
+  if (!installResult.ok) {
     dialog.showMessageBox(mainWindow!, {
       type: 'error',
       message: `Failed to install ${displayName}`,
-      detail: err instanceof Error ? err.message : String(err),
+      detail: installResult.error,
     })
   }
 }
@@ -785,4 +798,12 @@ ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorI
     "SELECT COUNT(*) as cnt FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
   ).get(connector.platform, connectorId) as { cnt: number }
   return row.cnt
+})
+
+ipcMain.handle('connector:fetch-registry', async () => {
+  return fetchRegistry({ fetchFn: (input, init) => net.fetch(input as any, init), cacheDir: spoolDir })
+})
+
+ipcMain.handle('connector:install', async (_e, { packageName }: { packageName: string }) => {
+  return installConnectorPackage(packageName)
 })
