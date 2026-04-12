@@ -10,6 +10,7 @@ import {
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability,
   TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
+  fetchRegistry,
 } from '@spool/core'
 import type { UpdateInfo } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
@@ -800,7 +801,6 @@ ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorI
 })
 
 ipcMain.handle('connector:fetch-registry', async () => {
-  const { fetchRegistry } = await import('@spool/core')
   return fetchRegistry({ fetchFn: (input, init) => net.fetch(input as any, init), cacheDir: spoolDir })
 })
 
