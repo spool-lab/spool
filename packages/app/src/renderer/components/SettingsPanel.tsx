@@ -346,8 +346,6 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         setSyncingConnector(null)
         if (event.connectorId) setSyncProgress(prev => { const next = { ...prev }; delete next[event.connectorId!]; return next })
         loadConnectors()
-      } else if (event.type === 'installed') {
-        loadConnectors()
       }
     })
     return off
