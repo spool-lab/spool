@@ -593,13 +593,13 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
             <button
               key={c.id}
               onClick={() => setSelectedId(c.id)}
-              className="w-full flex items-center gap-3 py-2.5 px-2 rounded-[6px] text-left hover:bg-warm-surface/50 dark:hover:bg-dark-surface/50 transition-colors"
+              className="w-full flex items-center gap-3 py-2.5 rounded-[6px] text-left relative before:absolute before:-inset-x-2 before:inset-y-0 before:rounded-[6px] before:transition-colors hover:before:bg-warm-surface/50 dark:hover:before:bg-dark-surface/50"
             >
               <span
                 className={`w-2 h-2 rounded-full flex-none ${isSyncing ? 'animate-pulse' : ''}`}
                 style={{ background: c.enabled ? c.color : '#888' }}
               />
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 leading-4">
                 <span className={`text-xs ${c.enabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
                   {c.label}
                 </span>
@@ -627,19 +627,19 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       </Section>
 
       {!registryLoading && !registryError && discoverConnectors.length > 0 && (
-        <Section title="Discover">
+        <Section title="Available Connectors">
           {discoverConnectors.map(rc => (
             <div
               key={rc.name}
-              className="flex items-center gap-2.5 py-2.5 px-2 rounded-[6px] border border-dashed border-warm-border dark:border-dark-border"
+              className="flex items-center gap-3 py-2.5"
             >
               <span
                 className="w-2 h-2 rounded-full flex-none opacity-50"
                 style={{ background: rc.color }}
               />
-              <div className="flex-1 min-w-0">
-                <span className="text-[11px] font-medium text-warm-muted dark:text-dark-muted">{rc.label}</span>
-                <span className="text-[10px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
+              <div className="flex-1 min-w-0 leading-4">
+                <span className="text-xs text-warm-muted dark:text-dark-muted">{rc.label}</span>
+                <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
                 {installErrors[rc.name] && installingPackage !== rc.name && (
                   <div className="text-[10px] text-red-400 mt-0.5">{installErrors[rc.name]}</div>
                 )}
