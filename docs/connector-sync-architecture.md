@@ -346,6 +346,7 @@ A connector package is identified by a `spool` manifest field in its `package.js
   "name": "@spool-lab/connector-twitter-bookmarks",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "keywords": ["spool-connector"],
   "spool": {
     "type": "connector",
     "id": "twitter-bookmarks",
@@ -361,6 +362,7 @@ A connector package is identified by a `spool` manifest field in its `package.js
 - `spool.type` must be `"connector"` (reserved for future non-connector Spool plugin types)
 - `id` / `platform` / `label` / `description` / `color` / `ephemeral` must match the corresponding fields on the `Connector` interface implementation exported from the package
 - `@spool-lab/` is the scope reserved for first-party packages; any other scope (or unscoped name) is a community package
+- `keywords` must include `"spool-connector"` — this is how spool.pro discovers the package on npm (see "Discovery on spool.pro" below). The keyword is discovery metadata only; the authoritative identification at runtime is still the `spool.type` manifest field
 
 The manifest lets the app read connector metadata (for the directory page, install UI, etc.) without loading the module — and lets the app decide whether to trust the package before running any of its code.
 
@@ -404,6 +406,51 @@ Any capability a connector uses must be declared in the `spool.capabilities` arr
 The consent dialog shown to users on first load lists these capabilities in plain language ("This connector will make network requests and read your Chrome cookies"). A connector that tries to use an undeclared capability at runtime is terminated with a `CONNECTOR_ERROR` and surfaced to the user.
 
 The exact capability set (names, signatures, consent strings) is frozen as part of the SDK v1 release. Until then this section is a design target, not a contract.
+
+### Discovery on spool.pro
+
+spool.pro is **not an independent registry**. It is a discovery and curation front-end over npm — similar in shape to how the VS Code Marketplace front-ends npm packages, or how Homebrew Cask front-ends upstream releases. Every package shown on spool.pro must exist on the public npm registry; every install button ultimately runs `npm install <package>` locally in the user's app.
+
+**Discovery mechanism: npm `spool-connector` keyword.** Connector authors add `"spool-connector"` to the `keywords` array in their `package.json`. spool.pro's backend periodically queries the npm registry:
+
+```
+GET https://registry.npmjs.org/-/v1/search?text=keywords:spool-connector&size=250
+```
+
+For each candidate returned, spool.pro fetches the package's `package.json`, cross-validates that `spool.type === 'connector'`, and indexes the `spool.*` manifest fields (label, description, color, capabilities) plus npm metadata (version, author, download count, last-published date).
+
+The keyword is **discovery metadata only**. It is not load-bearing for runtime identification — the Spool app's loader identifies connectors by the `spool.type` manifest field, not by keyword. A package with the keyword but without `spool.type === 'connector'` is rejected by the loader even if it made it into spool.pro's index. A package with `spool.type === 'connector'` but without the keyword will work fine at runtime if a user manually installs it; it just won't be discoverable through spool.pro.
+
+**Trust tiers on spool.pro cards:**
+
+| Badge | Criteria | Install UX |
+|---|---|---|
+| **Official** | Package name is under `@spool-lab/*` scope | Auto-loaded by the Spool app without consent |
+| **Community** | Any other package with the `spool-connector` keyword and valid `spool.type` manifest | Requires user consent on first load |
+
+Every card shows:
+- Package name, version, author (from npm metadata)
+- Label, description, color (from `spool.*` manifest)
+- Declared capabilities, translated to plain language ("Makes network requests · Reads Chrome cookies")
+- Download count, last-published date
+- Trust badge
+- **"Install in Spool" button** → generates a `spool://install/<package-name>` deep link (see "Deep-link install flow" below)
+
+**What spool.pro's MVP does NOT do:**
+
+- No editorial curation beyond the `@spool-lab/*` scope auto-tag. Any community package with the keyword shows up immediately in the directory, ranked by download count.
+- No submission form. Authors publish to npm the normal way.
+- No automated testing or sandboxing of candidate packages.
+- No takedown mechanism beyond npm's own registry moderation. If a malicious package slips through, spool.pro relies on npm removing it (unpublishing is still a global action on the registry).
+
+**Future curation layer (not Stage E MVP, explicitly deferred):**
+
+- `featured.json` maintained in a public GitHub repo (e.g. `spool-lab/connector-directory`), listing hand-picked community connectors
+- "Featured" badge for packages in that file
+- "Verified" badge for packages that have passed some stability threshold (download count, months since first publish, no unresolved issues) — criteria to be defined
+- Re-ranking logic that pushes Featured and Verified above raw community packages
+
+The MVP ships with only Official vs Community. The curation layer is a second iteration once there are enough community packages to make curation worthwhile.
 
 ### Installation & Discovery
 
@@ -663,24 +710,46 @@ packages/core/src/connectors/    # Framework — NOT any individual connector
 ├── sync-scheduler.ts            # SyncScheduler (timing, orchestration)
 └── loader.ts                    # Plugin discovery & dynamic loading
 
-packages/connector-twitter-bookmarks/   # First-party connector, workspace package
-├── package.json                # with `spool.type: 'connector'` manifest
-├── src/
-│   ├── index.ts                # TwitterBookmarksConnector (default export)
-│   ├── chrome-cookies.ts       # uses injected cookies capability
-│   └── graphql-fetch.ts        # uses injected fetch capability
-└── dist/                       # built output, packaged as npm tarball and
-                                # shipped inside the app's resource directory
-                                # for first-run extraction
+packages/connectors/             # First-party plugin workspace container
+├── twitter-bookmarks/           # → @spool-lab/connector-twitter-bookmarks on npm
+│   ├── package.json             # with `spool.type: 'connector'` + keywords
+│   ├── src/
+│   │   ├── index.ts             # TwitterBookmarksConnector (default export)
+│   │   ├── chrome-cookies.ts    # uses injected cookies:chrome capability
+│   │   └── graphql-fetch.ts     # uses injected fetch capability
+│   └── dist/                    # built output, packed as tarball for first-run
+├── typeless/                    # → @spool-lab/connector-typeless on npm
+│   ├── package.json
+│   └── src/
+│       ├── index.ts             # TypelessConnector (default export)
+│       └── db-reader.ts         # reads ~/Library/.../typeless.db
+└── hackernews/                  # → @spool-lab/connector-hackernews on npm
+    └── ...                       # future; follows the same shape
 
-~/.spool/connectors/            # User-visible connector install directory
+~/.spool/connectors/             # User-visible connector install directory
 ├── package.json
 └── node_modules/
-    ├── @spool-lab/connector-*/ # First-party (bundled with app, auto-trusted)
-    └── <any-other-name>/       # Community (trusted after user consent)
+    ├── @spool-lab/connector-*/  # First-party (bundled with app, auto-trusted)
+    └── <any-other-name>/        # Community (trusted after user consent)
 ```
 
-The framework code lives in `packages/core/src/connectors/`. **No connector implementation lives there** — even the first-party Twitter Bookmarks connector has its own workspace package (`packages/connector-twitter-bookmarks/`), is built into an npm tarball, and is loaded through the same dynamic-import path as community connectors. This keeps the SDK honest: if the framework ever needs a feature to support Twitter, that feature has to be exposed on the SDK surface, not hidden in the core package.
+The framework code lives in `packages/core/src/connectors/`. **No connector implementation lives there** — every first-party connector (Twitter Bookmarks, Typeless, Hacker News, …) has its own workspace package under `packages/connectors/`, is built into an npm tarball, and is loaded through the same dynamic-import path as community connectors. This keeps the SDK honest: if the framework ever needs a feature to support one of these, that feature has to be exposed on the SDK surface, not hidden in the core package.
+
+**Workspace layout.** `pnpm-workspace.yaml` declares both levels so pnpm treats every directory under `packages/connectors/` as an independent workspace package:
+
+```yaml
+packages:
+  - 'packages/*'
+  - 'packages/connectors/*'
+```
+
+**Naming convention for first-party plugins:**
+- Directory: `packages/connectors/<slug>/`
+- npm package: `@spool-lab/connector-<slug>`
+- `spool.id`: `<slug>` (may include a sub-scope like `twitter-bookmarks`)
+- `spool.platform`: the underlying platform, not the connector (e.g. `twitter` for `twitter-bookmarks`)
+
+Community plugins do **not** live in this monorepo. They live in their own repositories and publish to npm independently using any package name their authors choose. The `packages/connectors/` directory is reserved for first-party plugins that the Spool team maintains and ships with the app as first-run bundles.
 
 ---
 
@@ -730,7 +799,33 @@ export default class MyConnector implements Connector {
 }
 ```
 
-Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) with the `spool` manifest in `package.json`, publish to npm, and users can install it from the app's Settings → Install Connector field or from the spool.pro directory.
+Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) with the `spool` manifest in `package.json`, publish to npm, and users can install it from the app's Settings → Install Connector field or from the spool.pro directory. The minimum `package.json` shape is:
+
+```json
+{
+  "name": "@your-scope/connector-my-platform-bookmarks",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "keywords": ["spool-connector"],
+  "peerDependencies": {
+    "@spool/connector-sdk": "^1.0.0"
+  },
+  "spool": {
+    "type": "connector",
+    "id": "my-platform-bookmarks",
+    "platform": "my-platform",
+    "label": "My Platform Bookmarks",
+    "description": "Your saved items on My Platform",
+    "color": "#FF6600",
+    "ephemeral": false,
+    "capabilities": ["fetch", "storage", "log"]
+  }
+}
+```
+
+- `keywords: ["spool-connector"]` is how spool.pro's backend discovers your package on npm
+- `spool.type: "connector"` is how the Spool app's loader identifies your package at runtime
+- `spool.capabilities` declares which SDK-injected capabilities your connector needs — this list is shown to users in the first-load consent dialog
 
 ### Local source connectors
 
