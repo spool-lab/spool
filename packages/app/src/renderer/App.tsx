@@ -64,6 +64,7 @@ export default function App() {
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
+  const [connectorToast, setConnectorToast] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
   const deferredResults = useDeferredValue(results)
@@ -127,6 +128,18 @@ export default function App() {
       if (toastTimer.current) clearTimeout(toastTimer.current)
       if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
     }
+  }, [])
+
+  // Listen for connector install events
+  useEffect(() => {
+    if (!window.spool?.connectors?.onEvent) return () => {}
+    return window.spool.connectors.onEvent((event) => {
+      if (event.type === 'installed' && event.name) {
+        setConnectorToast(`${event.name} v${event.version} installed`)
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setConnectorToast(null), 4000)
+      }
+    })
   }, [])
 
   // Listen for AI streaming chunks and tool calls
@@ -439,6 +452,16 @@ export default function App() {
 
       {resumeToastCommand && (
         <ResumeToast command={resumeToastCommand} />
+      )}
+
+      {connectorToast && (
+        <div className="pointer-events-none absolute bottom-10 left-1/2 z-40 -translate-x-1/2 animate-in fade-in duration-150 px-4">
+          <div className="rounded-full border border-warm-border dark:border-dark-border bg-warm-surface2/95 dark:bg-dark-surface2/95 px-4 py-2 shadow-lg backdrop-blur-sm">
+            <p className="whitespace-nowrap text-xs text-warm-text dark:text-dark-text">
+              &#10003; {connectorToast}
+            </p>
+          </div>
+        </div>
       )}
 
       {showSettings && (

@@ -279,16 +279,10 @@ async function handleSpoolUrl(url: string): Promise<void> {
     })
 
     mainWindow?.setProgressBar(-1) // clear progress
-    mainWindow?.webContents.send('connector:installed', {
+    mainWindow?.webContents.send('connector:event', {
+      type: 'installed',
       name: result.name,
       version: result.version,
-    })
-
-    // Non-blocking success dialog (not awaited)
-    dialog.showMessageBox(mainWindow!, {
-      type: 'info',
-      message: `${displayName} installed`,
-      detail: `v${result.version} is ready to use.`,
     })
   } catch (err) {
     mainWindow?.setProgressBar(-1)
