@@ -1,0 +1,37 @@
+{
+  "name": "@spool-lab/connector-typeless",
+  "version": "0.1.0",
+  "description": "Your voice transcripts from Typeless for Spool",
+  "keywords": ["spool-connector", "typeless", "voice"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "prepack": "pnpm run build",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@spool/connector-sdk": "workspace:^"
+  },
+  "devDependencies": {
+    "@spool/connector-sdk": "workspace:^",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.3",
+    "better-sqlite3": "^11.9.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
+  },
+  "spool": {
+    "type": "connector",
+    "id": "typeless",
+    "platform": "typeless",
+    "label": "Typeless Voice",
+    "description": "Your voice transcripts from Typeless",
+    "color": "#1D1A1A",
+    "ephemeral": false,
+    "capabilities": ["sqlite", "log"]
+  }
+}

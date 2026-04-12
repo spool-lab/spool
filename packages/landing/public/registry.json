@@ -25,6 +25,18 @@
       "category": "news",
       "firstParty": true,
       "npm": "https://www.npmjs.com/package/@spool-lab/connector-hackernews-hot"
+    },
+    {
+      "name": "@spool-lab/connector-typeless",
+      "id": "typeless",
+      "platform": "typeless",
+      "label": "Typeless Voice",
+      "description": "Your voice transcripts from Typeless",
+      "color": "#1D1A1A",
+      "author": "spool-lab",
+      "category": "productivity",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-typeless"
     }
   ]
 }

@@ -14,6 +14,10 @@ export type {
   CookieQuery,
   LogCapability,
   LogFields,
+  SqliteCapability,
+  SqliteDatabase,
+  SqliteStatement,
+  SqliteBindValue,
   ConnectorCapabilities,
   KnownCapabilityV1,
 } from './capabilities.js'
