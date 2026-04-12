@@ -43,6 +43,21 @@ function bridgeAbortSignal(
   ).pipe(Effect.asVoid)
 }
 
+function cancelDeferredToSignal(
+  cancel: Deferred.Deferred<void>,
+): Effect.Effect<AbortSignal> {
+  return Effect.sync(() => {
+    const controller = new AbortController()
+    Effect.runFork(
+      Effect.gen(function* () {
+        yield* Deferred.await(cancel)
+        controller.abort()
+      }),
+    )
+    return controller.signal
+  })
+}
+
 /**
  * Sleep `ms` milliseconds but wake immediately if the cancel signal fires.
  * The loop top still polls the cancel signal for a graceful
@@ -347,6 +362,7 @@ export class SyncEngine {
     startCursor: string | null,
     startedAt: number,
     cancel: CancelSignal,
+    signal: AbortSignal,
   ): Effect.Effect<FetchLoopResult> {
     const db = this.db
     const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
@@ -384,7 +400,7 @@ export class SyncEngine {
           return { added, pages, stopReason: 'cancelled' }
         }
 
-        const fetchCtx: FetchContext = { cursor, sinceItemId, phase: opts.phase }
+        const fetchCtx: FetchContext = { cursor, sinceItemId, phase: opts.phase, signal }
         const outcome = yield* Effect.either(
           Effect.tryPromise({
             try: () => connector.fetchPage(fetchCtx),
@@ -545,6 +561,7 @@ export class SyncEngine {
     const self = this
 
     return Effect.gen(function* () {
+      const signal = yield* cancelDeferredToSignal(cancel)
       let totalAdded = 0
       let totalPages = 0
       let stopReason = 'complete'
@@ -561,6 +578,7 @@ export class SyncEngine {
             state.headCursor ?? null,
             startedAt,
             cancel,
+            signal,
           )
           .pipe(Effect.withSpan('sync.forward'))
 
@@ -594,6 +612,7 @@ export class SyncEngine {
             state.tailCursor,
             startedAt,
             cancel,
+            signal,
           )
           .pipe(Effect.withSpan('sync.backfill'))
 
@@ -652,6 +671,7 @@ export class SyncEngine {
     const deadline = maxMinutes > 0 ? startedAt + maxMinutes * 60_000 : Number.POSITIVE_INFINITY
 
     return Effect.gen(function* () {
+      const signal = yield* cancelDeferredToSignal(cancel)
       yield* Effect.sync(() =>
         db.transaction(() => deleteConnectorItems(db, connector.id))(),
       )
@@ -674,7 +694,7 @@ export class SyncEngine {
 
         const outcome = yield* Effect.either(
           Effect.tryPromise({
-            try: () => connector.fetchPage({ cursor, sinceItemId: null, phase: 'forward' }),
+            try: () => connector.fetchPage({ cursor, sinceItemId: null, phase: 'forward', signal }),
             catch: SyncError.from,
           }).pipe(
             Effect.withSpan('sync.fetchPage', {
