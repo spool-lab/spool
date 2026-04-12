@@ -18,7 +18,7 @@ import {
   SyncErrorCode as SdkSyncErrorCode,
 } from '@spool/connector-sdk'
 
-export interface ChromeCookieResult {
+interface ChromeCookieResult {
   csrfToken: string
   cookieHeader: string
 }
@@ -174,7 +174,7 @@ function queryCookies(
 }
 
 /** Detect the default Chrome user-data directory for the current OS. */
-export function detectChromeUserDataDir(): string {
+function detectChromeUserDataDir(): string {
   const os = platform()
   const home = homedir()
   if (os === 'darwin') return join(home, 'Library', 'Application Support', 'Google', 'Chrome')
@@ -186,7 +186,7 @@ export function detectChromeUserDataDir(): string {
   )
 }
 
-export function extractChromeXCookies(
+function extractChromeXCookies(
   chromeUserDataDir?: string,
   profileDirectory = 'Default',
 ): ChromeCookieResult {

@@ -14,7 +14,6 @@ export { ConnectorRegistry } from './connectors/registry.js'
 export { SyncEngine, loadSyncState, saveSyncState } from './connectors/sync-engine.js'
 export { SyncScheduler } from './connectors/sync-scheduler.js'
 export type { SchedulerEvent, SchedulerEventHandler } from './connectors/sync-scheduler.js'
-export { TwitterBookmarksConnector } from './connectors/twitter-bookmarks/index.js'
 export {
   SyncError,
   SyncErrorCode,
