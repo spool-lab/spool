@@ -25,11 +25,21 @@ export type {
 } from '@spool/connector-sdk'
 
 // ── Internal Effect-tagged SyncError ──────────────────────────────────────
+const RETRYABLE_CODES = new Set<SyncErrorCode>([
+  SyncErrorCode.API_RATE_LIMITED,
+  SyncErrorCode.API_SERVER_ERROR,
+  SyncErrorCode.NETWORK_OFFLINE,
+  SyncErrorCode.NETWORK_TIMEOUT,
+  SyncErrorCode.SYNC_MAX_PAGES,
+  SyncErrorCode.SYNC_TIMEOUT,
+  SyncErrorCode.SYNC_CANCELLED,
+])
+
 /**
  * Internal Effect-tagged version of SyncError used inside @spool/core for
  * Effect's typed error channel. External callers (connectors) use the plain
  * class exported from @spool/connector-sdk. Translation between the two
- * happens in SyncError.from() and SyncError.toCauseSafe().
+ * happens in SyncError.from().
  */
 export class SyncError extends Data.TaggedError('SyncError')<{
   readonly code: SyncErrorCode
@@ -62,16 +72,6 @@ export class SyncError extends Data.TaggedError('SyncError')<{
     return RETRYABLE_CODES.has(this.code)
   }
 }
-
-const RETRYABLE_CODES = new Set<SyncErrorCode>([
-  SyncErrorCode.API_RATE_LIMITED,
-  SyncErrorCode.API_SERVER_ERROR,
-  SyncErrorCode.NETWORK_OFFLINE,
-  SyncErrorCode.NETWORK_TIMEOUT,
-  SyncErrorCode.SYNC_MAX_PAGES,
-  SyncErrorCode.SYNC_TIMEOUT,
-  SyncErrorCode.SYNC_CANCELLED,
-])
 
 // ── SyncOptions / SyncProgress / ConnectorSyncResult ──────────────────────
 // Remain in @spool/core (not exposed via SDK because they reference Deferred).

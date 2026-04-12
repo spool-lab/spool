@@ -111,19 +111,7 @@ export interface CaptureResult {
   capturedAt: string
 }
 
-export interface CapturedItem {
-  url: string
-  title: string
-  contentText: string
-  author: string | null
-  platform: string
-  platformId: string | null
-  contentType: string
-  thumbnailUrl: string | null
-  metadata: Record<string, unknown>
-  capturedAt: string
-  rawJson: string | null
-}
+export type { CapturedItem } from './connectors/types.js'
 
 export type SearchResult =
   | (FragmentResult & { kind: 'fragment' })

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, CapturedItem, SearchResult, Source, SearchMatchType, SessionSource } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, SearchResult, Source, SearchMatchType, SessionSource } from '../types.js'
+import type { CapturedItem } from '../connectors/types.js'
 import { DB_PATH, getDBSize } from './db.js'
 import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 

@@ -10,7 +10,7 @@ import type {
   SyncProgress,
 } from './types.js'
 import { SyncError, SyncErrorCode, DEFAULT_SCHEDULE } from './types.js'
-import type { CapturedItem } from '../types.js'
+import type { CapturedItem } from './types.js'
 
 /**
  * The internal "please stop" signal. Resolved once → the loop returns

@@ -6,7 +6,7 @@
  */
 
 import { SyncError, SyncErrorCode } from '../types.js'
-import type { CapturedItem } from '../../types.js'
+import type { CapturedItem } from '../types.js'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
