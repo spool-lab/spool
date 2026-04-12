@@ -8,11 +8,12 @@
     "rebuild:native": "pnpm run rebuild:native:electron",
     "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
     "build:core": "pnpm --filter @spool/core build",
+    "prebuild:connectors": "bash ../../scripts/build-bundled-connectors.sh",
     "dev": "pnpm run build:core && pnpm run rebuild:native && electron-vite dev",
-    "build": "pnpm run build:core && electron-vite build && electron-builder --publish never",
-    "build:mac": "pnpm run build:core && electron-vite build && electron-builder --mac --arm64",
-    "build:linux": "pnpm run build:core && electron-vite build && electron-builder --linux",
-    "build:electron": "pnpm run build:core && electron-vite build",
+    "build": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --publish never",
+    "build:mac": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --mac --arm64",
+    "build:linux": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --linux",
+    "build:electron": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
     "test:e2e": "pnpm run build:core && pnpm run rebuild:native:electron && npx playwright test --config e2e/playwright.config.ts"
@@ -43,6 +44,13 @@
         "provider": "github",
         "owner": "spool-lab",
         "repo": "spool"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "dist/bundled-connectors",
+        "to": "bundled-connectors",
+        "filter": ["*.tgz"]
       }
     ],
     "asarUnpack": [
