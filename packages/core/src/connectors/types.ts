@@ -74,7 +74,6 @@ export class SyncError extends Data.TaggedError('SyncError')<{
 }
 
 // ── SyncOptions / SyncProgress / ConnectorSyncResult ──────────────────────
-// Remain in @spool/core (not exposed via SDK because they reference Deferred).
 
 export interface SyncOptions {
   /** Which direction to sync. Default: 'both'. */

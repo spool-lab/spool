@@ -11,17 +11,8 @@ import { existsSync, unlinkSync, copyFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir, platform, homedir } from 'node:os'
 import { pbkdf2Sync, createDecipheriv, randomUUID } from 'node:crypto'
-import { SyncError, SyncErrorCode } from '../types.js'
 import type { CookiesCapability, Cookie, CookieQuery } from '@spool/connector-sdk'
-import {
-  SyncError as SdkSyncError,
-  SyncErrorCode as SdkSyncErrorCode,
-} from '@spool/connector-sdk'
-
-interface ChromeCookieResult {
-  csrfToken: string
-  cookieHeader: string
-}
+import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
 
 function getMacOSChromeKey(): Buffer {
   const candidates = [
@@ -55,23 +46,6 @@ function getMacOSChromeKey(): Buffer {
   )
 }
 
-function sanitizeCookieValue(name: string, value: string): string {
-  const cleaned = value.replace(/\0+$/g, '').trim()
-  if (!cleaned) {
-    throw new SyncError(
-      SyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
-      `Cookie ${name} was empty after decryption. Try closing Chrome completely and retrying.`,
-    )
-  }
-  if (!/^[\x21-\x7E]+$/.test(cleaned)) {
-    throw new SyncError(
-      SyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
-      `Could not decrypt the ${name} cookie. Try closing Chrome or using a different profile.`,
-    )
-  }
-  return cleaned
-}
-
 export function decryptCookieValue(encryptedValue: Buffer, key: Buffer, dbVersion = 0): string {
   if (encryptedValue.length === 0) return ''
 
@@ -93,87 +67,6 @@ export function decryptCookieValue(encryptedValue: Buffer, key: Buffer, dbVersio
   return encryptedValue.toString('utf8')
 }
 
-interface RawCookie {
-  name: string
-  host_key: string
-  encrypted_value_hex: string
-  value: string
-}
-
-function queryDbVersion(dbPath: string): number {
-  const tryQuery = (p: string) =>
-    execFileSync('sqlite3', [p, "SELECT value FROM meta WHERE key='version';"], {
-      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000,
-    }).trim()
-
-  try {
-    return parseInt(tryQuery(dbPath), 10) || 0
-  } catch {
-    const tmpDb = join(tmpdir(), `spool-meta-${randomUUID()}.db`)
-    try {
-      copyFileSync(dbPath, tmpDb)
-      return parseInt(tryQuery(tmpDb), 10) || 0
-    } catch {
-      return 0
-    } finally {
-      try { unlinkSync(tmpDb) } catch {}
-    }
-  }
-}
-
-function queryCookies(
-  dbPath: string,
-  domain: string,
-  names: string[],
-): { cookies: RawCookie[]; dbVersion: number } {
-  if (!existsSync(dbPath)) {
-    throw new SyncError(
-      SyncErrorCode.AUTH_CHROME_NOT_FOUND,
-      `Chrome Cookies database not found at: ${dbPath}`,
-    )
-  }
-
-  const safeDomain = domain.replace(/'/g, "''")
-  const nameList = names.map(n => `'${n.replace(/'/g, "''")}'`).join(',')
-  const sql = `SELECT name, host_key, hex(encrypted_value) as encrypted_value_hex, value FROM cookies WHERE host_key LIKE '%${safeDomain}' AND name IN (${nameList});`
-
-  const tryQuery = (path: string): string =>
-    execFileSync('sqlite3', ['-json', path, sql], {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 10000,
-    }).trim()
-
-  let output: string
-  try {
-    output = tryQuery(dbPath)
-  } catch {
-    const tmpDb = join(tmpdir(), `spool-cookies-${randomUUID()}.db`)
-    try {
-      copyFileSync(dbPath, tmpDb)
-      output = tryQuery(tmpDb)
-    } catch (e2: unknown) {
-      throw new SyncError(
-        SyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
-        `Could not read Chrome Cookies database at ${dbPath}. ${e2 instanceof Error ? e2.message : ''}`,
-        e2,
-      )
-    } finally {
-      try { unlinkSync(tmpDb) } catch {}
-    }
-  }
-
-  const dbVersion = queryDbVersion(dbPath)
-
-  if (!output || output === '[]') return { cookies: [], dbVersion }
-  try {
-    return { cookies: JSON.parse(output), dbVersion }
-  } catch {
-    return { cookies: [], dbVersion }
-  }
-}
-
-/** Detect the default Chrome user-data directory for the current OS. */
 function detectChromeUserDataDir(): string {
   const os = platform()
   const home = homedir()
@@ -186,53 +79,35 @@ function detectChromeUserDataDir(): string {
   )
 }
 
-function extractChromeXCookies(
-  chromeUserDataDir?: string,
-  profileDirectory = 'Default',
-): ChromeCookieResult {
-  const os = platform()
-  if (os !== 'darwin') {
-    throw new SyncError(
-      SyncErrorCode.AUTH_CHROME_NOT_FOUND,
-      `Direct cookie extraction is currently supported on macOS only (detected: ${os}).`,
-    )
-  }
+/**
+ * Run a sqlite3 query with fallback to a temp copy (Chrome locks the DB while running).
+ * Returns raw stdout string.
+ */
+function runSqliteQuery(dbPath: string, sql: string): string {
+  const tryQuery = (path: string): string =>
+    execFileSync('sqlite3', ['-json', path, sql], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 10000,
+    }).trim()
 
-  const dataDir = chromeUserDataDir ?? detectChromeUserDataDir()
-  const dbPath = join(dataDir, profileDirectory, 'Cookies')
-  const key = getMacOSChromeKey()
-
-  let result = queryCookies(dbPath, '.x.com', ['ct0', 'auth_token'])
-  if (result.cookies.length === 0) {
-    result = queryCookies(dbPath, '.twitter.com', ['ct0', 'auth_token'])
-  }
-
-  const decrypted = new Map<string, string>()
-  for (const cookie of result.cookies) {
-    const hexVal = cookie.encrypted_value_hex
-    if (hexVal && hexVal.length > 0) {
-      const buf = Buffer.from(hexVal, 'hex')
-      decrypted.set(cookie.name, decryptCookieValue(buf, key, result.dbVersion))
-    } else if (cookie.value) {
-      decrypted.set(cookie.name, cookie.value)
+  try {
+    return tryQuery(dbPath)
+  } catch {
+    const tmpDb = join(tmpdir(), `spool-cookies-${randomUUID()}.db`)
+    try {
+      copyFileSync(dbPath, tmpDb)
+      return tryQuery(tmpDb)
+    } catch (e2: unknown) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
+        `Could not read Chrome Cookies database at ${dbPath}. ${e2 instanceof Error ? e2.message : ''}`,
+        e2,
+      )
+    } finally {
+      try { unlinkSync(tmpDb) } catch {}
     }
   }
-
-  const ct0 = decrypted.get('ct0')
-  const authToken = decrypted.get('auth_token')
-
-  if (!ct0) {
-    throw new SyncError(
-      SyncErrorCode.AUTH_NOT_LOGGED_IN,
-      `No ct0 CSRF cookie found for x.com in Chrome (profile: "${profileDirectory}"). Log into X in Chrome and retry.`,
-    )
-  }
-
-  const cookieParts = [`ct0=${sanitizeCookieValue('ct0', ct0)}`]
-  if (authToken) cookieParts.push(`auth_token=${sanitizeCookieValue('auth_token', authToken)}`)
-  const cookieHeader = cookieParts.join('; ')
-
-  return { csrfToken: sanitizeCookieValue('ct0', ct0), cookieHeader }
 }
 
 // ── CookiesCapability wrapper ──────────────────────────────────────────────
@@ -253,48 +128,25 @@ function queryAllCookiesForDomain(
   domain: string,
 ): { cookies: RawCookieFull[]; dbVersion: number } {
   if (!existsSync(dbPath)) {
-    throw new SdkSyncError(
-      SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+    throw new SyncError(
+      SyncErrorCode.AUTH_CHROME_NOT_FOUND,
       `Chrome Cookies database not found at: ${dbPath}`,
     )
   }
 
   const safeDomain = domain.replace(/'/g, "''")
-  const sql = `SELECT name, host_key, path, hex(encrypted_value) as encrypted_value_hex, value, expires_utc, is_secure, is_httponly FROM cookies WHERE host_key LIKE '%${safeDomain}';`
+  // Fetch cookies and DB version in one sqlite3 invocation to avoid double process spawn
+  const sql = `SELECT name, host_key, path, hex(encrypted_value) as encrypted_value_hex, value, expires_utc, is_secure, is_httponly, (SELECT value FROM meta WHERE key='version') as db_version FROM cookies WHERE host_key LIKE '%${safeDomain}';`
 
-  const tryQuery = (path: string): string =>
-    execFileSync('sqlite3', ['-json', path, sql], {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 10000,
-    }).trim()
+  const output = runSqliteQuery(dbPath, sql)
 
-  let output: string
+  if (!output || output === '[]') return { cookies: [], dbVersion: 0 }
   try {
-    output = tryQuery(dbPath)
+    const rows: Array<RawCookieFull & { db_version?: string }> = JSON.parse(output)
+    const dbVersion = rows.length > 0 ? parseInt(rows[0]?.db_version ?? '0', 10) || 0 : 0
+    return { cookies: rows, dbVersion }
   } catch {
-    const tmpDb = join(tmpdir(), `spool-cookies-${randomUUID()}.db`)
-    try {
-      copyFileSync(dbPath, tmpDb)
-      output = tryQuery(tmpDb)
-    } catch (e2: unknown) {
-      throw new SdkSyncError(
-        SdkSyncErrorCode.AUTH_COOKIE_DECRYPT_FAILED,
-        `Could not read Chrome Cookies database at ${dbPath}. ${e2 instanceof Error ? e2.message : ''}`,
-        e2,
-      )
-    } finally {
-      try { unlinkSync(tmpDb) } catch {}
-    }
-  }
-
-  const dbVersion = queryDbVersion(dbPath)
-
-  if (!output || output === '[]') return { cookies: [], dbVersion }
-  try {
-    return { cookies: JSON.parse(output), dbVersion }
-  } catch {
-    return { cookies: [], dbVersion }
+    return { cookies: [], dbVersion: 0 }
   }
 }
 
@@ -318,16 +170,16 @@ export function makeChromeCookiesCapability(): CookiesCapability {
   return {
     async get(query: CookieQuery): Promise<Cookie[]> {
       if (query.browser !== 'chrome') {
-        throw new SdkSyncError(
-          SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+        throw new SyncError(
+          SyncErrorCode.AUTH_CHROME_NOT_FOUND,
           `Unsupported browser: ${query.browser}. Only 'chrome' is supported.`,
         )
       }
 
       const os = platform()
       if (os !== 'darwin') {
-        throw new SdkSyncError(
-          SdkSyncErrorCode.AUTH_CHROME_NOT_FOUND,
+        throw new SyncError(
+          SyncErrorCode.AUTH_CHROME_NOT_FOUND,
           `Direct cookie extraction is currently supported on macOS only (detected: ${os}).`,
         )
       }
