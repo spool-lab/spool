@@ -16,7 +16,6 @@ OUT_DIR="$REPO_ROOT/packages/app/dist/bundled-connectors"
 
 FIRST_PARTY_PLUGINS=(
   "@spool-lab/connector-twitter-bookmarks"
-  "@spool-lab/connector-hackernews-hot"
 )
 
 echo "==> Preparing $OUT_DIR"
