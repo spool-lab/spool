@@ -45,4 +45,5 @@ export {
   makeFetchCapability,
   makeChromeCookiesCapability,
   makeLogCapabilityFor,
+  makeSqliteCapability,
 } from './connectors/capabilities/index.js'

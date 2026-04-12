@@ -7,7 +7,7 @@ import {
   searchFragments, searchAll, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
-  loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor,
+  loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability,
   TrustStore, downloadAndInstall, resolveNpmPackage,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
@@ -267,6 +267,7 @@ async function handleSpoolUrl(url: string): Promise<void> {
       capabilityImpls: {
         fetch: makeFetchCapability(proxyFetch),
         cookies: makeChromeCookiesCapability(),
+        sqlite: makeSqliteCapability(),
         logFor: (id: string) => makeLogCapabilityFor(id),
       },
       registry: connectorRegistry,
@@ -380,6 +381,7 @@ app.whenReady().then(async () => {
     capabilityImpls: {
       fetch: makeFetchCapability(proxyFetch),
       cookies: makeChromeCookiesCapability(),
+      sqlite: makeSqliteCapability(),
       logFor: (connectorId: string) => makeLogCapabilityFor(connectorId),
     },
     registry: connectorRegistry,

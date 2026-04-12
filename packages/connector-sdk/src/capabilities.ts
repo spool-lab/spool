@@ -62,17 +62,59 @@ export interface LogCapability {
 
 export type LogFields = Record<string, string | number | boolean | null>
 
+// ── SQLite ──────────────────────────────────────────────────────────────────
+
+/** Values accepted as bind parameters in SQLite queries. */
+export type SqliteBindValue = string | number | bigint | Buffer | null
+
+/**
+ * A prepared statement bound to a specific SQL query.
+ * Generic parameter `T` is the expected row shape — declared at the
+ * `prepare<T>()` call site, same pattern as `better-sqlite3`.
+ */
+export interface SqliteStatement<T = unknown> {
+  /** Execute the query and return all matching rows. */
+  all(...params: SqliteBindValue[]): T[]
+  /** Execute the query and return the first matching row, or undefined. */
+  get(...params: SqliteBindValue[]): T | undefined
+}
+
+/**
+ * A readonly handle to a SQLite database file.
+ * Connectors receive this from `caps.sqlite.openReadonly()`.
+ */
+export interface SqliteDatabase {
+  /** Prepare a SQL statement. `T` is the expected row type. */
+  prepare<T = unknown>(sql: string): SqliteStatement<T>
+  /** Close the database connection. Must be called when done. */
+  close(): void
+}
+
+/**
+ * Capability for reading local SQLite database files.
+ * The app injects a `better-sqlite3`-backed implementation; connectors
+ * see only these interfaces and carry no native dependency.
+ */
+export interface SqliteCapability {
+  /**
+   * Open a database file in readonly mode.
+   * Throws if the file does not exist or is not a valid SQLite database.
+   */
+  openReadonly(path: string): SqliteDatabase
+}
+
 // ── Bundle ──────────────────────────────────────────────────────────────────
 
 /**
  * The full set of capabilities passed to a connector's constructor.
- * v1.0: 3 capabilities. Future versions may add more via additive, non-breaking
+ * v1.0: 4 capabilities. Future versions may add more via additive, non-breaking
  * extension — connectors only receive what they declared in spool.capabilities.
  */
 export interface ConnectorCapabilities {
   fetch: FetchCapability
   cookies: CookiesCapability
   log: LogCapability
+  sqlite: SqliteCapability
 }
 
 // ── Manifest allowed values ────────────────────────────────────────────────
@@ -86,6 +128,7 @@ export const KNOWN_CAPABILITIES_V1 = [
   'fetch',
   'cookies:chrome',
   'log',
+  'sqlite',
 ] as const
 
 export type KnownCapabilityV1 = typeof KNOWN_CAPABILITIES_V1[number]

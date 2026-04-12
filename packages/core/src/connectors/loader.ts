@@ -7,6 +7,7 @@ import type {
   CookiesCapability,
   FetchCapability,
   LogCapability,
+  SqliteCapability,
 } from '@spool/connector-sdk'
 import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool/connector-sdk'
 import type { ConnectorRegistry } from './registry.js'
@@ -16,6 +17,7 @@ import { TrustStore } from './trust-store.js'
 export interface CapabilityImpls {
   fetch: FetchCapability
   cookies: CookiesCapability
+  sqlite: SqliteCapability
   logFor(connectorId: string): LogCapability
 }
 
@@ -226,6 +228,9 @@ function buildCapabilities(
     log: declared.includes('log')
       ? impls.logFor(connectorId)
       : (undefinedCapability('log') as LogCapability),
+    sqlite: declared.includes('sqlite')
+      ? impls.sqlite
+      : (undefinedCapability('sqlite') as SqliteCapability),
   }
 }
 
