@@ -798,3 +798,12 @@ ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorI
   ).get(connector.platform, connectorId) as { cnt: number }
   return row.cnt
 })
+
+ipcMain.handle('connector:fetch-registry', async () => {
+  const { fetchRegistry } = await import('@spool/core')
+  return fetchRegistry({ fetchFn: (input, init) => net.fetch(input as any, init), cacheDir: spoolDir })
+})
+
+ipcMain.handle('connector:install', async (_e, { packageName }: { packageName: string }) => {
+  return installConnectorPackage(packageName)
+})

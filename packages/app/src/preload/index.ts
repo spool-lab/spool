@@ -164,6 +164,16 @@ const api = {
       ipcRenderer.on('connector:event', handler)
       return () => ipcRenderer.removeListener('connector:event', handler)
     },
+
+    fetchRegistry: (): Promise<Array<{
+      name: string; id: string; platform: string; label: string;
+      description: string; color: string; author: string; category: string;
+      firstParty: boolean; bundled?: boolean; npm: string;
+    }>> =>
+      ipcRenderer.invoke('connector:fetch-registry'),
+
+    install: (packageName: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('connector:install', { packageName }),
   },
 
   // Auto-update
