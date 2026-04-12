@@ -28,7 +28,7 @@ importers:
         version: 5.2.7
       '@shipany/open-agent-sdk':
         specifier: link:/Users/claw/code/linkclaw/open-agent-sdk
-        version: link:../../../../../../../claw/code/linkclaw/open-agent-sdk
+        version: link:../../../../../claw/code/linkclaw/open-agent-sdk
       '@spool/core':
         specifier: workspace:*
         version: link:../core
@@ -151,7 +151,7 @@ importers:
         version: link:../../connector-sdk
       '@types/node':
         specifier: ^22.15.3
-        version: 22.19.15
+        version: 22.19.17
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
