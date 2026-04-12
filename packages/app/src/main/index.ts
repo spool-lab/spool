@@ -179,15 +179,29 @@ async function handleSpoolUrl(url: string): Promise<void> {
 
   const isFirstParty = parsed.packageName.startsWith('@spool-lab/')
 
-  const { response } = await dialog.showMessageBox(mainWindow!, {
-    type: isFirstParty ? 'question' : 'warning',
-    buttons: ['Install', 'Cancel'],
-    defaultId: 1,
-    title: 'Install Connector',
-    message: `Install connector "${parsed.packageName}"?`,
-    detail: isFirstParty
+  // Check if already installed by looking for the package in node_modules
+  const { existsSync } = await import('node:fs')
+  const nameSegments = parsed.packageName.startsWith('@') ? parsed.packageName.split('/') : [parsed.packageName]
+  const installedPath = join(spoolDir, 'connectors', 'node_modules', ...nameSegments, 'package.json')
+  const alreadyInstalled = existsSync(installedPath)
+
+  const message = alreadyInstalled
+    ? `"${parsed.packageName}" is already installed. Reinstall?`
+    : `Install connector "${parsed.packageName}"?`
+
+  const detail = alreadyInstalled
+    ? 'This will download and replace the current version.'
+    : isFirstParty
       ? 'This is an official Spool connector.'
-      : 'This is a community connector. It will run code on your machine. Only install connectors you trust.',
+      : 'This is a community connector. It will run code on your machine. Only install connectors you trust.'
+
+  const { response } = await dialog.showMessageBox(mainWindow!, {
+    type: alreadyInstalled ? 'question' : isFirstParty ? 'question' : 'warning',
+    buttons: [alreadyInstalled ? 'Reinstall' : 'Install', 'Cancel'],
+    defaultId: 1,
+    title: alreadyInstalled ? 'Reinstall Connector' : 'Install Connector',
+    message,
+    detail,
   })
 
   if (response !== 0) return

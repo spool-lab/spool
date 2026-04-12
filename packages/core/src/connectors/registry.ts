@@ -10,9 +10,6 @@ export class ConnectorRegistry {
   private connectors = new Map<string, Connector>()
 
   register(connector: Connector): void {
-    if (this.connectors.has(connector.id)) {
-      throw new Error(`Connector "${connector.id}" is already registered`)
-    }
     this.connectors.set(connector.id, connector)
   }
 
