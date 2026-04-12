@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { Worker } from 'node:worker_threads'
@@ -8,7 +8,7 @@ import {
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor,
-  TrustStore,
+  TrustStore, downloadAndInstall,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -28,6 +28,15 @@ if (customUserDataDir) {
 }
 // macOS menu bar shows the first menu's label as the app name
 app.setName(isDevMode ? 'Spool DEV' : 'Spool')
+
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('spool', process.execPath, [process.argv[1]!])
+  }
+} else {
+  app.setAsDefaultProtocolClient('spool')
+}
+
 const uiPreferences = loadUIPreferences()
 nativeTheme.themeSource = uiPreferences.themeSource
 let focusExistingWindow = () => {}
@@ -37,8 +46,10 @@ if (!gotSingleInstanceLock) {
   app.quit()
 }
 
-app.on('second-instance', () => {
+app.on('second-instance', (_event, argv) => {
   focusExistingWindow()
+  const url = argv.find(arg => arg.startsWith('spool://'))
+  if (url) handleSpoolUrl(url)
 })
 
 let mainWindow: BrowserWindow | null = null
@@ -50,6 +61,8 @@ let connectorRegistry: ConnectorRegistry
 let syncScheduler: SyncScheduler
 let trustStore: TrustStore | null = null
 let isSyncActive = false
+let proxyFetch: typeof globalThis.fetch
+let spoolDir: string
 
 type CachedSearchValue = SearchResult[] | FragmentResult[]
 
@@ -150,6 +163,87 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
   return activeSyncPromise
 }
 
+const VALID_NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
+
+function parseSpoolUrl(url: string): { action: string; packageName: string } | null {
+  const match = url.match(/^spool:\/\/install\/(.+)$/)
+  if (!match) return null
+  const packageName = decodeURIComponent(match[1]!)
+  if (!VALID_NPM_NAME.test(packageName)) return null
+  return { action: 'install', packageName }
+}
+
+async function handleSpoolUrl(url: string): Promise<void> {
+  const parsed = parseSpoolUrl(url)
+  if (!parsed) return
+
+  const isFirstParty = parsed.packageName.startsWith('@spool-lab/')
+
+  const { response } = await dialog.showMessageBox(mainWindow!, {
+    type: isFirstParty ? 'question' : 'warning',
+    buttons: ['Install', 'Cancel'],
+    defaultId: 1,
+    title: 'Install Connector',
+    message: `Install connector "${parsed.packageName}"?`,
+    detail: isFirstParty
+      ? 'This is an official Spool connector.'
+      : 'This is a community connector. It will run code on your machine. Only install connectors you trust.',
+  })
+
+  if (response !== 0) return
+
+  try {
+    const connectorsDir = join(spoolDir, 'connectors')
+    const result = await downloadAndInstall(parsed.packageName, connectorsDir, fetch)
+
+    if (!isFirstParty && trustStore) {
+      trustStore.add(parsed.packageName)
+    }
+
+    // Reload connectors into registry
+    await loadConnectors({
+      bundledConnectorsDir: !app.isPackaged
+        ? join(process.cwd(), 'dist/bundled-connectors')
+        : join(process.resourcesPath, 'bundled-connectors'),
+      connectorsDir,
+      capabilityImpls: {
+        fetch: makeFetchCapability(proxyFetch),
+        cookies: makeChromeCookiesCapability(),
+        logFor: (id: string) => makeLogCapabilityFor(id),
+      },
+      registry: connectorRegistry,
+      log: {
+        info: (msg, fields) => console.log(`[loader] ${msg}`, fields ?? ''),
+        warn: (msg, fields) => console.warn(`[loader] ${msg}`, fields ?? ''),
+        error: (msg, fields) => console.error(`[loader] ${msg}`, fields ?? ''),
+      },
+      trustStore: trustStore!,
+    })
+
+    mainWindow?.webContents.send('connector:installed', {
+      name: result.name,
+      version: result.version,
+    })
+
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      message: `Installed ${result.name} v${result.version}`,
+      detail: 'The connector is now available.',
+    })
+  } catch (err) {
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      message: 'Installation failed',
+      detail: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  handleSpoolUrl(url)
+})
+
 app.whenReady().then(async () => {
   // Set dock icon (dev mode doesn't pick up build config)
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
@@ -189,7 +283,7 @@ app.whenReady().then(async () => {
   // Use Electron's net.request for proxy support with full header control.
   // net.fetch drops Cookie (forbidden header) and injects Sec-Fetch-* headers;
   // net.request gives us raw control over what goes on the wire.
-  const proxyFetch: typeof globalThis.fetch = (input, init) => {
+  proxyFetch = (input, init) => {
     const url = input instanceof URL ? input.toString() : typeof input === 'string' ? input : input.url
     const hdrs = (init?.headers ?? {}) as Record<string, string>
     return new Promise((resolve, reject) => {
@@ -222,7 +316,7 @@ app.whenReady().then(async () => {
     ? join(process.cwd(), 'dist/bundled-connectors')
     : join(process.resourcesPath, 'bundled-connectors')
 
-  const spoolDir = join(homedir(), '.spool')
+  spoolDir = join(homedir(), '.spool')
   trustStore = new TrustStore(spoolDir)
 
   await loadConnectors({
