@@ -67,6 +67,7 @@ export default function App() {
   const [connectorToast, setConnectorToast] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
+  const refreshCaptureSourcesRef = useRef<() => void>(() => {})
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
 
@@ -138,10 +139,10 @@ export default function App() {
         setConnectorToast(`${event.name} v${event.version} installed`)
         if (toastTimer.current) clearTimeout(toastTimer.current)
         toastTimer.current = setTimeout(() => setConnectorToast(null), 4000)
-        refreshCaptureSources()
+        refreshCaptureSourcesRef.current()
       }
     })
-  }, [refreshCaptureSources])
+  }, [])
 
   // Listen for AI streaming chunks and tool calls
   useEffect(() => {
@@ -180,6 +181,7 @@ export default function App() {
       setCaptureSources(results)
     }).catch(console.error)
   }, [])
+  refreshCaptureSourcesRef.current = refreshCaptureSources
 
   useEffect(() => {
     if (!window.spool) return
