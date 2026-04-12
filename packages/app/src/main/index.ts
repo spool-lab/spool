@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
   searchFragments, searchAll, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
-  ConnectorRegistry, SyncScheduler, TwitterBookmarksConnector,
+  ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
+  loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -146,7 +148,7 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
   return activeSyncPromise
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set dock icon (dev mode doesn't pick up build config)
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
   try { app.dock?.setIcon(nativeImage.createFromPath(dockIconPath)) } catch {}
@@ -213,9 +215,26 @@ app.whenReady().then(() => {
     })
   }
 
-  connectorRegistry.register(new TwitterBookmarksConnector({
-    fetchFn: proxyFetch,
-  }))
+  const isDev = !app.isPackaged
+  const bundledConnectorsDir = isDev
+    ? join(process.cwd(), 'dist/bundled-connectors')
+    : join(process.resourcesPath, 'bundled-connectors')
+
+  await loadConnectors({
+    bundledConnectorsDir,
+    connectorsDir: join(homedir(), '.spool', 'connectors'),
+    capabilityImpls: {
+      fetch: makeFetchCapability(proxyFetch),
+      cookies: makeChromeCookiesCapability(),
+      logFor: (connectorId: string) => makeLogCapabilityFor(connectorId),
+    },
+    registry: connectorRegistry,
+    log: {
+      info: (msg, fields) => console.log(`[loader] ${msg}`, fields ?? ''),
+      warn: (msg, fields) => console.warn(`[loader] ${msg}`, fields ?? ''),
+      error: (msg, fields) => console.error(`[loader] ${msg}`, fields ?? ''),
+    },
+  })
 
   syncScheduler = new SyncScheduler(db, connectorRegistry)
   syncScheduler.on((event: SchedulerEvent) => {
