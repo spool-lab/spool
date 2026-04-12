@@ -11,12 +11,7 @@ import type {
 import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool/connector-sdk'
 import type { ConnectorRegistry } from './registry.js'
 import { extractBundledConnectorsIfNeeded, type BundleLogger, type BundleReport } from './bundle-extract.js'
-
-export const STAGE_D_FIRST_PARTY_ALLOWLIST = new Set<string>([
-  '@spool-lab/connector-twitter-bookmarks',
-  '@spool-lab/connector-typeless',
-  '@spool-lab/connector-hackernews-hot',
-])
+import { TrustStore } from './trust-store.js'
 
 export interface CapabilityImpls {
   fetch: FetchCapability
@@ -34,6 +29,7 @@ export interface LoadDeps {
   capabilityImpls: CapabilityImpls
   registry: ConnectorRegistry
   log: LoaderLogger
+  trustStore: TrustStore
 }
 
 export type LoadResult =
@@ -177,8 +173,8 @@ async function loadOneConnector(
   pkg: PkgInfo,
   deps: LoadDeps,
 ): Promise<LoadResult> {
-  if (!STAGE_D_FIRST_PARTY_ALLOWLIST.has(pkg.name)) {
-    deps.log.info('skip non-allowlisted connector (Stage D)', { name: pkg.name })
+  if (!deps.trustStore.isTrusted(pkg.name)) {
+    deps.log.info('skip untrusted connector', { name: pkg.name })
     return { status: 'skipped', name: pkg.name, reason: 'not-in-allowlist' }
   }
 

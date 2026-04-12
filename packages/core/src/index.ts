@@ -36,8 +36,9 @@ export type {
 } from './connectors/types.js'
 
 // ── Plugin loader ──────────────────────────────────────────────────────────
-export { loadConnectors, STAGE_D_FIRST_PARTY_ALLOWLIST } from './connectors/loader.js'
+export { loadConnectors } from './connectors/loader.js'
 export type { LoadDeps, LoadReport, LoadResult, CapabilityImpls } from './connectors/loader.js'
+export { TrustStore } from './connectors/trust-store.js'
 export {
   makeFetchCapability,
   makeChromeCookiesCapability,

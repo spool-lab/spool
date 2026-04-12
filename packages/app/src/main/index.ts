@@ -8,6 +8,7 @@ import {
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor,
+  TrustStore,
 } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
 import { setupTray } from './tray.js'
@@ -47,6 +48,7 @@ let watcher: SpoolWatcher
 let acpManager: AcpManager
 let connectorRegistry: ConnectorRegistry
 let syncScheduler: SyncScheduler
+let trustStore: TrustStore | null = null
 let isSyncActive = false
 
 type CachedSearchValue = SearchResult[] | FragmentResult[]
@@ -220,9 +222,12 @@ app.whenReady().then(async () => {
     ? join(process.cwd(), 'dist/bundled-connectors')
     : join(process.resourcesPath, 'bundled-connectors')
 
+  const spoolDir = join(homedir(), '.spool')
+  trustStore = new TrustStore(spoolDir)
+
   await loadConnectors({
     bundledConnectorsDir,
-    connectorsDir: join(homedir(), '.spool', 'connectors'),
+    connectorsDir: join(spoolDir, 'connectors'),
     capabilityImpls: {
       fetch: makeFetchCapability(proxyFetch),
       cookies: makeChromeCookiesCapability(),
@@ -234,6 +239,7 @@ app.whenReady().then(async () => {
       warn: (msg, fields) => console.warn(`[loader] ${msg}`, fields ?? ''),
       error: (msg, fields) => console.error(`[loader] ${msg}`, fields ?? ''),
     },
+    trustStore,
   })
 
   syncScheduler = new SyncScheduler(db, connectorRegistry)

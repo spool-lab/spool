@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConnectors, STAGE_D_FIRST_PARTY_ALLOWLIST } from './loader.js'
+import { loadConnectors } from './loader.js'
 import { ConnectorRegistry } from './registry.js'
+import { TrustStore } from './trust-store.js'
 import type { Connector } from '@spool/connector-sdk'
 
 function writePkg(nodeModulesDir: string, name: string, manifest: object, entrySource: string) {
@@ -50,11 +51,12 @@ describe('loadConnectors', () => {
   beforeEach(() => {
     connectorsDir = mkdtempSync(join(tmpdir(), 'loader-connectors-'))
     bundledDir = mkdtempSync(join(tmpdir(), 'loader-bundled-'))
-    STAGE_D_FIRST_PARTY_ALLOWLIST.clear()
-    STAGE_D_FIRST_PARTY_ALLOWLIST.add('@spool-lab/connector-twitter-bookmarks')
-    STAGE_D_FIRST_PARTY_ALLOWLIST.add('@spool-lab/connector-typeless')
-    STAGE_D_FIRST_PARTY_ALLOWLIST.add('@spool-lab/connector-test')
   })
+
+  function makeTrustStore(): TrustStore {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-trust-'))
+    return new TrustStore(dir)
+  }
 
   it('loads a connector that declares spool.type === "connector"', async () => {
     const registry = new ConnectorRegistry()
@@ -88,6 +90,7 @@ describe('loadConnectors', () => {
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
+      trustStore: makeTrustStore(),
     })
 
     expect(report.loadResults.find(r => r.name === '@spool-lab/connector-test')?.status)
@@ -110,6 +113,7 @@ describe('loadConnectors', () => {
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
+      trustStore: makeTrustStore(),
     })
 
     expect(report.loadResults.length).toBe(0)
@@ -146,15 +150,14 @@ describe('loadConnectors', () => {
     )).toBe(true)
   })
 
-  it('skips packages not in the first-party allowlist', async () => {
+  it('skips untrusted community connectors', async () => {
     const registry = new ConnectorRegistry()
-    STAGE_D_FIRST_PARTY_ALLOWLIST.clear()
     writePkg(
       join(connectorsDir, 'node_modules'),
-      '@spool-lab/connector-test',
+      '@community/connector-untrusted',
       {
         spool: {
-          type: 'connector', id: 'test', platform: 'test', label: 'Test',
+          type: 'connector', id: 'untrusted', platform: 'test', label: 'Untrusted',
           description: 'Test', color: '#000', ephemeral: false,
           capabilities: ['log'],
         },
@@ -168,9 +171,10 @@ describe('loadConnectors', () => {
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
+      trustStore: makeTrustStore(),
     })
 
-    expect(report.loadResults.find(r => r.name === '@spool-lab/connector-test')?.status)
+    expect(report.loadResults.find(r => r.name === '@community/connector-untrusted')?.status)
       .toBe('skipped')
     expect(registry.list().length).toBe(0)
   })
@@ -216,6 +220,7 @@ describe('loadConnectors', () => {
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
+      trustStore: makeTrustStore(),
     })
 
     const statuses = Object.fromEntries(
@@ -256,6 +261,7 @@ describe('loadConnectors', () => {
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
+      trustStore: makeTrustStore(),
     })
 
     expect(report.loadResults.find(r => r.name === '@spool-lab/connector-test')?.status)
