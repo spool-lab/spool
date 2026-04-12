@@ -23,7 +23,7 @@
     "commander": "^13.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
-    "vitest": "^3.1.2"
+    "@types/node": "^22.19.17",
+    "vitest": "^3.2.4"
   }
 }
