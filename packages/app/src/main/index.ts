@@ -171,30 +171,53 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 
 const VALID_NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
-async function installConnectorPackage(
+// Serialize install/uninstall/update/reload to prevent interleaving race conditions
+let connectorOpQueue: Promise<void> = Promise.resolve()
+function withConnectorLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = connectorOpQueue.then(fn, fn)
+  connectorOpQueue = next.then(() => {}, () => {})
+  return next
+}
+
+function installConnectorPackage(
   packageName: string,
 ): Promise<{ ok: true; name: string; version: string } | { ok: false; error: string }> {
-  try {
-    const connectorsDir = join(spoolDir, 'connectors')
-    const result = await downloadAndInstall(packageName, connectorsDir, fetch)
+  return withConnectorLock(async () => {
+    try {
+      const connectorsDir = join(spoolDir, 'connectors')
+      const result = await downloadAndInstall(packageName, connectorsDir, fetch)
 
-    const isFirstParty = packageName.startsWith('@spool-lab/')
-    if (!isFirstParty && trustStore) {
-      trustStore.add(packageName)
+      const isFirstParty = packageName.startsWith('@spool-lab/')
+      if (!isFirstParty && trustStore) {
+        trustStore.add(packageName)
+      }
+
+      // Clear stale sync state from a prior install (prevents inheriting
+      // old cursors/enabled flags if uninstall's DB cleanup failed)
+      const pkgJsonPath = join(connectorsDir, 'node_modules', ...result.name.split('/'), 'package.json')
+      try {
+        const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'))
+        const ids: string[] = Array.isArray(pkgJson.spool?.connectors)
+          ? pkgJson.spool.connectors.map((c: any) => c.id).filter(Boolean)
+          : pkgJson.spool?.id ? [pkgJson.spool.id] : []
+        for (const cid of ids) {
+          db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(cid)
+        }
+      } catch {}
+
+      await reloadConnectors()
+
+      mainWindow?.webContents.send('connector:event', {
+        type: 'installed',
+        name: result.name,
+        version: result.version,
+      })
+
+      return { ok: true, name: result.name, version: result.version }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
-
-    await reloadConnectors()
-
-    mainWindow?.webContents.send('connector:event', {
-      type: 'installed',
-      name: result.name,
-      version: result.version,
-    })
-
-    return { ok: true, name: result.name, version: result.version }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+  })
 }
 
 function parseSpoolUrl(url: string): { action: string; packageName: string } | null {
@@ -750,39 +773,52 @@ ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enab
 ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   const connectorsDir = join(spoolDir, 'connectors')
 
+  // 1. Find package and all sibling connectors (from disk, before deletion)
   const allInstalled = getInstalledConnectorPackages()
   const pkg = allInstalled.find(p => p.connectorId === id)
   if (!pkg) {
     return { ok: false, error: `No installed package found for connector "${id}"` }
   }
   const packageName = pkg.packageName
-
-  // Find ALL connectors in the same package (multi-connector support)
   const siblings = allInstalled.filter(p => p.packageName === packageName)
+  const removedIds = siblings.map(s => s.connectorId)
 
-  // Remove all sibling connectors from registry and DB
-  db.transaction(() => {
-    for (const sib of siblings) {
-      if (connectorRegistry.has(sib.connectorId)) {
-        const platform = connectorRegistry.get(sib.connectorId).platform
-        connectorRegistry.remove(sib.connectorId)
-        db.prepare(
-          "DELETE FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
-        ).run(platform, sib.connectorId)
-      }
-      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId)
-    }
-  })()
+  // 2. Remove from registry + cancel in-flight syncs (critical — must happen first)
+  for (const sib of removedIds) {
+    connectorRegistry.remove(sib)
+    syncScheduler.cancelIfRunning(sib)
+  }
 
-  // Delete package files and mark .do-not-restore
+  // 3. Delete package files (critical — before DB cleanup so re-extraction is blocked)
   uninstallConnector(packageName, connectorsDir)
 
-  // Notify renderer once for the whole package uninstall
+  // 4. Clean up DB (best-effort — json_extract can fail on corrupted rows)
+  for (const sib of removedIds) {
+    try {
+      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib)
+    } catch (err) {
+      console.error(`[uninstall] failed to delete sync state for ${sib}:`, err)
+    }
+    try {
+      db.prepare(
+        "DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?",
+      ).run(sib)
+    } catch (err) {
+      // Fallback: delete by platform if json_extract fails (corrupted metadata rows)
+      try {
+        const platform = sib.replace(/-[^-]+$/, '')
+        db.prepare('DELETE FROM captures WHERE platform = ?').run(platform)
+      } catch {}
+      console.error(`[uninstall] failed to delete captures for ${sib}:`, err)
+    }
+  }
+
+  // 5. Notify renderer
   mainWindow?.webContents.send('connector:event', {
     type: 'uninstalled',
     connectorId: id,
     packageName,
-    removedIds: siblings.map(s => s.connectorId),
+    removedIds,
   })
 
   return { ok: true }
@@ -799,27 +835,29 @@ ipcMain.handle('connector:check-updates', async () => {
 })
 
 ipcMain.handle('connector:update', async (_e, { id }: { id: string }) => {
-  const installed = getInstalledConnectorPackages()
-  const pkg = installed.find(p => p.connectorId === id)
-  if (!pkg) return { ok: false, error: `No installed package found for connector "${id}"` }
+  return withConnectorLock(async () => {
+    const installed = getInstalledConnectorPackages()
+    const pkg = installed.find(p => p.connectorId === id)
+    if (!pkg) return { ok: false, error: `No installed package found for connector "${id}"` }
 
-  try {
-    const connectorsDir = join(spoolDir, 'connectors')
-    const result = await downloadAndInstall(pkg.packageName, connectorsDir, fetch)
+    try {
+      const connectorsDir = join(spoolDir, 'connectors')
+      const result = await downloadAndInstall(pkg.packageName, connectorsDir, fetch)
 
-    await reloadConnectors()
-    updateCache.delete(pkg.packageName)
+      await reloadConnectors()
+      updateCache.delete(pkg.packageName)
 
-    mainWindow?.webContents.send('connector:event', {
-      type: 'updated',
-      name: result.name,
-      version: result.version,
-    })
+      mainWindow?.webContents.send('connector:event', {
+        type: 'updated',
+        name: result.name,
+        version: result.version,
+      })
 
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 })
 
 ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorId: string }) => {

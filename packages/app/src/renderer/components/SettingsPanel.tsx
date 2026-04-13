@@ -326,6 +326,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const [registryError, setRegistryError] = useState(false)
   const [installingPackage, setInstallingPackage] = useState<string | null>(null)
   const [installErrors, setInstallErrors] = useState<Record<string, string>>({})
+  const [uninstalling, setUninstalling] = useState(false)
 
   const loadConnectors = useCallback(async () => {
     if (!window.spool?.connectors) return
@@ -402,17 +403,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   }
   for (const pkg of discoverPackages) {
     if (pkg.subs.length > 1) {
-      const words = pkg.subs[0].label.split(' ')
+      const words = pkg.subs[0]!.label.split(' ')
       const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
-      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0].label.split(' ')[0]
-    }
-  }
-
-  for (const pkg of discoverPackages) {
-    if (pkg.subs.length > 1) {
-      const words = pkg.subs[0].label.split(' ')
-      const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
-      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0].label.split(' ')[0]
+      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0]!.label.split(' ')[0]!
     }
   }
 
@@ -469,7 +462,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
 
   // ── Detail view (drill-down) — package level ──
   if (selectedPkg && pkgConnectors.length > 0) {
-    const first = pkgConnectors[0]
+    const first = pkgConnectors[0]!
     const isBundled = pkgConnectors.every(c => c.bundled)
     const pkgLabel = pkgConnectors.length > 1
       ? (() => { const words = first.label.split(' '); const common = words.filter(w => pkgConnectors.every(c => c.label.includes(w))); return common.length > 0 ? common.join(' ') : first.label.split(' ')[0] })()
@@ -479,8 +472,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       <div className="space-y-5">
         {/* Back button */}
         <button
+          disabled={uninstalling}
           onClick={() => setSelectedPkg(null)}
-          className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-50"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -507,6 +501,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                     </button>
                   )}
                   <button
+                    disabled={uninstalling}
                     onClick={async () => {
                       const totalCount = pkgConnectors.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
                       const names = pkgConnectors.map(c => c.label).join(', ')
@@ -514,12 +509,17 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                         ? `Uninstall "${pkgLabel}"?\n\nThis will remove ${names} and permanently delete ${totalCount} synced item${totalCount === 1 ? '' : 's'}. You can reinstall from spool.pro/connectors.`
                         : `Uninstall "${pkgLabel}"?\n\nThis will remove ${names}. You can reinstall from spool.pro/connectors.`
                       if (!confirm(msg)) return
-                      setSelectedPkg(null)
-                      await window.spool?.connectors.uninstall(first.id)
+                      setUninstalling(true)
+                      try {
+                        await window.spool?.connectors.uninstall(first.id)
+                      } finally {
+                        setUninstalling(false)
+                        setSelectedPkg(null)
+                      }
                     }}
-                    className="font-medium text-warm-faint dark:text-dark-muted hover:text-red-400 hover:underline"
+                    className="font-medium text-warm-faint dark:text-dark-muted hover:text-red-400 hover:underline disabled:opacity-50"
                   >
-                    Uninstall
+                    {uninstalling ? 'Uninstalling…' : 'Uninstall'}
                   </button>
                 </div>
               )}
@@ -595,8 +595,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               <div className="flex items-center justify-between px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
                 <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
                 <button
+                  disabled={uninstalling}
                   onClick={() => handleToggleEnabled(c.id, !c.enabled)}
-                  className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                  className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 ${
                     c.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
                   }`}
                 >
@@ -610,7 +611,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               {c.enabled && (
                 <button
                   onClick={() => handleSync(c.id)}
-                  disabled={isSyncing}
+                  disabled={isSyncing || uninstalling}
                   className="w-full py-2 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[8px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
                 >
                   {isSyncing ? 'Syncing…' : 'Sync now'}
@@ -654,9 +655,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           }
           for (const g of groups) {
             if (g.items.length > 1) {
-              const words = g.items[0].label.split(' ')
+              const words = g.items[0]!.label.split(' ')
               const common = words.filter(w => g.items.every(c => c.label.includes(w)))
-              g.label = common.length > 0 ? common.join(' ') : g.items[0].label.split(' ')[0]
+              g.label = common.length > 0 ? common.join(' ') : g.items[0]!.label.split(' ')[0]!
             }
           }
           return groups.map(g => {
