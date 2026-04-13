@@ -29,6 +29,7 @@ function fakeCapabilityImpls() {
     fetch: globalThis.fetch,
     cookies: { get: async () => [] },
     sqlite: { openReadonly: () => { throw new Error('not available') } },
+    exec: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
     logFor: () => ({
       debug: () => {}, info: () => {}, warn: () => {}, error: () => {},
       span: async (_name: string, fn: () => Promise<any>) => fn(),

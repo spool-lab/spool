@@ -5,6 +5,7 @@ import type {
   Connector,
   ConnectorCapabilities,
   CookiesCapability,
+  ExecCapability,
   FetchCapability,
   LogCapability,
   SqliteCapability,
@@ -18,6 +19,7 @@ export interface CapabilityImpls {
   fetch: FetchCapability
   cookies: CookiesCapability
   sqlite: SqliteCapability
+  exec: ExecCapability
   logFor(connectorId: string): LogCapability
 }
 
@@ -231,6 +233,9 @@ function buildCapabilities(
     sqlite: declared.includes('sqlite')
       ? impls.sqlite
       : (undefinedCapability('sqlite') as SqliteCapability),
+    exec: declared.includes('exec')
+      ? impls.exec
+      : (undefinedCapability('exec') as ExecCapability),
   }
 }
 

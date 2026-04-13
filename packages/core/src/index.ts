@@ -49,4 +49,5 @@ export {
   makeChromeCookiesCapability,
   makeLogCapabilityFor,
   makeSqliteCapability,
+  makeExecCapability,
 } from './connectors/capabilities/index.js'
