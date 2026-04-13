@@ -54,7 +54,19 @@ export class GitHubStarsConnector implements Connector {
       throw new SyncError(SyncErrorCode.API_UNEXPECTED_STATUS, `gh api failed: ${result.stderr.slice(0, 300)}`)
     }
 
-    const items = parseCliJsonOutput(result.stdout, 'github', 'repo')
+    // Starred repos API returns { starred_at, repo: {...} } — flatten before parsing
+    let stdout = result.stdout
+    try {
+      const parsed = JSON.parse(stdout)
+      if (Array.isArray(parsed) && parsed[0]?.repo) {
+        stdout = JSON.stringify(parsed.map((s: any) => ({
+          ...s.repo,
+          url: s.repo.html_url ?? s.repo.url,
+          created_at: s.starred_at ?? s.repo.created_at,
+        })))
+      }
+    } catch {}
+    const items = parseCliJsonOutput(stdout, 'github', 'repo')
 
     if (items.length === 0) {
       return { items: [], nextCursor: null }

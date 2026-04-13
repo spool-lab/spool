@@ -6,21 +6,14 @@ interface ParseOptions {
 }
 
 function parseOneItem(raw: Record<string, unknown>, opts: ParseOptions): CapturedItem {
-  // Flatten GitHub starred repos: { starred_at, repo: {...} } → flat object
-  if (raw['repo'] && typeof raw['repo'] === 'object' && 'html_url' in (raw['repo'] as object)) {
-    const repo = raw['repo'] as Record<string, unknown>
-    const starredAt = raw['starred_at'] as string | undefined
-    raw = { ...repo, starred_at: starredAt ?? repo['created_at'] }
-  }
-
-  const url = String(raw['html_url'] ?? raw['link'] ?? raw['url'] ?? '')
+  const url = String(raw['url'] ?? raw['link'] ?? raw['html_url'] ?? '')
   const title = String(raw['title'] ?? raw['name'] ?? raw['full_name'] ?? '')
   const contentText = String(
     raw['content'] ?? raw['description'] ?? raw['text'] ?? raw['body']
-    ?? raw['selftext'] ?? raw['summary'] ?? '',
+    ?? raw['summary'] ?? '',
   )
 
-  const authorRaw = raw['author'] ?? raw['user'] ?? raw['owner'] ?? raw['username'] ?? raw['screen_name'] ?? null
+  const authorRaw = raw['author'] ?? raw['user'] ?? raw['owner'] ?? null
   let author: string | null = null
   if (typeof authorRaw === 'string') {
     author = authorRaw
@@ -29,12 +22,11 @@ function parseOneItem(raw: Record<string, unknown>, opts: ParseOptions): Capture
   }
 
   const capturedAt = String(
-    raw['starred_at'] ?? raw['created_at'] ?? raw['date'] ?? raw['timestamp']
-    ?? raw['pushed_at'] ?? new Date().toISOString(),
+    raw['created_at'] ?? raw['date'] ?? raw['timestamp'] ?? new Date().toISOString(),
   )
 
   const platformId = raw['id'] ?? raw['platform_id'] ?? null
-  const thumbnailUrl = raw['thumbnail'] ?? raw['thumbnail_url'] ?? raw['avatar_url'] ?? null
+  const thumbnailUrl = raw['thumbnail'] ?? raw['thumbnail_url'] ?? null
 
   return {
     url,
@@ -52,7 +44,7 @@ function parseOneItem(raw: Record<string, unknown>, opts: ParseOptions): Capture
 }
 
 export function parseCliJsonOutput(stdout: string, platform: string, contentType?: string): CapturedItem[] {
-  const opts: ParseOptions = { platform, contentType }
+  const opts: ParseOptions = contentType ? { platform, contentType } : { platform }
   const trimmed = stdout.trim()
   if (!trimmed) return []
 

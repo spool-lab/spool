@@ -20,17 +20,14 @@ describe('parseCliJsonOutput', () => {
     expect(items.length).toBe(2)
   })
 
-  it('flattens GitHub starred repo structure', () => {
+  it('extracts fields from flat JSON objects', () => {
     const input = JSON.stringify([{
-      starred_at: '2026-03-15T10:00:00Z',
-      repo: {
-        id: 12345,
-        full_name: 'user/repo',
-        html_url: 'https://github.com/user/repo',
-        description: 'A cool repo',
-        owner: { login: 'user' },
-        stargazers_count: 100,
-      },
+      id: 12345,
+      full_name: 'user/repo',
+      html_url: 'https://github.com/user/repo',
+      description: 'A cool repo',
+      owner: { login: 'user' },
+      created_at: '2026-03-15T10:00:00Z',
     }])
     const items = parseCliJsonOutput(input, 'github', 'repo')
     expect(items.length).toBe(1)
@@ -52,15 +49,10 @@ describe('parseCliJsonOutput', () => {
     expect(items.length).toBe(2)
   })
 
-  it('prefers html_url over url (GitHub API URLs are not web URLs)', () => {
-    const input = JSON.stringify([{
-      id: '1',
-      url: 'https://api.github.com/repos/user/repo',
-      html_url: 'https://github.com/user/repo',
-      full_name: 'user/repo',
-    }])
-    const items = parseCliJsonOutput(input, 'github')
-    expect(items[0].url).toBe('https://github.com/user/repo')
+  it('reads url field with fallbacks', () => {
+    expect(parseCliJsonOutput(JSON.stringify([{ id: '1', url: 'https://a.com' }]), 'test')[0].url).toBe('https://a.com')
+    expect(parseCliJsonOutput(JSON.stringify([{ id: '1', link: 'https://b.com' }]), 'test')[0].url).toBe('https://b.com')
+    expect(parseCliJsonOutput(JSON.stringify([{ id: '1', html_url: 'https://c.com' }]), 'test')[0].url).toBe('https://c.com')
   })
 
   it('uses contentType from caller, defaults to page', () => {
