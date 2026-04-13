@@ -626,47 +626,42 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         })}
       </Section>
 
-      {!registryLoading && !registryError && discoverConnectors.length > 0 && (
-        <Section title="Available Connectors">
-          {discoverConnectors.map(rc => (
-            <div
-              key={rc.name}
-              className="flex items-center gap-3 py-2.5"
-            >
-              <span
-                className="w-2 h-2 rounded-full flex-none opacity-50"
-                style={{ background: rc.color }}
-              />
-              <div className="flex-1 min-w-0 leading-4">
-                <span className="text-xs text-warm-muted dark:text-dark-muted">{rc.label}</span>
-                <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
-                {installErrors[rc.name] && installingPackage !== rc.name && (
-                  <div className="text-[10px] text-red-400 mt-0.5">{installErrors[rc.name]}</div>
-                )}
-              </div>
-              <button
-                onClick={() => handleInstall(rc.name)}
-                disabled={installingPackage === rc.name}
-                className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
-              >
-                {installingPackage === rc.name ? 'Installing\u2026' : 'Install'}
-              </button>
+      <Section title="Available Connectors">
+        {registryLoading && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Loading connector directory\u2026</p>
+        )}
+        {registryError && !registryLoading && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Couldn't load connector directory</p>
+        )}
+        {!registryLoading && !registryError && discoverConnectors.length === 0 && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">All connectors installed</p>
+        )}
+        {!registryLoading && !registryError && discoverConnectors.map(rc => (
+          <div
+            key={rc.name}
+            className="flex items-center gap-3 py-2.5"
+          >
+            <span
+              className="w-2 h-2 rounded-full flex-none opacity-50"
+              style={{ background: rc.color }}
+            />
+            <div className="flex-1 min-w-0 leading-4">
+              <span className="text-xs text-warm-muted dark:text-dark-muted">{rc.label}</span>
+              <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
+              {installErrors[rc.name] && installingPackage !== rc.name && (
+                <div className="text-[10px] text-red-400 mt-0.5">{installErrors[rc.name]}</div>
+              )}
             </div>
-          ))}
-        </Section>
-      )}
-
-      {registryLoading && (
-        <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
-          Loading connector directory\u2026
-        </div>
-      )}
-
-      {registryError && !registryLoading && (
-        <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
-          Couldn't load connector directory
-        </div>
-      )}
+            <button
+              onClick={() => handleInstall(rc.name)}
+              disabled={installingPackage === rc.name}
+              className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
+            >
+              {installingPackage === rc.name ? 'Installing\u2026' : 'Install'}
+            </button>
+          </div>
+        ))}
+      </Section>
 
       {syncError && (
         <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
