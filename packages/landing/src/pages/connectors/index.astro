@@ -282,15 +282,6 @@ const packages = [...packageMap.values()]
       line-height: 1.4;
     }
 
-    .sub-dot {
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--faint);
-      flex-shrink: 0;
-      margin-top: 7px;
-    }
-
     .sub-label {
       font-weight: 500;
       color: var(--text);
@@ -328,7 +319,6 @@ const packages = [...packageMap.values()]
             <div class="card-subs">
               {pkg.subs.map(sub => (
                 <div class="card-sub">
-                  <span class="sub-dot"></span>
                   <span class="sub-label">{sub.label}</span>
                   <span class="sub-desc">{sub.description}</span>
                 </div>
