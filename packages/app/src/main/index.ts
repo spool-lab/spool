@@ -501,7 +501,16 @@ function getInstalledConnectorPackages(): Array<{ packageName: string; currentVe
       if (!existsSync(pkgPath)) continue
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-        if (pkg.spool?.type === 'connector' && pkg.spool?.id && !bundledConnectorIds.has(pkg.spool.id)) {
+        if (pkg.spool?.type !== 'connector') continue
+        // Multi-connector package
+        if (Array.isArray(pkg.spool.connectors)) {
+          for (const c of pkg.spool.connectors) {
+            if (c.id && !bundledConnectorIds.has(c.id)) {
+              results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: c.id })
+            }
+          }
+        // Single-connector package
+        } else if (pkg.spool.id && !bundledConnectorIds.has(pkg.spool.id)) {
           results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: pkg.spool.id })
         }
       } catch {}
@@ -739,34 +748,37 @@ ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enab
 ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   const connectorsDir = join(spoolDir, 'connectors')
 
-  const pkg = getInstalledConnectorPackages().find(p => p.connectorId === id)
+  const allInstalled = getInstalledConnectorPackages()
+  const pkg = allInstalled.find(p => p.connectorId === id)
   if (!pkg) {
     return { ok: false, error: `No installed package found for connector "${id}"` }
   }
   const packageName = pkg.packageName
 
-  // Get platform before removing from registry
-  if (!connectorRegistry.has(id)) {
-    return { ok: false, error: `Connector "${id}" not found in registry` }
-  }
-  const platform = connectorRegistry.get(id).platform
+  // Find ALL connectors in the same package (multi-connector support)
+  const siblings = allInstalled.filter(p => p.packageName === packageName)
 
-  // Remove from registry (stops scheduler from picking it up)
-  connectorRegistry.remove(id)
-
-  // Delete files and mark .do-not-restore
-  uninstallConnector(packageName, connectorsDir)
-
-  // Clean up DB atomically
+  // Remove all sibling connectors from registry and DB
   db.transaction(() => {
-    db.prepare(
-      "DELETE FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
-    ).run(platform, id)
-    db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(id)
+    for (const sib of siblings) {
+      if (connectorRegistry.has(sib.connectorId)) {
+        const platform = connectorRegistry.get(sib.connectorId).platform
+        connectorRegistry.remove(sib.connectorId)
+        db.prepare(
+          "DELETE FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
+        ).run(platform, sib.connectorId)
+      }
+      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId)
+    }
   })()
 
-  // Notify renderer
-  mainWindow?.webContents.send('connector:event', { type: 'uninstalled', connectorId: id })
+  // Delete package files and mark .do-not-restore
+  uninstallConnector(packageName, connectorsDir)
+
+  // Notify renderer for each removed connector
+  for (const sib of siblings) {
+    mainWindow?.webContents.send('connector:event', { type: 'uninstalled', connectorId: sib.connectorId })
+  }
 
   return { ok: true }
 })
