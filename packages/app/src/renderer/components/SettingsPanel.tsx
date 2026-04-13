@@ -378,7 +378,32 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   }, [])
 
   const installedIds = new Set(connectors.map(c => c.id))
-  const discoverConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
+  const uninstalledConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
+
+  // Group by npm package name so multi-connector packages show as one row
+  const discoverPackages: Array<{ name: string; label: string; color: string; description: string; connectorLabels: string[] }> = []
+  const seen = new Set<string>()
+  for (const rc of uninstalledConnectors) {
+    if (seen.has(rc.name)) {
+      discoverPackages.find(p => p.name === rc.name)?.connectorLabels.push(rc.label)
+      continue
+    }
+    seen.add(rc.name)
+    discoverPackages.push({
+      name: rc.name,
+      label: rc.label,
+      color: rc.color,
+      description: rc.description,
+      connectorLabels: [rc.label],
+    })
+  }
+  for (const pkg of discoverPackages) {
+    if (pkg.connectorLabels.length > 1) {
+      const words = pkg.connectorLabels[0].split(' ')
+      const common = words.filter(w => pkg.connectorLabels.every(l => l.includes(w)))
+      pkg.label = common.length > 0 ? common.join(' ') : pkg.connectorLabels[0].split(' ')[0]
+    }
+  }
 
   const handleSync = async (connectorId: string) => {
     if (!window.spool?.connectors) return
@@ -626,30 +651,36 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         })}
       </Section>
 
-      {!registryLoading && !registryError && discoverConnectors.length > 0 && (
+      {!registryLoading && !registryError && discoverPackages.length > 0 && (
         <Section title="Available Connectors">
-          {discoverConnectors.map(rc => (
+          {discoverPackages.map(pkg => (
             <div
-              key={rc.name}
+              key={pkg.name}
               className="flex items-center gap-3 py-2.5"
             >
               <span
                 className="w-2 h-2 rounded-full flex-none opacity-50"
-                style={{ background: rc.color }}
+                style={{ background: pkg.color }}
               />
               <div className="flex-1 min-w-0 leading-4">
-                <span className="text-xs text-warm-muted dark:text-dark-muted">{rc.label}</span>
-                <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{rc.description}</span>
-                {installErrors[rc.name] && installingPackage !== rc.name && (
-                  <div className="text-[10px] text-red-400 mt-0.5">{installErrors[rc.name]}</div>
+                <span className="text-xs text-warm-muted dark:text-dark-muted">{pkg.label}</span>
+                {pkg.connectorLabels.length > 1 ? (
+                  <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">
+                    Includes: {pkg.connectorLabels.join(', ')}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{pkg.description}</span>
+                )}
+                {installErrors[pkg.name] && installingPackage !== pkg.name && (
+                  <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
                 )}
               </div>
               <button
-                onClick={() => handleInstall(rc.name)}
-                disabled={installingPackage === rc.name}
+                onClick={() => handleInstall(pkg.name)}
+                disabled={installingPackage === pkg.name}
                 className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
               >
-                {installingPackage === rc.name ? 'Installing\u2026' : 'Install'}
+                {installingPackage === pkg.name ? 'Installing\u2026' : 'Install'}
               </button>
             </div>
           ))}

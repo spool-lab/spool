@@ -1,6 +1,45 @@
 ---
 import registry from '../../../public/registry.json'
 const connectors = registry.connectors
+
+// Group multi-connector packages by npm name
+interface GroupedPackage {
+  name: string
+  label: string
+  color: string
+  category: string
+  bundled: boolean
+  firstParty: boolean
+  description: string
+  connectorLabels: string[]
+}
+const packageMap = new Map<string, GroupedPackage>()
+for (const c of connectors) {
+  const existing = packageMap.get(c.name)
+  if (existing) {
+    existing.connectorLabels.push(c.label)
+  } else {
+    packageMap.set(c.name, {
+      name: c.name,
+      label: c.label,
+      color: c.color,
+      category: c.category,
+      bundled: !!c.bundled,
+      firstParty: c.firstParty,
+      description: c.description,
+      connectorLabels: [c.label],
+    })
+  }
+}
+// For multi-connector packages, derive a group label from common prefix
+for (const pkg of packageMap.values()) {
+  if (pkg.connectorLabels.length > 1) {
+    const words = pkg.connectorLabels[0].split(' ')
+    const common = words.filter(w => pkg.connectorLabels.every(l => l.includes(w)))
+    pkg.label = common.length > 0 ? common.join(' ') : pkg.connectorLabels[0].split(' ')[0]
+  }
+}
+const packages = [...packageMap.values()]
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -242,27 +281,31 @@ const connectors = registry.connectors
     <p class="subtitle">Install connectors to index your data sources into Spool.</p>
 
     <div class="grid">
-      {connectors.map(c => (
+      {packages.map(pkg => (
         <div class="card">
           <div class="card-header">
-            <span class="color-dot" style={`background: ${c.color}`}></span>
-            <span class="card-title">{c.label}</span>
-            <span class="badge category">{c.category}</span>
-            {c.bundled
+            <span class="color-dot" style={`background: ${pkg.color}`}></span>
+            <span class="card-title">{pkg.label}</span>
+            <span class="badge category">{pkg.category}</span>
+            {pkg.bundled
               ? <span class="badge bundled">built-in</span>
-              : c.firstParty && <span class="badge">official</span>}
+              : pkg.firstParty && <span class="badge">official</span>}
           </div>
-          <p class="card-desc">{c.description}</p>
+          {pkg.connectorLabels.length > 1 ? (
+            <p class="card-desc">Includes: {pkg.connectorLabels.join(', ')}</p>
+          ) : (
+            <p class="card-desc">{pkg.description}</p>
+          )}
           <div class="card-footer">
-            {c.bundled ? (
+            {pkg.bundled ? (
               <>
                 <span class="cli-hint">Included with Spool</span>
                 <span class="included-label"><span class="check">&#10003;</span> Included</span>
               </>
             ) : (
               <>
-                <span class="cli-hint">spool connector install {c.name}</span>
-                <a href={`spool://connector/install/${c.name}`} class="install-btn">Install</a>
+                <span class="cli-hint">spool connector install {pkg.name}</span>
+                <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
               </>
             )}
           </div>
