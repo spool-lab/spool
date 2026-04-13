@@ -54,7 +54,7 @@ export class GitHubStarsConnector implements Connector {
       throw new SyncError(SyncErrorCode.API_UNEXPECTED_STATUS, `gh api failed: ${result.stderr.slice(0, 300)}`)
     }
 
-    const items = parseCliJsonOutput(result.stdout, 'github')
+    const items = parseCliJsonOutput(result.stdout, 'github', 'repo')
 
     if (items.length === 0) {
       return { items: [], nextCursor: null }

@@ -32,7 +32,7 @@ describe('parseCliJsonOutput', () => {
         stargazers_count: 100,
       },
     }])
-    const items = parseCliJsonOutput(input, 'github')
+    const items = parseCliJsonOutput(input, 'github', 'repo')
     expect(items.length).toBe(1)
     expect(items[0].url).toBe('https://github.com/user/repo')
     expect(items[0].title).toBe('user/repo')
@@ -63,10 +63,10 @@ describe('parseCliJsonOutput', () => {
     expect(items[0].url).toBe('https://github.com/user/repo')
   })
 
-  it('infers content type from platform', () => {
+  it('uses contentType from caller, defaults to page', () => {
     const input = JSON.stringify([{ id: '1', title: 'Post', url: 'https://x.com' }])
-    expect(parseCliJsonOutput(input, 'twitter')[0].contentType).toBe('tweet')
-    expect(parseCliJsonOutput(input, 'youtube')[0].contentType).toBe('video')
-    expect(parseCliJsonOutput(input, 'xiaohongshu')[0].contentType).toBe('post')
+    expect(parseCliJsonOutput(input, 'github', 'repo')[0].contentType).toBe('repo')
+    expect(parseCliJsonOutput(input, 'twitter', 'tweet')[0].contentType).toBe('tweet')
+    expect(parseCliJsonOutput(input, 'unknown')[0].contentType).toBe('page')
   })
 })
