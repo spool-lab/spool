@@ -513,6 +513,13 @@ app.on('before-quit', () => {
 
 // ── Connector helpers ─────────────────────────────────────────────────────────
 
+function tryRun(fn: () => void, label: string, fallback?: () => void): void {
+  try { fn() } catch (err) {
+    if (fallback) try { fallback() } catch (err2) { console.warn(`[uninstall] fallback also failed for ${label}:`, err2) }
+    console.error(`[uninstall] failed to delete ${label}:`, err)
+  }
+}
+
 interface InstalledConnectorInfo { packageName: string; currentVersion: string; connectorId: string; platform: string }
 
 function getInstalledConnectorPackages(): InstalledConnectorInfo[] {
@@ -796,26 +803,14 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   // Files before DB: ensures .do-not-restore is written even if DB ops fail
   uninstallConnector(packageName, connectorsDir)
 
-  // DB cleanup is best-effort — the captures_fts_delete trigger can fail
-  // on corrupted FTS rows, so each DELETE is individually try-caught.
+  // Best-effort DB cleanup — captures_fts_delete trigger can fail on corrupted FTS rows
   for (const sib of siblings) {
-    try {
-      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId)
-    } catch (err) {
-      console.error(`[uninstall] failed to delete sync state for ${sib.connectorId}:`, err)
-    }
-    try {
-      db.prepare(
-        "DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?",
-      ).run(sib.connectorId)
-    } catch (err) {
-      try {
-        db.prepare('DELETE FROM captures WHERE platform = ?').run(sib.platform)
-      } catch (err2) {
-        console.warn(`[uninstall] fallback captures delete also failed for ${sib.connectorId}:`, err2)
-      }
-      console.error(`[uninstall] failed to delete captures for ${sib.connectorId}:`, err)
-    }
+    tryRun(() => db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId), `sync state for ${sib.connectorId}`)
+    tryRun(
+      () => db.prepare("DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?").run(sib.connectorId),
+      `captures for ${sib.connectorId}`,
+      () => db.prepare('DELETE FROM captures WHERE platform = ?').run(sib.platform),
+    )
   }
 
   const removedIds = siblings.map(s => s.connectorId)
