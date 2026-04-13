@@ -8,16 +8,11 @@ import type {
 import { SyncError, SyncErrorCode, parseCliJsonOutput } from '@spool/connector-sdk'
 
 async function checkOpenCLI(caps: ConnectorCapabilities): Promise<AuthStatus> {
+  // Step 1: check opencli is installed
+  let doctorOutput: string
   try {
-    const result = await caps.exec.run('opencli', ['--version'], { timeout: 5000 })
-    if (result.exitCode !== 0) {
-      return {
-        ok: false,
-        error: SyncErrorCode.AUTH_NOT_LOGGED_IN,
-        message: 'opencli not working',
-        hint: 'Install opencli: npm i -g @jackwener/opencli',
-      }
-    }
+    const result = await caps.exec.run('opencli', ['doctor'], { timeout: 10000 })
+    doctorOutput = result.stdout + result.stderr
   } catch {
     return {
       ok: false,
@@ -27,29 +22,26 @@ async function checkOpenCLI(caps: ConnectorCapabilities): Promise<AuthStatus> {
     }
   }
 
-  // Check xiaohongshu auth by attempting a minimal fetch
-  try {
-    const result = await caps.exec.run('opencli', ['xiaohongshu', 'feed', '-f', 'json', '--limit', '1'], { timeout: 15000 })
-    if (result.exitCode !== 0) {
-      const isAuth = /login|auth|cookie|session/i.test(result.stderr)
-      return {
-        ok: false,
-        error: isAuth ? SyncErrorCode.AUTH_NOT_LOGGED_IN : SyncErrorCode.CONNECTOR_ERROR,
-        message: result.stderr.slice(0, 200),
-        hint: isAuth
-          ? 'Log into Xiaohongshu in Chrome, then run: opencli xiaohongshu feed'
-          : `opencli error: ${result.stderr.slice(0, 100)}`,
-      }
-    }
-    return { ok: true }
-  } catch (err) {
+  // Step 2: check browser bridge connectivity via doctor output
+  if (!/\[OK\].*Extension/i.test(doctorOutput)) {
     return {
       ok: false,
-      error: SyncErrorCode.CONNECTOR_ERROR,
-      message: err instanceof Error ? err.message : String(err),
-      hint: 'Check opencli installation: opencli xiaohongshu feed -f json --limit 1',
+      error: SyncErrorCode.AUTH_NOT_LOGGED_IN,
+      message: 'opencli Browser Bridge not connected',
+      hint: 'Install the opencli Browser Bridge extension in Chrome. Run "opencli doctor" for details.',
     }
   }
+
+  if (!/\[OK\].*Connectivity/i.test(doctorOutput)) {
+    return {
+      ok: false,
+      error: SyncErrorCode.AUTH_NOT_LOGGED_IN,
+      message: 'opencli connectivity check failed',
+      hint: 'Open Chrome and make sure the opencli extension is enabled. Run "opencli doctor" for details.',
+    }
+  }
+
+  return { ok: true }
 }
 
 async function runOpenCLI(

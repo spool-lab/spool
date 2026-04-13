@@ -52,6 +52,17 @@ describe('parseCliJsonOutput', () => {
     expect(items.length).toBe(2)
   })
 
+  it('prefers html_url over url (GitHub API URLs are not web URLs)', () => {
+    const input = JSON.stringify([{
+      id: '1',
+      url: 'https://api.github.com/repos/user/repo',
+      html_url: 'https://github.com/user/repo',
+      full_name: 'user/repo',
+    }])
+    const items = parseCliJsonOutput(input, 'github')
+    expect(items[0].url).toBe('https://github.com/user/repo')
+  })
+
   it('infers content type from platform', () => {
     const input = JSON.stringify([{ id: '1', title: 'Post', url: 'https://x.com' }])
     expect(parseCliJsonOutput(input, 'twitter')[0].contentType).toBe('tweet')

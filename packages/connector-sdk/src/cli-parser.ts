@@ -36,7 +36,7 @@ function parseOneItem(raw: Record<string, unknown>, platform: string): CapturedI
     raw = { ...repo, starred_at: starredAt ?? repo['created_at'] }
   }
 
-  const url = String(raw['url'] ?? raw['link'] ?? raw['html_url'] ?? '')
+  const url = String(raw['html_url'] ?? raw['link'] ?? raw['url'] ?? '')
   const title = String(raw['title'] ?? raw['name'] ?? raw['full_name'] ?? '')
   const contentText = String(
     raw['content'] ?? raw['description'] ?? raw['text'] ?? raw['body']
