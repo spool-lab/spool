@@ -314,7 +314,7 @@ function AppearanceTab({
 function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
   const [connectorCounts, setConnectorCounts] = useState<Record<string, number>>({})
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedPkg, setSelectedPkg] = useState<string | null>(null)
   const [syncingConnector, setSyncingConnector] = useState<string | null>(null)
   const [syncProgress, setSyncProgress] = useState<Record<string, { added: number; phase: string }>>({})
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -363,6 +363,9 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
       } else if (event.type === 'installed') {
         loadConnectors()
+      } else if (event.type === 'uninstalled') {
+        setSelectedPkg(null)
+        loadConnectors()
       }
     })
     return off
@@ -380,7 +383,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const installedIds = new Set(connectors.map(c => c.id))
   const uninstalledConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
 
-  // Group by npm package name so multi-connector packages show as one row
+  // Group available connectors by npm package so multi-connector packages show as one row
   const discoverPackages: Array<{ name: string; label: string; color: string; description: string; subs: Array<{ label: string; description: string }> }> = []
   const seen = new Set<string>()
   for (const rc of uninstalledConnectors) {
@@ -397,6 +400,14 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       subs: [{ label: rc.label, description: rc.description }],
     })
   }
+  for (const pkg of discoverPackages) {
+    if (pkg.subs.length > 1) {
+      const words = pkg.subs[0].label.split(' ')
+      const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
+      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0].label.split(' ')[0]
+    }
+  }
+
   for (const pkg of discoverPackages) {
     if (pkg.subs.length > 1) {
       const words = pkg.subs[0].label.split(' ')
@@ -451,17 +462,24 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
     }
   }
 
-  const selected = connectors.find(c => c.id === selectedId)
+  // Package-level detail: find all connectors for selected package
+  const pkgConnectors = selectedPkg
+    ? connectors.filter(c => (c.packageName || c.id) === selectedPkg)
+    : []
 
-  // ── Detail view (drill-down) ──
-  if (selected) {
-    const isSyncing = syncingConnector === selected.id || selected.syncing
-    const progress = syncProgress[selected.id]
+  // ── Detail view (drill-down) — package level ──
+  if (selectedPkg && pkgConnectors.length > 0) {
+    const first = pkgConnectors[0]
+    const isBundled = pkgConnectors.every(c => c.bundled)
+    const pkgLabel = pkgConnectors.length > 1
+      ? (() => { const words = first.label.split(' '); const common = words.filter(w => pkgConnectors.every(c => c.label.includes(w))); return common.length > 0 ? common.join(' ') : first.label.split(' ')[0] })()
+      : first.label
+
     return (
       <div className="space-y-5">
         {/* Back button */}
         <button
-          onClick={() => setSelectedId(null)}
+          onClick={() => setSelectedPkg(null)}
           className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -470,130 +488,143 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           Back
         </button>
 
-        {/* Connector header */}
+        {/* Package header */}
         <div className="flex items-start gap-3">
-          <span
-            className={`w-3 h-3 rounded-full flex-none mt-0.5 ${isSyncing ? 'animate-pulse' : ''}`}
-            style={{ background: selected.enabled ? selected.color : '#888' }}
-          />
+          <span className="w-3 h-3 rounded-full flex-none mt-0.5" style={{ background: first.color }} />
           <div className="flex-1 min-w-0">
-            <h4 className="text-xs font-medium text-warm-text dark:text-dark-text">{selected.label}</h4>
-            <p className="text-[11px] text-warm-faint dark:text-dark-muted">{selected.description}</p>
-            {!selected.bundled && <div className="flex items-center mt-1.5 text-[11px]">
-              <span className="font-mono text-warm-faint dark:text-dark-muted">v{selected.version}</span>
-              <div className="flex items-center gap-2 ml-auto">
-                {availableUpdates[selected.id] && (
-                  <button
-                    onClick={() => handleUpdate(selected.id)}
-                    disabled={updatingConnector === selected.id}
-                    className="font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50"
-                  >
-                    {updatingConnector === selected.id ? 'Updating…' : 'Update'}
-                  </button>
-                )}
-                {!selected.bundled && (
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-medium text-warm-text dark:text-dark-text">{pkgLabel}</h4>
+              {!isBundled && <span className="text-[10px] font-mono text-warm-faint dark:text-dark-faint">v{first.version}</span>}
+              {!isBundled && (
+                <div className="flex items-center gap-2 ml-auto text-[11px]">
+                  {availableUpdates[first.id] && (
+                    <button
+                      onClick={() => handleUpdate(first.id)}
+                      disabled={updatingConnector === first.id}
+                      className="font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50"
+                    >
+                      {updatingConnector === first.id ? 'Updating…' : 'Update'}
+                    </button>
+                  )}
                   <button
                     onClick={async () => {
-                      const count = connectorCounts[selected.id] ?? 0
-                      const msg = count > 0
-                        ? `Uninstall "${selected.label}"?\n\nThis will permanently delete ${count} synced item${count === 1 ? '' : 's'} and remove the connector. You can reinstall it later from spool.pro/connectors.`
-                        : `Uninstall "${selected.label}"?\n\nThis will remove the connector. You can reinstall it later from spool.pro/connectors.`
+                      const totalCount = pkgConnectors.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
+                      const names = pkgConnectors.map(c => c.label).join(', ')
+                      const msg = totalCount > 0
+                        ? `Uninstall "${pkgLabel}"?\n\nThis will remove ${names} and permanently delete ${totalCount} synced item${totalCount === 1 ? '' : 's'}. You can reinstall from spool.pro/connectors.`
+                        : `Uninstall "${pkgLabel}"?\n\nThis will remove ${names}. You can reinstall from spool.pro/connectors.`
                       if (!confirm(msg)) return
-                      await window.spool?.connectors.uninstall(selected.id)
-                      setSelectedId(null)
-                      await loadConnectors()
+                      setSelectedPkg(null)
+                      await window.spool?.connectors.uninstall(first.id)
                     }}
                     className="font-medium text-warm-faint dark:text-dark-muted hover:text-red-400 hover:underline"
                   >
                     Uninstall
                   </button>
-                )}
-              </div>
-            </div>}
-            {updateErrors[selected.id] && updatingConnector !== selected.id && (
-              <p className="text-[11px] text-red-400 mt-1">{updateErrors[selected.id]}</p>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-warm-faint dark:text-dark-muted">
+              {pkgConnectors.length === 1 ? first.description : pkgConnectors.map(c => c.label).join(', ')}
+            </p>
+            {updateErrors[first.id] && updatingConnector !== first.id && (
+              <p className="text-[11px] text-red-400 mt-1">{updateErrors[first.id]}</p>
             )}
           </div>
         </div>
 
-        {/* Status */}
-        <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
-            <span className={`text-[11px] font-medium ${selected.enabled ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
-              {!selected.enabled
-                ? 'Disabled'
-                : isSyncing
-                  ? 'Syncing…'
-                  : selected.state.lastErrorCode?.startsWith('AUTH_')
-                    ? 'Needs login'
-                    : 'Connected'}
-            </span>
-          </div>
-          {selected.enabled && (connectorCounts[selected.id] ?? 0) > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-warm-muted dark:text-dark-muted">Items</span>
-              <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted">
-                {connectorCounts[selected.id]} · {formatSyncTime(selected.state.lastForwardSyncAt)}
-              </span>
-            </div>
-          )}
-          {isSyncing && progress && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
-              <span className="text-[11px] text-warm-faint dark:text-dark-muted">
-                {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
-              </span>
-            </div>
-          )}
-          {selected.enabled && !isSyncing && selected.state.lastErrorCode && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-warm-muted dark:text-dark-muted">Error</span>
-              <span className="text-[11px] text-red-400 dark:text-red-400 max-w-[60%] truncate text-right" title={selected.state.lastErrorMessage ?? undefined}>
-                {selected.state.lastErrorMessage ?? selected.state.lastErrorCode}
-              </span>
-            </div>
-          )}
-          {selected.enabled && !selected.state.tailComplete && !isSyncing && !selected.state.lastErrorCode && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
-              <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
-            </div>
-          )}
-        </div>
+        {/* Per-connector cards */}
+        {pkgConnectors.map(c => {
+          const isSyncing = syncingConnector === c.id || c.syncing
+          const progress = syncProgress[c.id]
+          return (
+            <div key={c.id} className="space-y-3">
+              {pkgConnectors.length > 1 && (
+                <div>
+                  <h5 className="text-[11px] font-medium text-warm-text dark:text-dark-text">{c.label}</h5>
+                  <p className="text-[10px] text-warm-faint dark:text-dark-muted">{c.description}</p>
+                </div>
+              )}
+              {/* Status */}
+              <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
+                  <span className={`text-[11px] font-medium ${c.enabled ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
+                    {!c.enabled
+                      ? 'Disabled'
+                      : isSyncing
+                        ? 'Syncing…'
+                        : c.state.lastErrorCode?.startsWith('AUTH_')
+                          ? 'Needs login'
+                          : 'Connected'}
+                  </span>
+                </div>
+                {c.enabled && (connectorCounts[c.id] ?? 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-warm-muted dark:text-dark-muted">Items</span>
+                    <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted">
+                      {connectorCounts[c.id]} · {formatSyncTime(c.state.lastForwardSyncAt)}
+                    </span>
+                  </div>
+                )}
+                {isSyncing && progress && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
+                    <span className="text-[11px] text-warm-faint dark:text-dark-muted">
+                      {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
+                    </span>
+                  </div>
+                )}
+                {c.enabled && !isSyncing && c.state.lastErrorCode && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-warm-muted dark:text-dark-muted">Error</span>
+                    <span className="text-[11px] text-red-400 max-w-[60%] truncate text-right" title={c.state.lastErrorMessage ?? undefined}>
+                      {c.state.lastErrorMessage ?? c.state.lastErrorCode}
+                    </span>
+                  </div>
+                )}
+                {c.enabled && !c.state.tailComplete && !isSyncing && !c.state.lastErrorCode && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
+                    <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
+                  </div>
+                )}
+              </div>
 
-        {/* Enable toggle */}
-        <div className="flex items-center justify-between px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
-          <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
-          <button
-            onClick={() => handleToggleEnabled(selected.id, !selected.enabled)}
-            className={`relative w-8 h-[18px] rounded-full transition-colors ${
-              selected.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
-            }`}
-          >
-            <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
-              selected.enabled ? 'left-[16px]' : 'left-[2px]'
-            }`} />
-          </button>
-        </div>
+              {/* Enable toggle */}
+              <div className="flex items-center justify-between px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
+                <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
+                <button
+                  onClick={() => handleToggleEnabled(c.id, !c.enabled)}
+                  className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                    c.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
+                  }`}
+                >
+                  <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
+                    c.enabled ? 'left-[16px]' : 'left-[2px]'
+                  }`} />
+                </button>
+              </div>
 
-        {/* Sync button */}
-        {selected.enabled && (
-          <button
-            onClick={() => handleSync(selected.id)}
-            disabled={isSyncing}
-            className="w-full py-2 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[8px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
-          >
-            {isSyncing ? 'Syncing…' : 'Sync now'}
-          </button>
-        )}
+              {/* Sync button */}
+              {c.enabled && (
+                <button
+                  onClick={() => handleSync(c.id)}
+                  disabled={isSyncing}
+                  className="w-full py-2 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[8px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
+                >
+                  {isSyncing ? 'Syncing…' : 'Sync now'}
+                </button>
+              )}
+            </div>
+          )
+        })}
 
         {syncError && (
           <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
             <p className="text-xs text-red-500">{syncError}</p>
           </div>
         )}
-
       </div>
     )
   }
@@ -611,44 +642,79 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         {connectors.length === 0 && (
           <p className="text-xs text-warm-faint dark:text-dark-muted">No connectors installed yet</p>
         )}
-        {connectors.map(c => {
-          const isSyncing = syncingConnector === c.id || c.syncing
-          const progress = syncProgress[c.id]
-          return (
-            <button
-              key={c.id}
-              onClick={() => setSelectedId(c.id)}
-              className="w-full flex items-center gap-3 py-2.5 rounded-[6px] text-left relative before:absolute before:-inset-x-2 before:inset-y-0 before:rounded-[6px] before:transition-colors hover:before:bg-warm-surface/50 dark:hover:before:bg-dark-surface/50"
-            >
-              <span
-                className={`w-2 h-2 rounded-full flex-none ${isSyncing ? 'animate-pulse' : ''}`}
-                style={{ background: c.enabled ? c.color : '#888' }}
-              />
-              <div className="flex-1 min-w-0 leading-4">
-                <span className={`text-xs ${c.enabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
-                  {c.label}
-                </span>
-                <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
-                  {!c.enabled
-                    ? 'Not connected'
-                    : isSyncing && progress
-                      ? `${progress.added} new · ${progress.phase === 'forward' ? 'fetching' : 'backfilling'}…`
-                      : (connectorCounts[c.id] ?? 0) > 0
-                        ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}`
-                        : c.state.lastErrorCode
-                          ? c.state.lastErrorMessage ?? 'Error'
-                          : 'Not synced yet'}
-                </span>
-              </div>
-              {c.enabled && !isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
-                <span className="text-[10px] text-amber-500 font-medium">needs login</span>
-              )}
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-warm-faint dark:text-dark-muted">
-                <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )
-        })}
+        {(() => {
+          // Group installed connectors by package
+          const groups: Array<{ key: string; label: string; color: string; items: typeof connectors }> = []
+          const seen = new Set<string>()
+          for (const c of connectors) {
+            const key = c.packageName || c.id
+            if (seen.has(key)) { groups.find(g => g.key === key)?.items.push(c); continue }
+            seen.add(key)
+            groups.push({ key, label: c.label, color: c.color, items: [c] })
+          }
+          for (const g of groups) {
+            if (g.items.length > 1) {
+              const words = g.items[0].label.split(' ')
+              const common = words.filter(w => g.items.every(c => c.label.includes(w)))
+              g.label = common.length > 0 ? common.join(' ') : g.items[0].label.split(' ')[0]
+            }
+          }
+          return groups.map(g => {
+            const totalItems = g.items.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
+            const anyEnabled = g.items.some(c => c.state.enabled)
+            const anySyncing = g.items.some(c => syncingConnector === c.id || c.syncing)
+            const lastSync = g.items.map(c => c.state.lastForwardSyncAt).filter(Boolean).sort().pop() ?? null
+            const anyError = g.items.some(c => c.state.lastErrorCode)
+            return (
+              <button
+                key={g.key}
+                onClick={() => setSelectedPkg(g.key)}
+                className="w-full flex items-center gap-3 py-2.5 rounded-[6px] text-left relative before:absolute before:-inset-x-2 before:inset-y-0 before:rounded-[6px] before:transition-colors hover:before:bg-warm-surface/50 dark:hover:before:bg-dark-surface/50"
+              >
+                <span
+                  className={`w-2 h-2 rounded-full flex-none ${anySyncing ? 'animate-pulse' : ''}`}
+                  style={{ background: anyEnabled ? g.color : '#888' }}
+                />
+                <div className="flex-1 min-w-0 leading-4">
+                  <span className={`text-xs ${anyEnabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
+                    {g.label}
+                  </span>
+                  {g.items.length > 1 ? (
+                    <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
+                      {!anyEnabled
+                        ? g.items.map(c => c.label).join(', ')
+                        : anySyncing
+                          ? 'Syncing…'
+                          : totalItems > 0
+                            ? `${totalItems} items · ${formatSyncTime(lastSync)}`
+                            : anyError
+                              ? 'Error'
+                              : 'Not synced yet'}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
+                      {!anyEnabled
+                        ? 'Not connected'
+                        : anySyncing
+                          ? 'Syncing…'
+                          : totalItems > 0
+                            ? `${totalItems} items · ${formatSyncTime(lastSync)}`
+                            : anyError
+                              ? 'Error'
+                              : 'Not synced yet'}
+                    </span>
+                  )}
+                </div>
+                {anyEnabled && !anySyncing && anyError && (
+                  <span className="text-[10px] text-amber-500 font-medium">needs login</span>
+                )}
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-warm-faint dark:text-dark-muted">
+                  <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )
+          })
+        })()}
       </Section>
 
       {!registryLoading && !registryError && discoverPackages.length > 0 && (

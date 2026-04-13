@@ -715,10 +715,12 @@ ipcMain.handle('spool:install-update', () => {
 ipcMain.handle('connector:list', (): ConnectorStatus[] => {
   const installed = getInstalledConnectorPackages()
   const versionMap = new Map(installed.map(p => [p.connectorId, p.currentVersion]))
+  const pkgNameMap = new Map(installed.map(p => [p.connectorId, p.packageName]))
   return syncScheduler.getStatus().connectors.map(c => ({
     ...c,
     bundled: bundledConnectorIds.has(c.id),
     version: versionMap.get(c.id) ?? '0.0.0',
+    packageName: pkgNameMap.get(c.id) ?? '',
   }))
 })
 
@@ -775,10 +777,13 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   // Delete package files and mark .do-not-restore
   uninstallConnector(packageName, connectorsDir)
 
-  // Notify renderer for each removed connector
-  for (const sib of siblings) {
-    mainWindow?.webContents.send('connector:event', { type: 'uninstalled', connectorId: sib.connectorId })
-  }
+  // Notify renderer once for the whole package uninstall
+  mainWindow?.webContents.send('connector:event', {
+    type: 'uninstalled',
+    connectorId: id,
+    packageName,
+    removedIds: siblings.map(s => s.connectorId),
+  })
 
   return { ok: true }
 })

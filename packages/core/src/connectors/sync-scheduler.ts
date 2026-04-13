@@ -131,6 +131,7 @@ export class SyncScheduler {
         syncing: this.running.has(c.id),
         bundled: false,
         version: '0.0.0',
+        packageName: '',
         state,
       }
     })
