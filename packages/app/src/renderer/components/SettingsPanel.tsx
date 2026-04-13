@@ -381,11 +381,11 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const uninstalledConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
 
   // Group by npm package name so multi-connector packages show as one row
-  const discoverPackages: Array<{ name: string; label: string; color: string; description: string; connectorLabels: string[] }> = []
+  const discoverPackages: Array<{ name: string; label: string; color: string; description: string; subs: Array<{ label: string; description: string }> }> = []
   const seen = new Set<string>()
   for (const rc of uninstalledConnectors) {
     if (seen.has(rc.name)) {
-      discoverPackages.find(p => p.name === rc.name)?.connectorLabels.push(rc.label)
+      discoverPackages.find(p => p.name === rc.name)?.subs.push({ label: rc.label, description: rc.description })
       continue
     }
     seen.add(rc.name)
@@ -394,14 +394,14 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
       label: rc.label,
       color: rc.color,
       description: rc.description,
-      connectorLabels: [rc.label],
+      subs: [{ label: rc.label, description: rc.description }],
     })
   }
   for (const pkg of discoverPackages) {
-    if (pkg.connectorLabels.length > 1) {
-      const words = pkg.connectorLabels[0].split(' ')
-      const common = words.filter(w => pkg.connectorLabels.every(l => l.includes(w)))
-      pkg.label = common.length > 0 ? common.join(' ') : pkg.connectorLabels[0].split(' ')[0]
+    if (pkg.subs.length > 1) {
+      const words = pkg.subs[0].label.split(' ')
+      const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
+      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0].label.split(' ')[0]
     }
   }
 
@@ -664,10 +664,16 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               />
               <div className="flex-1 min-w-0 leading-4">
                 <span className="text-xs text-warm-muted dark:text-dark-muted">{pkg.label}</span>
-                {pkg.connectorLabels.length > 1 ? (
-                  <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">
-                    Includes: {pkg.connectorLabels.join(', ')}
-                  </span>
+                {pkg.subs.length > 1 ? (
+                  <div className="mt-1 space-y-0.5">
+                    {pkg.subs.map((sub, i) => (
+                      <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
+                        <span className="text-warm-faint dark:text-dark-faint">·</span>
+                        <span className="text-warm-muted dark:text-dark-muted">{sub.label}</span>
+                        <span className="text-warm-faint dark:text-dark-faint">{sub.description}</span>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{pkg.description}</span>
                 )}
