@@ -71,6 +71,7 @@ export async function loadConnectors(deps: LoadDeps): Promise<LoadReport> {
   const { bundledConnectorsDir, connectorsDir, log } = deps
 
   importedModules.clear()
+  // Clear before re-populating so connectors deleted from disk don't linger
   deps.registry.clear()
 
   const bundleReport = await extractBundledConnectorsIfNeeded({

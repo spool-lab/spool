@@ -171,10 +171,13 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 
 const VALID_NPM_NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
-// Serialize install/uninstall/update/reload to prevent interleaving race conditions
+// Serialize async connector operations (install/update) via a promise chain.
+// Prevents races where reloadConnectors() from an install could re-register
+// a connector that a concurrent uninstall just removed.
 let connectorOpQueue: Promise<void> = Promise.resolve()
 function withConnectorLock<T>(fn: () => Promise<T>): Promise<T> {
   const next = connectorOpQueue.then(fn, fn)
+  // Swallow rejections on the queue so a failed op doesn't block subsequent ones
   connectorOpQueue = next.then(() => {}, () => {})
   return next
 }
@@ -203,7 +206,9 @@ function installConnectorPackage(
         for (const cid of ids) {
           db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(cid)
         }
-      } catch {}
+      } catch (err) {
+        console.warn('[install] failed to clear stale sync state:', err)
+      }
 
       await reloadConnectors()
 
@@ -508,12 +513,14 @@ app.on('before-quit', () => {
 
 // ── Connector helpers ─────────────────────────────────────────────────────────
 
-function getInstalledConnectorPackages(): Array<{ packageName: string; currentVersion: string; connectorId: string }> {
+interface InstalledConnectorInfo { packageName: string; currentVersion: string; connectorId: string; platform: string }
+
+function getInstalledConnectorPackages(): InstalledConnectorInfo[] {
   const connectorsDir = join(spoolDir, 'connectors')
   const nodeModules = join(connectorsDir, 'node_modules')
   if (!existsSync(nodeModules)) return []
 
-  const results: Array<{ packageName: string; currentVersion: string; connectorId: string }> = []
+  const results: InstalledConnectorInfo[] = []
   for (const entry of readdirSync(nodeModules)) {
     if (entry.startsWith('.')) continue
     const dirs = entry.startsWith('@')
@@ -525,16 +532,14 @@ function getInstalledConnectorPackages(): Array<{ packageName: string; currentVe
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
         if (pkg.spool?.type !== 'connector') continue
-        // Multi-connector package
         if (Array.isArray(pkg.spool.connectors)) {
           for (const c of pkg.spool.connectors) {
             if (c.id && !bundledConnectorIds.has(c.id)) {
-              results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: c.id })
+              results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: c.id, platform: c.platform ?? '' })
             }
           }
-        // Single-connector package
         } else if (pkg.spool.id && !bundledConnectorIds.has(pkg.spool.id)) {
-          results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: pkg.spool.id })
+          results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: pkg.spool.id, platform: pkg.spool.platform ?? '' })
         }
       } catch {}
     }
@@ -773,7 +778,6 @@ ipcMain.handle('connector:set-enabled', (_e, { id, enabled }: { id: string; enab
 ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   const connectorsDir = join(spoolDir, 'connectors')
 
-  // 1. Find package and all sibling connectors (from disk, before deletion)
   const allInstalled = getInstalledConnectorPackages()
   const pkg = allInstalled.find(p => p.connectorId === id)
   if (!pkg) {
@@ -781,39 +785,40 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   }
   const packageName = pkg.packageName
   const siblings = allInstalled.filter(p => p.packageName === packageName)
-  const removedIds = siblings.map(s => s.connectorId)
 
-  // 2. Remove from registry + cancel in-flight syncs (critical — must happen first)
-  for (const sib of removedIds) {
-    connectorRegistry.remove(sib)
-    syncScheduler.cancelIfRunning(sib)
+  // Registry + scheduler first: prevents the scheduler tick from re-queuing
+  // syncs, and lets in-flight syncs wind down via the cancel signal.
+  for (const sib of siblings) {
+    connectorRegistry.remove(sib.connectorId)
+    syncScheduler.cancelIfRunning(sib.connectorId)
   }
 
-  // 3. Delete package files (critical — before DB cleanup so re-extraction is blocked)
+  // Files before DB: ensures .do-not-restore is written even if DB ops fail
   uninstallConnector(packageName, connectorsDir)
 
-  // 4. Clean up DB (best-effort — json_extract can fail on corrupted rows)
-  for (const sib of removedIds) {
+  // DB cleanup is best-effort — the captures_fts_delete trigger can fail
+  // on corrupted FTS rows, so each DELETE is individually try-caught.
+  for (const sib of siblings) {
     try {
-      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib)
+      db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId)
     } catch (err) {
-      console.error(`[uninstall] failed to delete sync state for ${sib}:`, err)
+      console.error(`[uninstall] failed to delete sync state for ${sib.connectorId}:`, err)
     }
     try {
       db.prepare(
         "DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?",
-      ).run(sib)
+      ).run(sib.connectorId)
     } catch (err) {
-      // Fallback: delete by platform if json_extract fails (corrupted metadata rows)
       try {
-        const platform = sib.replace(/-[^-]+$/, '')
-        db.prepare('DELETE FROM captures WHERE platform = ?').run(platform)
-      } catch {}
-      console.error(`[uninstall] failed to delete captures for ${sib}:`, err)
+        db.prepare('DELETE FROM captures WHERE platform = ?').run(sib.platform)
+      } catch (err2) {
+        console.warn(`[uninstall] fallback captures delete also failed for ${sib.connectorId}:`, err2)
+      }
+      console.error(`[uninstall] failed to delete captures for ${sib.connectorId}:`, err)
     }
   }
 
-  // 5. Notify renderer
+  const removedIds = siblings.map(s => s.connectorId)
   mainWindow?.webContents.send('connector:event', {
     type: 'uninstalled',
     connectorId: id,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import type { ConnectorStatus, RegistryConnector } from '@spool/core'
 import type { AgentInfo, AgentsConfig, SdkAgentConfig } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
@@ -9,6 +9,15 @@ import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessi
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
+
+// Derive a shared label for a multi-connector package from its sub-connector labels.
+// e.g. ["GitHub Stars", "GitHub Notifications"] → "GitHub"
+function commonLabel(labels: string[]): string {
+  if (labels.length <= 1) return labels[0] ?? ''
+  const words = labels[0]!.split(' ')
+  const shared = words.filter(w => labels.every(l => l.includes(w)))
+  return shared.length > 0 ? shared.join(' ') : words[0]!
+}
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_OPTIONS = [
@@ -385,29 +394,19 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   const uninstalledConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
 
   // Group available connectors by npm package so multi-connector packages show as one row
-  const discoverPackages: Array<{ name: string; label: string; color: string; description: string; subs: Array<{ label: string; description: string }> }> = []
-  const seen = new Set<string>()
-  for (const rc of uninstalledConnectors) {
-    if (seen.has(rc.name)) {
-      discoverPackages.find(p => p.name === rc.name)?.subs.push({ label: rc.label, description: rc.description })
-      continue
+  const discoverPackages = useMemo(() => {
+    const byName = new Map<string, { name: string; label: string; color: string; description: string; subs: Array<{ label: string; description: string }> }>()
+    for (const rc of uninstalledConnectors) {
+      const existing = byName.get(rc.name)
+      if (existing) { existing.subs.push({ label: rc.label, description: rc.description }); continue }
+      byName.set(rc.name, { name: rc.name, label: rc.label, color: rc.color, description: rc.description, subs: [{ label: rc.label, description: rc.description }] })
     }
-    seen.add(rc.name)
-    discoverPackages.push({
-      name: rc.name,
-      label: rc.label,
-      color: rc.color,
-      description: rc.description,
-      subs: [{ label: rc.label, description: rc.description }],
-    })
-  }
-  for (const pkg of discoverPackages) {
-    if (pkg.subs.length > 1) {
-      const words = pkg.subs[0]!.label.split(' ')
-      const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
-      pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0]!.label.split(' ')[0]!
+    const pkgs = [...byName.values()]
+    for (const pkg of pkgs) {
+      if (pkg.subs.length > 1) pkg.label = commonLabel(pkg.subs.map(s => s.label))
     }
-  }
+    return pkgs
+  }, [uninstalledConnectors])
 
   const handleSync = async (connectorId: string) => {
     if (!window.spool?.connectors) return
@@ -464,9 +463,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   if (selectedPkg && pkgConnectors.length > 0) {
     const first = pkgConnectors[0]!
     const isBundled = pkgConnectors.every(c => c.bundled)
-    const pkgLabel = pkgConnectors.length > 1
-      ? (() => { const words = first.label.split(' '); const common = words.filter(w => pkgConnectors.every(c => c.label.includes(w))); return common.length > 0 ? common.join(' ') : first.label.split(' ')[0] })()
-      : first.label
+    const pkgLabel = commonLabel(pkgConnectors.map(c => c.label))
 
     return (
       <div className="space-y-5">
@@ -645,20 +642,16 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         )}
         {(() => {
           // Group installed connectors by package
-          const groups: Array<{ key: string; label: string; color: string; items: typeof connectors }> = []
-          const seen = new Set<string>()
+          const groupMap = new Map<string, { key: string; label: string; color: string; items: typeof connectors }>()
           for (const c of connectors) {
             const key = c.packageName || c.id
-            if (seen.has(key)) { groups.find(g => g.key === key)?.items.push(c); continue }
-            seen.add(key)
-            groups.push({ key, label: c.label, color: c.color, items: [c] })
+            const existing = groupMap.get(key)
+            if (existing) { existing.items.push(c); continue }
+            groupMap.set(key, { key, label: c.label, color: c.color, items: [c] })
           }
+          const groups = [...groupMap.values()]
           for (const g of groups) {
-            if (g.items.length > 1) {
-              const words = g.items[0]!.label.split(' ')
-              const common = words.filter(w => g.items.every(c => c.label.includes(w)))
-              g.label = common.length > 0 ? common.join(' ') : g.items[0]!.label.split(' ')[0]!
-            }
+            if (g.items.length > 1) g.label = commonLabel(g.items.map(c => c.label))
           }
           return groups.map(g => {
             const totalItems = g.items.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
