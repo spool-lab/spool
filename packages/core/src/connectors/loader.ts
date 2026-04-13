@@ -60,12 +60,17 @@ interface PkgInfo {
     capabilities: string[]
   }
   main: string
+  multi: boolean
 }
 
 const KNOWN_CAPS_SET = new Set<string>(KNOWN_CAPABILITIES_V1)
 
+const importedModules = new Map<string, any>()
+
 export async function loadConnectors(deps: LoadDeps): Promise<LoadReport> {
   const { bundledConnectorsDir, connectorsDir, log } = deps
+
+  importedModules.clear()
 
   const bundleReport = await extractBundledConnectorsIfNeeded({
     bundledDir: bundledConnectorsDir,
@@ -113,12 +118,10 @@ function discoverConnectorPackages(
       }
       for (const sub of scopedEntries) {
         if (sub.startsWith('.')) continue
-        const pkg = tryReadConnectorManifest(join(entryPath, sub), log)
-        if (pkg) results.push(pkg)
+        results.push(...tryReadConnectorManifest(join(entryPath, sub), log))
       }
     } else {
-      const pkg = tryReadConnectorManifest(entryPath, log)
-      if (pkg) results.push(pkg)
+      results.push(...tryReadConnectorManifest(entryPath, log))
     }
   }
 
@@ -128,20 +131,56 @@ function discoverConnectorPackages(
 function tryReadConnectorManifest(
   pkgDir: string,
   log: LoaderLogger,
-): PkgInfo | null {
+): PkgInfo[] {
   const pkgJsonPath = join(pkgDir, 'package.json')
-  if (!existsSync(pkgJsonPath)) return null
+  if (!existsSync(pkgJsonPath)) return []
 
   let json: any
   try {
     json = JSON.parse(readFileSync(pkgJsonPath, 'utf8'))
   } catch (err) {
     log.warn('invalid package.json', { path: pkgJsonPath, error: String(err) })
-    return null
+    return []
   }
 
-  if (json?.spool?.type !== 'connector') return null
+  if (json?.spool?.type !== 'connector') return []
 
+  // Multi-connector package: spool.connectors is an array
+  if (Array.isArray(json.spool.connectors)) {
+    const results: PkgInfo[] = []
+    for (const entry of json.spool.connectors) {
+      const declared: string[] = Array.isArray(entry.capabilities) ? entry.capabilities : []
+      const unknown = declared.filter(c => !KNOWN_CAPS_SET.has(c))
+      if (unknown.length > 0) {
+        log.error('unknown capability in spool.connectors entry', {
+          package: json.name,
+          connectorId: entry.id,
+          unknown,
+          error: `Unknown capability "${unknown[0]}" — known v1 values: ${[...KNOWN_CAPS_SET].join(', ')}`,
+        })
+        continue
+      }
+      results.push({
+        dir: pkgDir,
+        name: String(json.name),
+        version: String(json.version ?? '0.0.0'),
+        manifest: {
+          id: String(entry.id ?? ''),
+          platform: String(entry.platform ?? ''),
+          label: String(entry.label ?? ''),
+          description: String(entry.description ?? ''),
+          color: String(entry.color ?? '#888'),
+          ephemeral: Boolean(entry.ephemeral),
+          capabilities: declared,
+        },
+        main: String(json.main ?? 'dist/index.js'),
+        multi: true,
+      })
+    }
+    return results
+  }
+
+  // Single-connector package (original path)
   const declared: string[] = Array.isArray(json.spool.capabilities)
     ? json.spool.capabilities
     : []
@@ -153,10 +192,10 @@ function tryReadConnectorManifest(
       unknown,
       error: `Unknown capability "${unknown[0]}" — known v1 values: ${[...KNOWN_CAPS_SET].join(', ')}`,
     })
-    return null
+    return []
   }
 
-  return {
+  return [{
     dir: pkgDir,
     name: String(json.name),
     version: String(json.version ?? '0.0.0'),
@@ -170,7 +209,8 @@ function tryReadConnectorManifest(
       capabilities: declared,
     },
     main: String(json.main ?? 'dist/index.js'),
-  }
+    multi: false,
+  }]
 }
 
 async function loadOneConnector(
@@ -178,7 +218,7 @@ async function loadOneConnector(
   deps: LoadDeps,
 ): Promise<LoadResult> {
   if (!deps.trustStore.isTrusted(pkg.name)) {
-    deps.log.info('skip untrusted connector', { name: pkg.name })
+    deps.log.info('skip untrusted connector', { name: pkg.name, id: pkg.manifest.id })
     return { status: 'skipped', name: pkg.name, reason: 'not-in-allowlist' }
   }
 
@@ -187,27 +227,58 @@ async function loadOneConnector(
     if (!existsSync(entryPath)) {
       throw new Error(`entry file not found: ${entryPath}`)
     }
-    const modUrl = pathToFileURL(entryPath).href
-    const mod = await import(modUrl)
-    const ConnectorClass =
-      mod.default ??
-      mod[pkg.manifest.id] ??
-      (typeof mod === 'function' ? mod : null)
+
+    let mod: any
+    if (importedModules.has(entryPath)) {
+      mod = importedModules.get(entryPath)
+    } else {
+      const modUrl = pathToFileURL(entryPath).href
+      mod = await import(modUrl)
+      importedModules.set(entryPath, mod)
+    }
+
+    const caps = buildCapabilities(pkg.manifest.capabilities, pkg.manifest.id, deps.capabilityImpls)
+    let ConnectorClass: any
+
+    if (pkg.multi) {
+      // Multi-connector: find the class from mod.connectors by matching id
+      const classes: any[] = mod.connectors
+      if (!Array.isArray(classes)) {
+        throw new Error('multi-connector package must export a `connectors` array')
+      }
+      ConnectorClass = null
+      for (const Cls of classes) {
+        if (typeof Cls !== 'function') continue
+        const probe: Connector = new Cls(caps)
+        if (probe.id === pkg.manifest.id) {
+          ConnectorClass = Cls
+          break
+        }
+      }
+      if (!ConnectorClass) {
+        throw new Error(`no connector class with id="${pkg.manifest.id}" found in connectors array`)
+      }
+    } else {
+      ConnectorClass =
+        mod.default ??
+        mod[pkg.manifest.id] ??
+        (typeof mod === 'function' ? mod : null)
+    }
 
     if (typeof ConnectorClass !== 'function') {
       throw new Error('module does not export a connector class')
     }
 
-    const caps = buildCapabilities(pkg.manifest.capabilities, pkg.name, deps.capabilityImpls)
     const instance: Connector = new ConnectorClass(caps)
     validateMetadataConsistency(pkg, instance)
 
     deps.registry.register(instance)
-    deps.log.info('loaded connector', { name: pkg.name, version: pkg.version })
+    deps.log.info('loaded connector', { name: pkg.name, id: pkg.manifest.id, version: pkg.version })
     return { status: 'loaded', name: pkg.name, version: pkg.version }
   } catch (err) {
     deps.log.error('failed to load connector', {
       name: pkg.name,
+      id: pkg.manifest.id,
       error: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
     })
