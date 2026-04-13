@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { Worker } from 'node:worker_threads'
@@ -18,6 +18,7 @@ import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
+import { linkDevConnectors } from './dev-connectors.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource } from './uiPreferences.js'
@@ -372,6 +373,10 @@ app.whenReady().then(async () => {
 
   spoolDir = join(homedir(), '.spool')
   trustStore = new TrustStore(spoolDir)
+
+  if (isDev) {
+    linkDevConnectors(spoolDir, resolve(process.cwd(), '../..'))
+  }
 
   const loadReport = await loadConnectors({
     bundledConnectorsDir,
