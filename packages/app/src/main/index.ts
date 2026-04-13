@@ -406,7 +406,13 @@ app.whenReady().then(async () => {
       const pkgPath = join(spoolDir, 'connectors', 'node_modules', ...segs, 'package.json')
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-        if (pkg.spool?.id) bundledConnectorIds.add(pkg.spool.id)
+        if (pkg.spool?.id) {
+          bundledConnectorIds.add(pkg.spool.id)
+        } else if (Array.isArray(pkg.spool?.connectors)) {
+          for (const c of pkg.spool.connectors) {
+            if (c.id) bundledConnectorIds.add(c.id)
+          }
+        }
       } catch {}
     }
   }

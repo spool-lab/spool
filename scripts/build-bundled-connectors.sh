@@ -20,6 +20,8 @@ fi
 
 FIRST_PARTY_PLUGINS=(
   "@spool-lab/connector-twitter-bookmarks"
+  "@spool-lab/connector-github"
+  "@spool-lab/connector-xiaohongshu"
 )
 
 for plugin in "${FIRST_PARTY_PLUGINS[@]}"; do
