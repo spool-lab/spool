@@ -1,0 +1,46 @@
+{
+  "name": "@spool-lab/connector-github",
+  "version": "0.1.0",
+  "description": "GitHub Stars and Notifications for Spool",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "keywords": ["spool-connector", "github"],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@spool/connector-sdk": "workspace:^"
+  },
+  "devDependencies": {
+    "@spool/connector-sdk": "workspace:^",
+    "@types/node": "^22.15.3",
+    "typescript": "^5.7.3"
+  },
+  "spool": {
+    "type": "connector",
+    "connectors": [
+      {
+        "id": "github-stars",
+        "platform": "github",
+        "label": "GitHub Stars",
+        "description": "Repos you recently starred on GitHub",
+        "color": "#333333",
+        "ephemeral": false,
+        "capabilities": ["exec", "log"]
+      },
+      {
+        "id": "github-notifications",
+        "platform": "github",
+        "label": "GitHub Notifications",
+        "description": "Your GitHub notifications",
+        "color": "#333333",
+        "ephemeral": true,
+        "capabilities": ["exec", "log"]
+      }
+    ]
+  }
+}

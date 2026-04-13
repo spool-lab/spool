@@ -147,6 +147,18 @@ importers:
         specifier: ^3.1.2
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)
 
+  packages/connectors/github:
+    devDependencies:
+      '@spool/connector-sdk':
+        specifier: workspace:^
+        version: link:../../connector-sdk
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.19.17
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/connectors/hackernews-hot:
     devDependencies:
       '@spool/connector-sdk':
