@@ -13,19 +13,30 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/packages/app/dist/bundled-connectors"
+BUILD_ONLY=false
+if [[ "${1:-}" == "--build-only" ]]; then
+  BUILD_ONLY=true
+fi
 
 FIRST_PARTY_PLUGINS=(
   "@spool-lab/connector-twitter-bookmarks"
 )
+
+for plugin in "${FIRST_PARTY_PLUGINS[@]}"; do
+  echo "==> Building $plugin"
+  pnpm --filter "$plugin" build
+done
+
+if [[ "$BUILD_ONLY" == true ]]; then
+  echo "==> Build-only mode, skipping pack"
+  exit 0
+fi
 
 echo "==> Preparing $OUT_DIR"
 mkdir -p "$OUT_DIR"
 rm -f "$OUT_DIR"/*.tgz
 
 for plugin in "${FIRST_PARTY_PLUGINS[@]}"; do
-  echo "==> Building $plugin"
-  pnpm --filter "$plugin" build
-
   echo "==> Packing $plugin"
   pkg_dir="$(pnpm --filter "$plugin" exec pwd)"
   (cd "$pkg_dir" && pnpm pack --pack-destination "$OUT_DIR")

@@ -9,7 +9,7 @@
     "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
     "build:core": "pnpm --filter @spool/core build",
     "prebuild:connectors": "bash ../../scripts/build-bundled-connectors.sh",
-    "dev": "pnpm run build:core && pnpm run rebuild:native && electron-vite dev",
+    "dev": "pnpm run build:core && bash ../../scripts/build-bundled-connectors.sh --build-only && pnpm run rebuild:native && electron-vite dev",
     "build": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --publish never",
     "build:mac": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --mac --arm64",
     "build:linux": "pnpm run build:core && pnpm run prebuild:connectors && electron-vite build && electron-builder --linux",
@@ -50,7 +50,9 @@
       {
         "from": "dist/bundled-connectors",
         "to": "bundled-connectors",
-        "filter": ["*.tgz"]
+        "filter": [
+          "*.tgz"
+        ]
       }
     ],
     "asarUnpack": [
@@ -129,6 +131,7 @@
     "electron-builder": "^26.0.12",
     "electron-vite": "^3.1.0",
     "tailwindcss": "^4.1.4",
-    "vite": "^6.3.3"
+    "vite": "^6.3.3",
+    "vitest": "^4.1.4"
   }
 }
