@@ -61,42 +61,6 @@
       "category": "dev",
       "firstParty": true,
       "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
-    },
-    {
-      "name": "@spool-lab/connector-xiaohongshu",
-      "id": "xiaohongshu-feed",
-      "platform": "xiaohongshu",
-      "label": "Xiaohongshu Feed",
-      "description": "Recommended posts on Xiaohongshu",
-      "color": "#FE2C55",
-      "author": "spool-lab",
-      "category": "social",
-      "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
-    },
-    {
-      "name": "@spool-lab/connector-xiaohongshu",
-      "id": "xiaohongshu-notes",
-      "platform": "xiaohongshu",
-      "label": "Xiaohongshu My Notes",
-      "description": "Your published notes with stats",
-      "color": "#FE2C55",
-      "author": "spool-lab",
-      "category": "social",
-      "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
-    },
-    {
-      "name": "@spool-lab/connector-xiaohongshu",
-      "id": "xiaohongshu-notifications",
-      "platform": "xiaohongshu",
-      "label": "Xiaohongshu Notifications",
-      "description": "Your notifications on Xiaohongshu",
-      "color": "#FE2C55",
-      "author": "spool-lab",
-      "category": "social",
-      "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
     }
   ]
 }
