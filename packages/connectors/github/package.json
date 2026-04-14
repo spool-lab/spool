@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/connector-github",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GitHub Stars and Notifications for Spool",
   "type": "module",
   "main": "./dist/index.js",
