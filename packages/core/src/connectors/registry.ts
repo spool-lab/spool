@@ -1,4 +1,4 @@
-import type { Connector } from './types.js'
+import type { Connector, ConnectorPackage } from './types.js'
 
 /**
  * In-memory registry of available connectors.
@@ -8,9 +8,34 @@ import type { Connector } from './types.js'
  */
 export class ConnectorRegistry {
   private connectors = new Map<string, Connector>()
+  private packages = new Map<string, ConnectorPackage>()
 
   register(connector: Connector): void {
     this.connectors.set(connector.id, connector)
+  }
+
+  registerPackage(pkg: ConnectorPackage): void {
+    const existing = this.packages.get(pkg.id)
+    if (existing) {
+      // Multi-connector packages register once per sub-connector — merge the connectors list
+      const mergedConnectors = [...existing.connectors]
+      for (const c of pkg.connectors) {
+        if (!mergedConnectors.some(e => e.id === c.id)) {
+          mergedConnectors.push(c)
+        }
+      }
+      this.packages.set(pkg.id, { ...pkg, connectors: mergedConnectors })
+    } else {
+      this.packages.set(pkg.id, pkg)
+    }
+  }
+
+  getPackage(id: string): ConnectorPackage | undefined {
+    return this.packages.get(id)
+  }
+
+  listPackages(): ConnectorPackage[] {
+    return Array.from(this.packages.values())
   }
 
   get(id: string): Connector {
@@ -29,6 +54,7 @@ export class ConnectorRegistry {
 
   clear(): void {
     this.connectors.clear()
+    this.packages.clear()
   }
 
   list(): Connector[] {

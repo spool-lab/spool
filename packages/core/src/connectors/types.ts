@@ -84,6 +84,8 @@ export interface SyncOptions {
   maxMinutes?: number
   /** Consecutive pages with 0 new items before stopping forward sync. Default: 3. */
   stalePageLimit?: number
+  /** Hard cap on total pages fetched per sync run. Default: 100. */
+  maxPages?: number
   /** AbortSignal for cancellation. */
   signal?: AbortSignal
   /**
@@ -148,6 +150,14 @@ export interface SyncJob {
   queuedAt: number
 }
 
+export interface ConnectorPackage {
+  id: string
+  packageName: string
+  rootDir: string
+  connectors: Connector[]
+  prerequisites?: import('@spool/connector-sdk').Prerequisite[]
+}
+
 export interface ConnectorStatus {
   id: string
   label: string
@@ -159,6 +169,8 @@ export interface ConnectorStatus {
   bundled: boolean
   version: string
   packageName: string
+  packageId?: string
+  setup?: import('@spool/connector-sdk').SetupStep[]
   state: SyncState
 }
 

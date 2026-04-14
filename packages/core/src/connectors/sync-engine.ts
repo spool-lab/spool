@@ -367,6 +367,7 @@ export class SyncEngine {
     const db = this.db
     const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
     const maxMinutes = opts.maxMinutes ?? 0
+    const maxPages = opts.maxPages ?? 100
     const stalePageLimit = opts.stalePageLimit ?? 3
     const checkpointEvery = 25
     const deadline = maxMinutes > 0 ? startedAt + maxMinutes * 60_000 : Number.POSITIVE_INFINITY
@@ -395,6 +396,9 @@ export class SyncEngine {
         const now = yield* Clock.currentTimeMillis
         if (now >= deadline) {
           return { added, pages, stopReason: 'timeout' }
+        }
+        if (pages >= maxPages) {
+          return { added, pages, stopReason: 'max_pages' }
         }
         if (yield* Deferred.isDone(cancel)) {
           return { added, pages, stopReason: 'cancelled' }
@@ -667,6 +671,7 @@ export class SyncEngine {
     const db = this.db
     const delayMs = opts.delayMs ?? DEFAULT_SCHEDULE.pageDelayMs
     const maxMinutes = opts.maxMinutes ?? 0
+    const maxPages = opts.maxPages ?? 100
     const sourceId = getSourceId(db)
     const deadline = maxMinutes > 0 ? startedAt + maxMinutes * 60_000 : Number.POSITIVE_INFINITY
 
@@ -685,6 +690,10 @@ export class SyncEngine {
         const now = yield* Clock.currentTimeMillis
         if (now >= deadline) {
           stopReason = 'timeout'
+          break
+        }
+        if (totalPages >= maxPages) {
+          stopReason = 'max_pages'
           break
         }
         if (yield* Deferred.isDone(cancel)) {
