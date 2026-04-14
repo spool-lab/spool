@@ -1,0 +1,120 @@
+{
+  "name": "@spool-lab/connector-xiaohongshu",
+  "version": "0.1.0",
+  "description": "Xiaohongshu (小红书) feed, notes, and notifications via opencli",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@spool/connector-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@spool/connector-sdk": "workspace:*",
+    "@types/node": "^22.15.3",
+    "typescript": "^5.4.0",
+    "vitest": "^3.2.4"
+  },
+  "spool": {
+    "type": "connector",
+    "prerequisites": [
+      {
+        "id": "opencli",
+        "name": "OpenCLI",
+        "kind": "cli",
+        "detect": {
+          "type": "exec",
+          "command": "opencli",
+          "args": ["--version"],
+          "versionRegex": "v?(\\d+\\.\\d+\\.\\d+)",
+          "timeoutMs": 5000
+        },
+        "minVersion": "0.3.0",
+        "install": {
+          "kind": "cli",
+          "command": {
+            "darwin": "npm i -g @jackwener/opencli",
+            "linux": "npm i -g @jackwener/opencli",
+            "win32": "npm i -g @jackwener/opencli"
+          }
+        },
+        "docsUrl": "https://github.com/jackwener/opencli"
+      },
+      {
+        "id": "opencli-extension",
+        "name": "Browser Bridge",
+        "kind": "browser-extension",
+        "requires": ["opencli"],
+        "detect": {
+          "type": "exec",
+          "command": "opencli",
+          "args": ["doctor"],
+          "matchStdout": "\\[OK\\].*Extension",
+          "timeoutMs": 10000
+        },
+        "install": {
+          "kind": "browser-extension",
+          "manual": {
+            "downloadUrl": "https://github.com/jackwener/opencli/releases/latest",
+            "steps": [
+              "Download and unzip the extension",
+              "Paste chrome://extensions into Chrome's address bar",
+              "Enable Developer mode (top-right toggle)",
+              "Click 'Load unpacked' and choose the unzipped folder",
+              "Keep the folder in place — moving or deleting it will break the extension"
+            ]
+          }
+        }
+      },
+      {
+        "id": "xhs-login",
+        "name": "Logged into Xiaohongshu",
+        "kind": "site-session",
+        "requires": ["opencli-extension"],
+        "detect": {
+          "type": "exec",
+          "command": "opencli",
+          "args": ["doctor"],
+          "matchStdout": "\\[OK\\].*Connectivity",
+          "timeoutMs": 10000
+        },
+        "install": {
+          "kind": "site-session",
+          "openUrl": "https://www.xiaohongshu.com"
+        }
+      }
+    ],
+    "connectors": [
+      {
+        "id": "xiaohongshu-feed",
+        "platform": "xiaohongshu",
+        "label": "Xiaohongshu Feed",
+        "description": "Your Xiaohongshu home feed",
+        "color": "#FF2442",
+        "ephemeral": true,
+        "capabilities": ["exec", "log", "prerequisites"]
+      },
+      {
+        "id": "xiaohongshu-notes",
+        "platform": "xiaohongshu",
+        "label": "Xiaohongshu Notes",
+        "description": "Notes you have published",
+        "color": "#FF2442",
+        "ephemeral": false,
+        "capabilities": ["exec", "log", "prerequisites"]
+      },
+      {
+        "id": "xiaohongshu-notifications",
+        "platform": "xiaohongshu",
+        "label": "Xiaohongshu Notifications",
+        "description": "Messages, likes, and comments",
+        "color": "#FF2442",
+        "ephemeral": false,
+        "capabilities": ["exec", "log", "prerequisites"]
+      }
+    ]
+  }
+}
