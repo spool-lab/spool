@@ -5,19 +5,12 @@ import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } 
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
+import { commonLabel } from '../lib/common-label.js'
+import { PackageSetupCard } from './PackageSetupCard.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
-
-// Derive a shared label for a multi-connector package from its sub-connector labels.
-// e.g. ["GitHub Stars", "GitHub Notifications"] → "GitHub"
-function commonLabel(labels: string[]): string {
-  if (labels.length <= 1) return labels[0] ?? ''
-  const words = labels[0]!.split(' ')
-  const shared = words.filter(w => labels.every(l => l.includes(w)))
-  return shared.length > 0 ? shared.join(' ') : words[0]!
-}
 
 // Strip the common package prefix from a sub-label when the parent context is already visible.
 // e.g. stripLabelPrefix("GitHub Stars", "GitHub") → "Stars"
@@ -389,6 +382,13 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
     return off
   }, [loadConnectors])
 
+  // Refresh when prerequisites status changes (e.g. background check completes)
+  useEffect(() => {
+    if (!window.spool?.connectors?.onStatusChanged) return
+    const unsub = window.spool.connectors.onStatusChanged(() => loadConnectors())
+    return () => { unsub() }
+  }, [loadConnectors])
+
   useEffect(() => {
     if (!window.spool?.connectors?.fetchRegistry) return
     setRegistryLoading(true)
@@ -464,7 +464,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
 
   // Package-level detail: find all connectors for selected package
   const pkgConnectors = selectedPkg
-    ? connectors.filter(c => (c.packageName || c.id) === selectedPkg)
+    ? connectors.filter(c => (c.packageId ?? (c.packageName || c.id)) === selectedPkg)
     : []
 
   // ── Detail view (drill-down) — package level ──
@@ -537,6 +537,21 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
             )}
           </div>
         </div>
+
+        {/* Setup card (package-level prerequisites) */}
+        {(() => {
+          const setup = pkgConnectors.find(c => c.setup && c.setup.length > 0)?.setup
+          if (!setup) return null
+          const packageId = first.packageId ?? selectedPkg
+          return (
+            <PackageSetupCard
+              packageId={packageId}
+              packageLabel={pkgLabel}
+              steps={setup}
+              onChanged={loadConnectors}
+            />
+          )
+        })()}
 
         {/* Per-connector cards */}
         {pkgConnectors.map(c => {
@@ -670,7 +685,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           // Group installed connectors by package
           const groupMap = new Map<string, { key: string; label: string; color: string; items: typeof connectors }>()
           for (const c of connectors) {
-            const key = c.packageName || c.id
+            const key = c.packageId ?? (c.packageName || c.id)
             const existing = groupMap.get(key)
             if (existing) { existing.items.push(c); continue }
             groupMap.set(key, { key, label: c.label, color: c.color, items: [c] })

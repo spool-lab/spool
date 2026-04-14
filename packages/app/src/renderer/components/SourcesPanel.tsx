@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ConnectorStatus } from '@spool/core'
+import { PackageSetupCard } from './PackageSetupCard.js'
+import { commonLabel } from '../lib/common-label.js'
 
 interface Props {
   onClose: () => void
@@ -83,6 +85,12 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount, geminiC
     return off
   }, [loadConnectors])
 
+  useEffect(() => {
+    if (!window.spool?.connectors?.onStatusChanged) return
+    const unsub = window.spool.connectors.onStatusChanged(() => loadConnectors())
+    return () => { unsub() }
+  }, [loadConnectors])
+
   const handleConnectorSync = async (connectorId: string) => {
     if (!window.spool?.connectors) return
     setSyncingConnector(connectorId)
@@ -131,69 +139,138 @@ export default function SourcesPanel({ onClose, claudeCount, codexCount, geminiC
               <h3 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase mb-2">
                 Connectors
               </h3>
-              {connectors.map(c => {
-                const isSyncing = syncingConnector === c.id || c.syncing
-                const progress = syncProgress[c.id]
-                return (
-                  <div key={c.id} className="py-2.5 group">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="w-2 h-2 rounded-full flex-none"
-                        style={{ background: c.enabled ? c.color : '#888' }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm ${c.enabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
-                          {c.label}
-                        </span>
-                        <span className="text-xs text-warm-faint dark:text-dark-muted ml-2">
-                          {!c.enabled
-                            ? 'Not connected'
-                            : isSyncing && progress
-                              ? `page ${progress.page} · ${progress.added} new`
-                              : (connectorCounts[c.id] ?? 0) > 0
-                                ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
-                                : c.state.lastErrorCode
-                                  ? c.state.lastErrorMessage ?? 'Error'
-                                  : 'Not synced yet'}
-                        </span>
+              {(() => {
+                // Group connectors by packageId, falling back to c.id for legacy connectors
+                const groups = new Map<string, ConnectorStatus[]>()
+                for (const c of connectors) {
+                  const key = c.packageId ?? c.id
+                  const group = groups.get(key) ?? []
+                  group.push(c)
+                  groups.set(key, group)
+                }
+                return Array.from(groups.entries()).map(([groupKey, groupConnectors]) => {
+                  // Use setup steps from the first connector in the group that has them
+                  const setupSource = groupConnectors.find(c => c.setup && c.setup.length > 0)
+                  const setupSteps = setupSource?.setup
+                  const packageId = setupSource?.packageId ?? groupKey
+                  const setupNotOk = setupSteps && setupSteps.some(s => s.status !== 'ok')
+
+                  // Single connector: render as-is (legacy behavior)
+                  if (groupConnectors.length === 1) {
+                    const c = groupConnectors[0]!
+                    const isSyncing = syncingConnector === c.id || c.syncing
+                    const progress = syncProgress[c.id]
+                    return (
+                      <div key={groupKey} className="mb-2">
+                        {setupSteps && (
+                          <div className="mb-2">
+                            <PackageSetupCard packageId={packageId} packageLabel={c.label} steps={setupSteps} onChanged={loadConnectors} />
+                          </div>
+                        )}
+                        <div className={setupNotOk ? 'opacity-50 pointer-events-none' : ''}>
+                          <div className="py-2.5 group">
+                            <div className="flex items-center gap-3">
+                              <span className="w-2 h-2 rounded-full flex-none" style={{ background: c.enabled ? c.color : '#888' }} />
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-sm ${c.enabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>{c.label}</span>
+                                <span className="text-xs text-warm-faint dark:text-dark-muted ml-2">
+                                  {!c.enabled ? 'Not connected'
+                                    : isSyncing && progress ? `page ${progress.page} · ${progress.added} new`
+                                    : (connectorCounts[c.id] ?? 0) > 0 ? `${connectorCounts[c.id]} items · ${formatSyncTime(c.state.lastForwardSyncAt)}${!c.state.tailComplete ? ' · syncing history' : ''}`
+                                    : c.state.lastErrorCode ? c.state.lastErrorMessage ?? 'Error'
+                                    : 'Not synced yet'}
+                                </span>
+                              </div>
+                              {!c.enabled ? (
+                                <button onClick={() => handleEnableConnector(c.id)} className="text-[11px] text-accent dark:text-accent-dark hover:underline">Connect</button>
+                              ) : (
+                                <>
+                                  {!isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
+                                    <span className="text-[10px] text-amber-500 font-medium">needs login</span>
+                                  )}
+                                  <button onClick={() => handleConnectorSync(c.id)} disabled={isSyncing} className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {isSyncing ? 'Syncing...' : 'Sync'}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {isSyncing && progress && (
+                              <div className="ml-5 mt-1 flex items-center gap-2">
+                                <div className="h-1 w-3 rounded-full bg-accent dark:bg-accent-dark animate-pulse" />
+                                <span className="text-[10px] text-warm-faint dark:text-dark-muted">{progress.phase === 'forward' ? 'Fetching new items' : 'Backfilling history'}...</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      {!c.enabled ? (
-                        <button
-                          onClick={() => handleEnableConnector(c.id)}
-                          className="text-[11px] text-accent dark:text-accent-dark hover:underline"
-                        >
-                          Connect
-                        </button>
-                      ) : (
-                        <>
-                          {!isSyncing && c.state.lastErrorCode?.startsWith('AUTH_') && (
-                            <span className="text-[10px] text-amber-500 font-medium">needs login</span>
-                          )}
-                          <button
-                            onClick={() => handleConnectorSync(c.id)}
-                            disabled={isSyncing}
-                            className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            {isSyncing ? 'Syncing...' : 'Sync'}
-                          </button>
-                        </>
+                    )
+                  }
+
+                  // Multi-connector package: render as ONE aggregated row
+                  const pkgLabel = commonLabel(groupConnectors.map(c => c.label))
+                  const pkgColor = groupConnectors[0]!.color
+                  const enabledCount = groupConnectors.filter(c => c.enabled).length
+                  const allEnabled = enabledCount === groupConnectors.length
+                  const noneEnabled = enabledCount === 0
+                  const isSyncingGroup = groupConnectors.some(c => syncingConnector === c.id || c.syncing)
+                  const totalItems = groupConnectors.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
+                  const syncTimes = groupConnectors.map(c => c.state.lastForwardSyncAt).filter(Boolean) as string[]
+                  const earliestSync = syncTimes.length > 0 ? syncTimes.reduce((a, b) => (a < b ? a : b)) : null
+
+                  const handleGroupConnect = () =>
+                    Promise.all(groupConnectors.filter(c => !c.enabled).map(c => handleEnableConnector(c.id).catch(() => undefined)))
+
+                  const handleGroupSync = () =>
+                    Promise.all(groupConnectors.map(c => handleConnectorSync(c.id).catch(() => undefined)))
+
+                  let statusText: string
+                  if (setupNotOk) {
+                    statusText = 'Not set up'
+                  } else if (!allEnabled && noneEnabled) {
+                    statusText = 'Not connected'
+                  } else if (!allEnabled) {
+                    statusText = `${enabledCount}/${groupConnectors.length} enabled`
+                  } else if (isSyncingGroup) {
+                    statusText = 'Syncing...'
+                  } else if (totalItems > 0) {
+                    statusText = `${totalItems} items · ${formatSyncTime(earliestSync)}`
+                  } else {
+                    statusText = 'Not synced yet'
+                  }
+
+                  return (
+                    <div key={groupKey} className="mb-2">
+                      {setupSteps && (
+                        <div className="mb-2">
+                          <PackageSetupCard packageId={packageId} packageLabel={pkgLabel} steps={setupSteps} onChanged={loadConnectors} />
+                        </div>
                       )}
-                    </div>
-                    {isSyncing && progress && (
-                      <div className="ml-5 mt-1 flex items-center gap-2">
-                        <div className="h-1 w-3 rounded-full bg-accent dark:bg-accent-dark animate-pulse" />
-                        <span className="text-[10px] text-warm-faint dark:text-dark-muted">
-                          {progress.phase === 'forward' ? 'Fetching new items' : 'Backfilling history'}...
-                        </span>
+                      <div className={setupNotOk ? 'opacity-50 pointer-events-none' : ''}>
+                        <div className="py-2.5 group">
+                          <div className="flex items-center gap-3">
+                            <span className="w-2 h-2 rounded-full flex-none" style={{ background: allEnabled ? pkgColor : '#888' }} />
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm ${allEnabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>{pkgLabel}</span>
+                              <span className="text-xs text-warm-faint dark:text-dark-muted ml-2">{statusText}</span>
+                            </div>
+                            {noneEnabled ? (
+                              <button onClick={handleGroupConnect} className="text-[11px] text-accent dark:text-accent-dark hover:underline">Connect</button>
+                            ) : (
+                              <button onClick={handleGroupSync} disabled={isSyncingGroup} className="text-[11px] text-accent dark:text-accent-dark hover:underline disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {isSyncingGroup ? 'Syncing...' : 'Sync'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-              {connectors.some(c => c.state.lastErrorCode) && (
+                    </div>
+                  )
+                })
+              })()}
+              {connectors.some(c => c.state.lastErrorCode && !c.setup) && (
                 <div className="mt-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-[6px]">
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    {connectors.find(c => c.state.lastErrorCode)?.state.lastErrorMessage}
+                    {connectors.find(c => c.state.lastErrorCode && !c.setup)?.state.lastErrorMessage}
                   </p>
                 </div>
               )}
