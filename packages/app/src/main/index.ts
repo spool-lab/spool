@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, nativeTheme, nativeImage, net, powerMonitor } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, nativeTheme, nativeImage, net, powerMonitor, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
@@ -11,6 +12,7 @@ import {
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability, makeExecCapability,
   TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
   fetchRegistry,
+  PrerequisiteChecker,
 } from '@spool/core'
 import type { UpdateInfo } from '@spool/core'
 import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
@@ -18,7 +20,7 @@ import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
-import { linkDevConnectors } from './dev-connectors.js'
+import { linkDevConnectors, installFromWorkspace } from './dev-connectors.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource } from './uiPreferences.js'
@@ -69,6 +71,26 @@ let proxyFetch: typeof globalThis.fetch
 let spoolDir: string
 const bundledConnectorIds = new Set<string>()
 let updateCache = new Map<string, UpdateInfo>()
+let prerequisiteChecker: PrerequisiteChecker
+let execCapabilityImpl: ReturnType<typeof makeExecCapability>
+const runningInstalls = new Map<string, ChildProcess>()
+
+function makePrerequisitesFor(registry: ConnectorRegistry, checker: PrerequisiteChecker) {
+  return (packageId: string) => ({
+    check: () => {
+      const pkg = registry.getPackage(packageId)
+      if (!pkg) throw new Error(`Package "${packageId}" not found in registry`)
+      return checker.check(pkg)
+    },
+  })
+}
+
+function killChildWithEscalation(child: ChildProcess): void {
+  child.kill('SIGTERM')
+  setTimeout(() => {
+    if (!child.killed) child.kill('SIGKILL')
+  }, 5000)
+}
 
 type CachedSearchValue = SearchResult[] | FragmentResult[]
 
@@ -188,7 +210,12 @@ function installConnectorPackage(
   return withConnectorLock(async () => {
     try {
       const connectorsDir = join(spoolDir, 'connectors')
-      const result = await downloadAndInstall(packageName, connectorsDir, fetch)
+      // Dev-mode: if the package lives in this workspace, symlink it instead
+      // of hitting npm. Lets us test connectors before they're published.
+      const workspaceResult = !app.isPackaged
+        ? installFromWorkspace(packageName, spoolDir, resolve(process.cwd(), '..', '..'))
+        : null
+      const result = workspaceResult ?? await downloadAndInstall(packageName, connectorsDir, fetch)
 
       const isFirstParty = packageName.startsWith('@spool-lab/')
       if (!isFirstParty && trustStore) {
@@ -402,6 +429,9 @@ app.whenReady().then(async () => {
   spoolDir = join(homedir(), '.spool')
   trustStore = new TrustStore(spoolDir)
 
+  execCapabilityImpl = makeExecCapability()
+  prerequisiteChecker = new PrerequisiteChecker(execCapabilityImpl)
+
   if (isDev) {
     linkDevConnectors(spoolDir, resolve(process.cwd(), '../..'))
   }
@@ -413,8 +443,9 @@ app.whenReady().then(async () => {
       fetch: makeFetchCapability(proxyFetch),
       cookies: makeChromeCookiesCapability(),
       sqlite: makeSqliteCapability(),
-      exec: makeExecCapability(),
+      exec: execCapabilityImpl,
       logFor: (connectorId: string) => makeLogCapabilityFor(connectorId),
+      prerequisitesFor: makePrerequisitesFor(connectorRegistry, prerequisiteChecker),
     },
     registry: connectorRegistry,
     log: {
@@ -470,6 +501,22 @@ app.whenReady().then(async () => {
   })
 
   mainWindow = createWindow()
+
+  mainWindow.on('focus', () => {
+    for (const pkg of connectorRegistry.listPackages()) {
+      const cached = prerequisiteChecker.getCached(pkg.id)
+      if (!cached || cached.some(s => s.status !== 'ok')) {
+        const before = cached
+        prerequisiteChecker.check(pkg).then((after) => {
+          const changed = !before || before.length !== after.length ||
+            before.some((s, i) => s.status !== after[i]?.status)
+          if (changed) {
+            mainWindow?.webContents.send('connector:status-changed', { packageId: pkg.id })
+          }
+        }).catch(() => undefined)
+      }
+    }
+  })
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)
@@ -565,8 +612,9 @@ async function reloadConnectors(): Promise<void> {
       fetch: makeFetchCapability(proxyFetch),
       cookies: makeChromeCookiesCapability(),
       sqlite: makeSqliteCapability(),
-      exec: makeExecCapability(),
+      exec: execCapabilityImpl,
       logFor: (id: string) => makeLogCapabilityFor(id),
+      prerequisitesFor: makePrerequisitesFor(connectorRegistry, prerequisiteChecker),
     },
     registry: connectorRegistry,
     log: {
@@ -583,6 +631,33 @@ async function runConnectorUpdateCheck(): Promise<{ updates: Map<string, UpdateI
   if (installed.length === 0) return { updates: new Map(), installed }
   updateCache = await checkForUpdates(installed, fetch)
   return { updates: updateCache, installed }
+}
+
+function pkgIdForConnector(connectorId: string): string | undefined {
+  for (const pkg of connectorRegistry.listPackages()) {
+    if (pkg.connectors.some(c => c.id === connectorId)) return pkg.id
+  }
+  return undefined
+}
+
+type ResolvedCli =
+  | { ok: true; pkg: ReturnType<ConnectorRegistry['getPackage']> & {}; command: string }
+  | { ok: false; reason: 'package-not-found' | 'not-cli-prereq' | 'no-command-for-platform' | 'requires-manual' }
+
+function stepsDiffer(a: import('@spool/core').SetupStep[] | undefined, b: import('@spool/core').SetupStep[]): boolean {
+  if (!a || a.length !== b.length) return true
+  return a.some((s, i) => s.status !== b[i]?.status)
+}
+
+function resolveCliPrereq(packageId: string, prereqId: string): ResolvedCli {
+  const pkg = connectorRegistry.getPackage(packageId)
+  if (!pkg) return { ok: false, reason: 'package-not-found' }
+  const p = (pkg.prerequisites ?? []).find(x => x.id === prereqId)
+  if (!p || p.install.kind !== 'cli') return { ok: false, reason: 'not-cli-prereq' }
+  const command = p.install.command[process.platform as 'darwin' | 'linux' | 'win32']
+  if (!command) return { ok: false, reason: 'no-command-for-platform' }
+  if (p.install.requiresManual || /\bsudo\b/.test(command)) return { ok: false, reason: 'requires-manual' }
+  return { ok: true, pkg, command }
 }
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
@@ -751,12 +826,35 @@ ipcMain.handle('connector:list', (): ConnectorStatus[] => {
   const installed = getInstalledConnectorPackages()
   const versionMap = new Map(installed.map(p => [p.connectorId, p.currentVersion]))
   const pkgNameMap = new Map(installed.map(p => [p.connectorId, p.packageName]))
-  return syncScheduler.getStatus().connectors.map(c => ({
-    ...c,
-    bundled: bundledConnectorIds.has(c.id),
-    version: versionMap.get(c.id) ?? '0.0.0',
-    packageName: pkgNameMap.get(c.id) ?? '',
-  }))
+  const connIdToPackageId = new Map<string, string>()
+  for (const pkg of connectorRegistry.listPackages()) {
+    for (const c of pkg.connectors) {
+      connIdToPackageId.set(c.id, pkg.id)
+    }
+  }
+  const result = syncScheduler.getStatus().connectors.map(c => {
+    const pkgId = connIdToPackageId.get(c.id)
+    const cached = pkgId ? prerequisiteChecker?.getCached(pkgId) : undefined
+    const status: ConnectorStatus = {
+      ...c,
+      bundled: bundledConnectorIds.has(c.id),
+      version: versionMap.get(c.id) ?? '0.0.0',
+      packageName: pkgNameMap.get(c.id) ?? '',
+    }
+    if (pkgId !== undefined) status.packageId = pkgId
+    if (cached !== undefined) status.setup = cached
+    return status
+  })
+  // Kick off background prereq checks for packages not yet cached so the
+  // Setup card appears on first load without needing a focus event.
+  for (const pkg of connectorRegistry.listPackages()) {
+    if (pkg.prerequisites && pkg.prerequisites.length > 0 && !prerequisiteChecker.getCached(pkg.id)) {
+      prerequisiteChecker.check(pkg).then(() => {
+        mainWindow?.webContents.send('connector:status-changed', { packageId: pkg.id })
+      }).catch(() => undefined)
+    }
+  }
+  return result
 })
 
 ipcMain.handle('connector:check-auth', async (_e, { id }: { id: string }): Promise<AuthStatus> => {
@@ -793,6 +891,9 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   const packageName = pkg.packageName
   const siblings = allInstalled.filter(p => p.packageName === packageName)
 
+  // Resolve registry package id before removing from registry
+  const registryPkgId = pkgIdForConnector(id)
+
   // Registry + scheduler first: prevents the scheduler tick from re-queuing
   // syncs, and lets in-flight syncs wind down via the cancel signal.
   for (const sib of siblings) {
@@ -812,6 +913,8 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
       () => db.prepare('DELETE FROM captures WHERE platform = ?').run(sib.platform),
     )
   }
+
+  if (registryPkgId) prerequisiteChecker.invalidate(registryPkgId)
 
   const removedIds = siblings.map(s => s.connectorId)
   mainWindow?.webContents.send('connector:event', {
@@ -869,9 +972,97 @@ ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorI
 })
 
 ipcMain.handle('connector:fetch-registry', async () => {
-  return fetchRegistry({ fetchFn: (input, init) => net.fetch(input as any, init), cacheDir: spoolDir })
+  // Dev-mode override: read registry.json from the workspace so local edits
+  // show up without pushing to GitHub main. Set SPOOL_REGISTRY_URL to a file://
+  // URL, absolute path, or HTTP URL to override explicitly.
+  const override = process.env.SPOOL_REGISTRY_URL
+    ?? (!app.isPackaged ? join(process.cwd(), '../landing/public/registry.json') : undefined)
+  return fetchRegistry({
+    fetchFn: (input, init) => net.fetch(input as any, init),
+    cacheDir: spoolDir,
+    ...(override !== undefined && { url: override }),
+  })
 })
 
 ipcMain.handle('connector:install', async (_e, { packageName }: { packageName: string }) => {
   return installConnectorPackage(packageName)
+})
+
+ipcMain.handle('connector:recheck-prerequisites', async (_e, { packageId }: { packageId: string }) => {
+  const pkg = connectorRegistry.getPackage(packageId)
+  if (!pkg) return { ok: false, error: 'PACKAGE_NOT_FOUND' }
+  const before = prerequisiteChecker.getCached(packageId)
+  prerequisiteChecker.invalidate(packageId)
+  const setup = await prerequisiteChecker.check(pkg)
+  if (stepsDiffer(before, setup)) {
+    mainWindow?.webContents.send('connector:status-changed', { packageId })
+  }
+  return { ok: true, setup }
+})
+
+type InstallResult =
+  | { ok: true; installId: string; exitCode: number }
+  | { ok: false; reason: 'requires-manual' }
+  | { ok: false; reason: 'package-not-found' }
+  | { ok: false; reason: 'not-cli-prereq' }
+  | { ok: false; reason: 'no-command-for-platform' }
+  | { ok: false; reason: 'install-failed'; exitCode: number; errorMessage: string }
+
+ipcMain.handle('connector:install-cli', async (_e, { packageId, prereqId, installId: providedInstallId }: { packageId: string; prereqId: string; installId?: string }) => {
+  const resolved = resolveCliPrereq(packageId, prereqId)
+  if (!resolved.ok) return { ok: false, reason: resolved.reason } satisfies InstallResult
+
+  const { pkg, command } = resolved
+  const installId = providedInstallId ?? `${packageId}::${prereqId}::${Date.now()}`
+  const isWin = process.platform === 'win32'
+  const shellBin = isWin ? (process.env['ComSpec'] || 'cmd.exe') : (process.env['SHELL'] || '/bin/bash')
+  const args = isWin ? ['/c', command] : ['-lc', command]
+
+  // SECURITY: runs with user's shell/env; trust anchor is registry.json allowlist.
+  return new Promise<InstallResult>((resolvePromise) => {
+    const child = spawn(shellBin, args, { env: process.env })
+    runningInstalls.set(installId, child)
+    const timer = setTimeout(() => killChildWithEscalation(child), 120_000)
+    let stderrTail = ''
+    child.stdout?.on('data', () => { /* discard */ })
+    child.stderr?.on('data', (d: Buffer) => { stderrTail = (stderrTail + d.toString()).slice(-4096) })
+    child.on('exit', async (code) => {
+      clearTimeout(timer)
+      runningInstalls.delete(installId)
+      const ok = code === 0
+      if (ok) {
+        const before = prerequisiteChecker.getCached(packageId)
+        prerequisiteChecker.invalidate(packageId)
+        const after = await prerequisiteChecker.check(pkg).catch(() => undefined)
+        if (after && stepsDiffer(before, after)) {
+          mainWindow?.webContents.send('connector:status-changed', { packageId })
+        }
+        resolvePromise({ ok: true, installId, exitCode: code ?? 0 })
+      } else {
+        const errorMessage = stderrTail.trim().split('\n').slice(-3).join('\n')
+        resolvePromise({ ok: false, reason: 'install-failed', exitCode: code ?? -1, errorMessage })
+      }
+    })
+  })
+})
+
+ipcMain.handle('connector:install-cli-cancel', async (_e, { installId }: { installId: string }) => {
+  const child = runningInstalls.get(installId)
+  if (child) {
+    killChildWithEscalation(child)
+    return { ok: true }
+  }
+  return { ok: false, error: 'NOT_FOUND' }
+})
+
+ipcMain.handle('connector:copy-install-command', async (_e, { packageId, prereqId }: { packageId: string; prereqId: string }) => {
+  const resolved = resolveCliPrereq(packageId, prereqId)
+  if (!resolved.ok) return { ok: false, reason: resolved.reason }
+  clipboard.writeText(resolved.command)
+  return { ok: true, command: resolved.command }
+})
+
+ipcMain.handle('connector:open-external', async (_e, { url }: { url: string }) => {
+  await shell.openExternal(url)
+  return { ok: true }
 })
