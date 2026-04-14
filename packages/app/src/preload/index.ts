@@ -170,6 +170,27 @@ const api = {
 
     install: (packageName: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('connector:install', { packageName }),
+
+    recheckPrerequisites: (packageId: string) =>
+      ipcRenderer.invoke('connector:recheck-prerequisites', { packageId }),
+
+    installCli: (packageId: string, prereqId: string, installId?: string) =>
+      ipcRenderer.invoke('connector:install-cli', { packageId, prereqId, installId }),
+
+    cancelInstallCli: (installId: string) =>
+      ipcRenderer.invoke('connector:install-cli-cancel', { installId }),
+
+    copyInstallCommand: (packageId: string, prereqId: string) =>
+      ipcRenderer.invoke('connector:copy-install-command', { packageId, prereqId }),
+
+    openExternal: (url: string) =>
+      ipcRenderer.invoke('connector:open-external', { url }),
+
+    onStatusChanged: (cb: (e: { packageId: string }) => void) => {
+      const handler = (_e: unknown, payload: { packageId: string }) => cb(payload)
+      ipcRenderer.on('connector:status-changed', handler)
+      return () => ipcRenderer.removeListener('connector:status-changed', handler)
+    },
   },
 
   // Auto-update

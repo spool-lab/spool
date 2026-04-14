@@ -1,6 +1,72 @@
 import type { SyncErrorCode } from './errors.js'
 import type { CapturedItem } from './captured-item.js'
 
+// ── Prerequisites ─────────────────────────────────────────────────────────────
+
+export type PrerequisiteKind = 'cli' | 'browser-extension' | 'site-session'
+
+export interface Prerequisite {
+  id: string
+  name: string
+  kind: PrerequisiteKind
+  requires?: string[]
+  detect: Detect
+  install: Install
+  minVersion?: string
+  docsUrl?: string
+}
+
+export interface Detect {
+  type: 'exec'
+  command: string
+  args: string[]
+  versionRegex?: string
+  matchStdout?: string
+  timeoutMs?: number
+}
+
+export type Install =
+  | {
+      kind: 'cli'
+      command: Partial<Record<'darwin' | 'linux' | 'win32', string>>
+      requiresManual?: boolean
+    }
+  | {
+      kind: 'browser-extension'
+      webstoreUrl?: string
+      manual?: ManualInstall
+    }
+  | {
+      kind: 'site-session'
+      openUrl: string
+    }
+
+/**
+ * Steps for manual extension install. By convention:
+ * - steps[0]: download step (rendered with a "Download" button wired to downloadUrl)
+ * - steps[1]: unzip step (user action, no button)
+ * - steps[2]: open chrome://extensions step (rendered with an "Open" button)
+ * - steps[3+]: any additional user actions
+ */
+export interface ManualInstall {
+  downloadUrl: string
+  steps: string[]
+}
+
+export type SetupStatus = 'ok' | 'missing' | 'outdated' | 'error' | 'pending'
+
+export interface SetupStep {
+  id: string
+  label: string
+  kind: PrerequisiteKind
+  status: SetupStatus
+  hint?: string
+  detectedVersion?: string
+  minVersion?: string
+  install?: Install
+  docsUrl?: string
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface AuthStatus {
@@ -9,6 +75,7 @@ export interface AuthStatus {
   message?: string
   /** Actionable guidance for the user. */
   hint?: string
+  setup?: SetupStep[]
 }
 
 // ── Page result ──────────────────────────────────────────────────────────────
@@ -39,6 +106,21 @@ export interface FetchContext {
    * Optional until Task 5 wires the engine to always provide it.
    */
   signal?: AbortSignal
+}
+
+// ── checkAuthViaPrerequisites helper ─────────────────────────────────────────
+
+import type { ConnectorCapabilities } from './capabilities.js'
+
+export async function checkAuthViaPrerequisites(caps: ConnectorCapabilities): Promise<AuthStatus> {
+  if (!caps.prerequisites) {
+    return {
+      ok: false,
+      message: 'Prerequisites capability not wired',
+    }
+  }
+  const setup = await caps.prerequisites.check()
+  return { ok: setup.every(s => s.status === 'ok'), setup }
 }
 
 // ── Connector interface ──────────────────────────────────────────────────────

@@ -2,7 +2,6 @@
 import registry from '../../../public/registry.json'
 const connectors = registry.connectors
 
-// Group multi-connector packages by npm name
 interface SubConnector { label: string; description: string }
 interface GroupedPackage {
   name: string
@@ -12,13 +11,15 @@ interface GroupedPackage {
   bundled: boolean
   firstParty: boolean
   description: string
+  packageDescription?: string
   subs: SubConnector[]
 }
 const packageMap = new Map<string, GroupedPackage>()
-for (const c of connectors) {
+for (const c of connectors as Array<typeof connectors[number] & { packageDescription?: string }>) {
   const existing = packageMap.get(c.name)
   if (existing) {
     existing.subs.push({ label: c.label, description: c.description })
+    if (c.packageDescription && !existing.packageDescription) existing.packageDescription = c.packageDescription
   } else {
     packageMap.set(c.name, {
       name: c.name,
@@ -28,6 +29,7 @@ for (const c of connectors) {
       bundled: !!c.bundled,
       firstParty: c.firstParty,
       description: c.description,
+      packageDescription: c.packageDescription,
       subs: [{ label: c.label, description: c.description }],
     })
   }
@@ -40,6 +42,15 @@ for (const pkg of packageMap.values()) {
   }
 }
 const packages = [...packageMap.values()]
+
+const subNamesOf = (pkg: GroupedPackage): string[] => {
+  if (pkg.subs.length <= 1) return []
+  const prefix = pkg.label.trim()
+  return pkg.subs.map(s => {
+    const cleaned = s.label.replace(new RegExp(`^${prefix}\\s*`, 'i'), '').trim()
+    return cleaned || s.label
+  })
+}
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -117,27 +128,10 @@ const packages = [...packageMap.values()]
       align-items: center;
       gap: 16px;
     }
-
-    nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      transition: color 0.15s;
-    }
-
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.15s; }
     nav a:hover { color: var(--text); }
-
-    nav a.home {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    nav .sep {
-      color: var(--faint);
-      font-size: 14px;
-      user-select: none;
-    }
+    nav a.home { color: var(--text); font-weight: 600; }
+    nav .sep { color: var(--faint); font-size: 14px; user-select: none; }
 
     main {
       max-width: 860px;
@@ -160,139 +154,185 @@ const packages = [...packageMap.values()]
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       grid-auto-rows: 1fr;
-      gap: 16px;
+      gap: 12px;
+    }
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
     }
 
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 20px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      height: 100%;
+      gap: 10px;
     }
 
-    .card-header {
+    .card-head {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 11px;
     }
 
-    .color-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
+    .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
       flex-shrink: 0;
     }
 
-    .card-title {
-      font-size: 15px;
+    .head-text { min-width: 0; }
+
+    .title {
+      font-size: 14px;
       font-weight: 600;
-      flex: 1;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .badge {
+    .author {
       font-size: 11px;
-      font-weight: 500;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: var(--accent-subtle);
-      color: var(--accent);
+      color: var(--faint);
+      margin-top: 2px;
     }
 
-    .badge.category {
-      background: var(--surface2);
+    .desc {
+      font-size: 12.5px;
       color: var(--muted);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: calc(12.5px * 1.45 * 2);
     }
 
-    .card-desc {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .card-footer {
+    .footer {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      align-items: center;
+      gap: 10px;
       margin-top: auto;
     }
 
-    .cli-hint {
-      font-family: 'Geist Mono', monospace;
+    .meta {
+      font-size: 11.5px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+    }
+    .meta .category { text-transform: capitalize; }
+    .meta .sep { color: var(--faint); margin: 0 6px; }
+    .source-count {
+      position: relative;
+      cursor: default;
+    }
+    .source-count[data-sources]:hover::after {
+      content: attr(data-sources);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      background: var(--text);
+      color: var(--bg);
       font-size: 11px;
-      color: var(--faint);
+      font-weight: 500;
+      line-height: 1.4;
+      padding: 6px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    }
+    .source-count[data-sources]:hover::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 3px);
+      transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: var(--text);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     .install-btn {
       display: inline-block;
-      padding: 6px 14px;
+      padding: 5px 12px;
       border-radius: 6px;
       background: var(--accent);
       color: #fff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       text-decoration: none;
       transition: opacity 0.15s;
       white-space: nowrap;
-      flex-shrink: 0;
     }
+    .install-btn:hover { opacity: 0.88; }
 
-    .install-btn:hover { opacity: 0.85; }
-
-    .included-label {
+    .copy-btn {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg); }
+    .copy-btn svg { width: 12px; height: 12px; display: block; }
+    .copy-btn .icon-check { display: none; }
+    .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+    .copy-btn.copied .icon-copy { display: none; }
+    .copy-btn.copied .icon-check { display: block; }
+    .copy-btn .label-default { display: inline; }
+    .copy-btn .label-done { display: none; }
+    .copy-btn.copied .label-default { display: none; }
+    .copy-btn.copied .label-done { display: inline; }
+
+    .built-in {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
       border-radius: 6px;
       background: var(--surface2);
       color: var(--muted);
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .included-label .check {
-      color: #4ADE80;
-      font-size: 14px;
-      line-height: 1;
-    }
-
-    .badge.bundled {
-      background: var(--surface2);
-      color: var(--muted);
-    }
-
-    .card-subs {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .card-sub {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
       font-size: 12px;
-      line-height: 1.3;
-    }
-
-    .sub-label {
       font-weight: 500;
-      color: var(--text);
       white-space: nowrap;
     }
-
-    .sub-desc {
-      color: var(--muted);
-    }
+    .built-in .check { color: #4ADE80; font-size: 12px; line-height: 1; }
   </style>
 </head>
 <body>
@@ -307,47 +347,73 @@ const packages = [...packageMap.values()]
     <p class="subtitle">Install connectors to index your data sources into Spool.</p>
 
     <div class="grid">
-      {packages.map(pkg => (
-        <div class="card">
-          <div class="card-header">
-            <span class="color-dot" style={`background: ${pkg.color}`}></span>
-            <span class="card-title">{pkg.label}</span>
-            <span class="badge category">{pkg.category}</span>
-            {pkg.bundled
-              ? <span class="badge bundled">built-in</span>
-              : pkg.firstParty && <span class="badge">official</span>}
-          </div>
-          {pkg.subs.length > 1 ? (
-            <div class="card-subs">
-              {pkg.subs.map(sub => {
-                const stripped = sub.label.startsWith(pkg.label + ' ') ? sub.label.slice(pkg.label.length + 1) : sub.label
-                return (
-                  <div class="card-sub">
-                    <span class="sub-label">{stripped}</span>
-                    <span class="sub-desc">{sub.description}</span>
-                  </div>
-                )
-              })}
+      {packages.map(pkg => {
+        const initial = pkg.label.replace(/^[^A-Za-z0-9\u4e00-\u9fa5]+/, '').charAt(0).toUpperCase() || '·'
+        const sourceCount = pkg.subs.length
+        const desc = sourceCount > 1 ? (pkg.packageDescription ?? pkg.description) : pkg.description
+        const cliCmd = `spool connector install ${pkg.name}`
+        const subNames = subNamesOf(pkg)
+        return (
+          <div class="card">
+            <div class="card-head">
+              <span class="icon" style={`background: ${pkg.color}`}>{initial}</span>
+              <div class="head-text">
+                <div class="title">{pkg.label}</div>
+                <div class="author">Spool Lab</div>
+              </div>
             </div>
-          ) : (
-            <p class="card-desc">{pkg.description}</p>
-          )}
-          <div class="card-footer">
-            {pkg.bundled ? (
-              <>
-                <span class="cli-hint">Included with Spool</span>
-                <span class="included-label"><span class="check">&#10003;</span> Included</span>
-              </>
-            ) : (
-              <>
-                <span class="cli-hint">spool connector install {pkg.name}</span>
-                <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
-              </>
-            )}
+            <p class="desc">{desc}</p>
+            <div class="footer">
+              <span class="meta">
+                <span class="category">{pkg.category}</span>
+                <span class="sep">·</span>
+                <span class="source-count" data-sources={subNames.length ? subNames.join(' · ') : undefined}>
+                  {sourceCount} {sourceCount === 1 ? 'source' : 'sources'}
+                </span>
+              </span>
+              <span class="actions">
+                {pkg.bundled ? (
+                  <span class="built-in"><span class="check">&#10003;</span> Built-in</span>
+                ) : (
+                  <>
+                    <button class="copy-btn" type="button" data-cmd={cliCmd} aria-label="Copy install command">
+                      <svg class="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="5" y="5" width="8" height="8" rx="1.5"/>
+                        <path d="M3 11V4a1 1 0 0 1 1-1h7"/>
+                      </svg>
+                      <svg class="icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3.5 8.5l3 3 6-6.5"/>
+                      </svg>
+                      <span class="label-default">Copy CLI</span>
+                      <span class="label-done">Copied</span>
+                    </button>
+                    <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
+                  </>
+                )}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   </main>
+
+  <script is:inline>
+    document.querySelectorAll('.copy-btn').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault()
+        const cmd = btn.getAttribute('data-cmd') || ''
+        try {
+          await navigator.clipboard.writeText(cmd)
+          btn.classList.add('copied')
+          btn.setAttribute('title', 'Copied!')
+          setTimeout(() => {
+            btn.classList.remove('copied')
+            btn.setAttribute('title', 'Copy install command')
+          }, 1400)
+        } catch {}
+      })
+    })
+  </script>
 </body>
 </html>

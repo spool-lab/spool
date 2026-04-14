@@ -51,3 +51,18 @@ export {
   makeSqliteCapability,
   makeExecCapability,
 } from './connectors/capabilities/index.js'
+export { PrerequisiteChecker } from './connectors/prerequisites.js'
+export type { ConnectorPackage } from './connectors/types.js'
+
+// ── SDK re-exports (so app doesn't need a direct connector-sdk dep) ─────────
+export type {
+  Prerequisite,
+  PrerequisiteKind,
+  Detect,
+  Install,
+  ManualInstall,
+  SetupStep,
+  SetupStatus,
+  PrerequisitesCapability,
+} from '@spool/connector-sdk'
+export { checkAuthViaPrerequisites } from '@spool/connector-sdk'

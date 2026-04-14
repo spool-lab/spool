@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 
-const coreAlias = { '@spool/core': resolve(__dirname, '../core/dist/index.js') }
+const coreAlias = {
+  '@spool/core': resolve(__dirname, '../core/dist/index.js'),
+}
 
 // better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
 // It must NOT be bundled — it must stay as a real require() in the output.
@@ -37,7 +39,7 @@ export default defineConfig({
     resolve: { alias: coreAlias },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@spool/core'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },

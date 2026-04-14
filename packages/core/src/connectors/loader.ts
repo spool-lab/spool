@@ -8,6 +8,8 @@ import type {
   ExecCapability,
   FetchCapability,
   LogCapability,
+  Prerequisite,
+  PrerequisitesCapability,
   SqliteCapability,
 } from '@spool/connector-sdk'
 import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool/connector-sdk'
@@ -15,12 +17,48 @@ import type { ConnectorRegistry } from './registry.js'
 import { extractBundledConnectorsIfNeeded, type BundleLogger, type BundleReport } from './bundle-extract.js'
 import { TrustStore } from './trust-store.js'
 
+export function validatePrerequisites(prereqs: unknown[], packageName: string): Prerequisite[] {
+  const result: Prerequisite[] = []
+  const seen = new Set<string>()
+  for (const raw of prereqs) {
+    const p = raw as Prerequisite
+    if (!p.id || !p.name || !p.kind || !p.detect || !p.install) {
+      throw new Error(`Invalid prerequisite in ${packageName}: missing required fields`)
+    }
+    if (p.install.kind !== p.kind) {
+      throw new Error(`Prerequisite ${p.id} in ${packageName}: install.kind "${p.install.kind}" must match kind "${p.kind}"`)
+    }
+    if (p.kind === 'browser-extension') {
+      const inst = p.install as { webstoreUrl?: string; manual?: unknown }
+      if (!inst.webstoreUrl && !inst.manual) {
+        throw new Error(`Prerequisite ${p.id} in ${packageName}: browser-extension requires webstoreUrl or manual`)
+      }
+    }
+    if (p.minVersion && !(p.detect.type === 'exec' && p.detect.versionRegex)) {
+      throw new Error(`Prerequisite ${p.id} in ${packageName}: minVersion requires detect.versionRegex`)
+    }
+    if (seen.has(p.id)) {
+      throw new Error(`Prerequisite ${p.id} in ${packageName}: duplicate id`)
+    }
+    for (const req of p.requires ?? []) {
+      if (!seen.has(req)) {
+        throw new Error(`Prerequisite ${p.id} in ${packageName}: requires "${req}" must appear earlier in array`)
+      }
+    }
+    seen.add(p.id)
+    result.push(p)
+  }
+  return result
+}
+
 export interface CapabilityImpls {
   fetch: FetchCapability
   cookies: CookiesCapability
   sqlite: SqliteCapability
   exec: ExecCapability
   logFor(connectorId: string): LogCapability
+  /** Returns the prerequisites capability for the given package id, or undefined if not supported. */
+  prerequisitesFor?: (packageId: string) => PrerequisitesCapability
 }
 
 export interface LoaderLogger extends BundleLogger {
@@ -61,6 +99,7 @@ interface PkgInfo {
   }
   main: string
   multi: boolean
+  prerequisites: Prerequisite[]
 }
 
 const KNOWN_CAPS_SET = new Set<string>(KNOWN_CAPABILITIES_V1)
@@ -147,6 +186,18 @@ function tryReadConnectorManifest(
 
   if (json?.spool?.type !== 'connector') return []
 
+  const packageName = String(json.name)
+  let prerequisites: Prerequisite[]
+  try {
+    prerequisites = validatePrerequisites(
+      Array.isArray(json.spool.prerequisites) ? json.spool.prerequisites : [],
+      packageName,
+    )
+  } catch (err) {
+    log.error('invalid prerequisites in package', { package: packageName, error: String(err) })
+    return []
+  }
+
   // Multi-connector package: spool.connectors is an array
   if (Array.isArray(json.spool.connectors)) {
     const results: PkgInfo[] = []
@@ -155,7 +206,7 @@ function tryReadConnectorManifest(
       const unknown = declared.filter(c => !KNOWN_CAPS_SET.has(c))
       if (unknown.length > 0) {
         log.error('unknown capability in spool.connectors entry', {
-          package: json.name,
+          package: packageName,
           connectorId: entry.id,
           unknown,
           error: `Unknown capability "${unknown[0]}" — known v1 values: ${[...KNOWN_CAPS_SET].join(', ')}`,
@@ -164,7 +215,7 @@ function tryReadConnectorManifest(
       }
       results.push({
         dir: pkgDir,
-        name: String(json.name),
+        name: packageName,
         version: String(json.version ?? '0.0.0'),
         manifest: {
           id: String(entry.id ?? ''),
@@ -177,6 +228,7 @@ function tryReadConnectorManifest(
         },
         main: String(json.main ?? 'dist/index.js'),
         multi: true,
+        prerequisites,
       })
     }
     return results
@@ -190,7 +242,7 @@ function tryReadConnectorManifest(
   const unknown = declared.filter(c => !KNOWN_CAPS_SET.has(c))
   if (unknown.length > 0) {
     log.error('unknown capability in spool.capabilities', {
-      package: json.name,
+      package: packageName,
       unknown,
       error: `Unknown capability "${unknown[0]}" — known v1 values: ${[...KNOWN_CAPS_SET].join(', ')}`,
     })
@@ -199,7 +251,7 @@ function tryReadConnectorManifest(
 
   return [{
     dir: pkgDir,
-    name: String(json.name),
+    name: packageName,
     version: String(json.version ?? '0.0.0'),
     manifest: {
       id: String(json.spool.id ?? ''),
@@ -212,6 +264,7 @@ function tryReadConnectorManifest(
     },
     main: String(json.main ?? 'dist/index.js'),
     multi: false,
+    prerequisites,
   }]
 }
 
@@ -239,7 +292,7 @@ async function loadOneConnector(
       importedModules.set(entryPath, mod)
     }
 
-    const caps = buildCapabilities(pkg.manifest.capabilities, pkg.manifest.id, deps.capabilityImpls)
+    const caps = buildCapabilities(pkg.manifest.capabilities, pkg.manifest.id, pkg.name, deps.capabilityImpls)
     let ConnectorClass: any
 
     if (pkg.multi) {
@@ -272,9 +325,19 @@ async function loadOneConnector(
     }
 
     const instance: Connector = new ConnectorClass(caps)
-    validateMetadataConsistency(pkg, instance)
+    applyManifestMetadata(instance, pkg, deps.log)
 
     deps.registry.register(instance)
+    const connectorPkg: import('./types.js').ConnectorPackage = {
+      id: pkg.name,
+      packageName: pkg.name,
+      rootDir: pkg.dir,
+      connectors: [instance],
+    }
+    if (pkg.prerequisites.length > 0) {
+      connectorPkg.prerequisites = pkg.prerequisites
+    }
+    deps.registry.registerPackage(connectorPkg)
     deps.log.info('loaded connector', { name: pkg.name, id: pkg.manifest.id, version: pkg.version })
     return { status: 'loaded', name: pkg.name, version: pkg.version }
   } catch (err) {
@@ -291,9 +354,10 @@ async function loadOneConnector(
 function buildCapabilities(
   declared: string[],
   connectorId: string,
+  packageId: string,
   impls: CapabilityImpls,
 ): ConnectorCapabilities {
-  return {
+  const caps: ConnectorCapabilities = {
     fetch: declared.includes('fetch')
       ? impls.fetch
       : (undefinedCapability('fetch') as FetchCapability),
@@ -310,6 +374,10 @@ function buildCapabilities(
       ? impls.exec
       : (undefinedCapability('exec') as ExecCapability),
   }
+  if (declared.includes('prerequisites') && impls.prerequisitesFor) {
+    caps.prerequisites = impls.prerequisitesFor(packageId)
+  }
+  return caps
 }
 
 function undefinedCapability(name: string): unknown {
@@ -337,17 +405,37 @@ function makeUndeclaredError(name: string, accessor: string): SyncError {
   )
 }
 
-function validateMetadataConsistency(pkg: PkgInfo, instance: Connector): void {
+/**
+ * Manifest is the single source of truth for connector metadata.
+ *
+ * Any `readonly id/platform/label/description/color/ephemeral` declared on the
+ * connector class is treated as a default and overwritten with the manifest
+ * value so that runtime behavior always matches what the package declared.
+ *
+ * If the class field disagrees with the manifest, we log a warning so authors
+ * can clean it up — but loading proceeds, since silently dropping a connector
+ * because two redundant declarations drifted is worse than the inconsistency.
+ */
+function applyManifestMetadata(instance: Connector, pkg: PkgInfo, log: LoadDeps['log']): void {
   const fields: Array<keyof typeof pkg.manifest & keyof Connector> = [
     'id', 'platform', 'label', 'description', 'color', 'ephemeral',
   ]
   for (const field of fields) {
-    if (instance[field] !== pkg.manifest[field]) {
-      throw new Error(
-        `metadata mismatch for ${pkg.name}: ` +
-        `instance.${field}=${JSON.stringify(instance[field])} ` +
-        `but manifest.${field}=${JSON.stringify(pkg.manifest[field])}`,
-      )
+    const classValue = (instance as any)[field]
+    const manifestValue = pkg.manifest[field]
+    if (classValue !== undefined && classValue !== manifestValue) {
+      log.warn('connector class field disagrees with manifest; manifest wins', {
+        package: pkg.name,
+        field,
+        classValue,
+        manifestValue,
+      })
     }
+    Object.defineProperty(instance, field, {
+      value: manifestValue,
+      writable: false,
+      configurable: true,
+      enumerable: true,
+    })
   }
 }

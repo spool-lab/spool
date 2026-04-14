@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { validatePrerequisites } from './loader.js'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -98,6 +99,49 @@ describe('loadConnectors', () => {
     expect(report.loadResults.find(r => r.name === '@spool-lab/connector-test')?.status)
       .toBe('loaded')
     expect(registry.list().length).toBe(1)
+  })
+
+  it('manifest metadata wins over class field declarations', async () => {
+    const registry = new ConnectorRegistry()
+    writePkg(
+      join(connectorsDir, 'node_modules'),
+      '@spool-lab/connector-drift',
+      {
+        spool: {
+          type: 'connector',
+          id: 'drift',
+          platform: 'drift',
+          label: 'Manifest Label',
+          description: 'manifest description',
+          color: '#abcdef',
+          ephemeral: true,
+          capabilities: ['log'],
+        },
+      },
+      `export default class DriftConn {
+        id = 'drift'; platform = 'drift'; label = 'Stale Class Label';
+        description = 'class description'; color = '#000000'; ephemeral = false;
+        constructor(caps) { this.caps = caps }
+        async checkAuth() { return { ok: true } }
+        async fetchPage() { return { items: [], nextCursor: null } }
+      }`,
+    )
+
+    const report = await loadConnectors({
+      bundledConnectorsDir: bundledDir,
+      connectorsDir,
+      capabilityImpls: fakeCapabilityImpls(),
+      registry,
+      log: silentLogger(),
+      trustStore: makeTrustStore(),
+    })
+
+    expect(report.loadResults.find(r => r.name === '@spool-lab/connector-drift')?.status)
+      .toBe('loaded')
+    const loaded = registry.list()[0]!
+    expect(loaded.label).toBe('Manifest Label')
+    expect(loaded.color).toBe('#abcdef')
+    expect(loaded.ephemeral).toBe(true)
   })
 
   it('skips packages without spool.type === "connector"', async () => {
@@ -375,5 +419,35 @@ describe('loadConnectors', () => {
     const connector = registry.list()[0]
     await expect(connector.fetchPage({ cursor: null, sinceItemId: null, phase: 'forward', signal: new AbortController().signal }))
       .rejects.toThrow(/not declared/)
+  })
+})
+
+describe('validatePrerequisites', () => {
+  const validBase = {
+    id: 'req1',
+    name: 'Req One',
+    kind: 'exec' as const,
+    detect: { type: 'exec' as const, command: 'req1', args: ['--version'] },
+    install: { kind: 'exec' as const, url: 'https://example.com' },
+  }
+
+  it('accepts a valid prerequisite', () => {
+    expect(validatePrerequisites([validBase], 'pkg')).toHaveLength(1)
+  })
+
+  it('throws on duplicate prerequisite id', () => {
+    expect(() => validatePrerequisites([validBase, validBase], 'pkg'))
+      .toThrow('Prerequisite req1 in pkg: duplicate id')
+  })
+
+  it('throws on missing required fields', () => {
+    expect(() => validatePrerequisites([{ id: 'x' }], 'pkg'))
+      .toThrow(/missing required fields/)
+  })
+
+  it('throws on install.kind mismatch', () => {
+    const bad = { ...validBase, install: { ...validBase.install, kind: 'browser-extension' as any } }
+    expect(() => validatePrerequisites([bad], 'pkg'))
+      .toThrow(/install\.kind/)
   })
 })

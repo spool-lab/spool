@@ -113,6 +113,17 @@ export interface ExecResult {
 
 export interface ExecCapability {
   run(bin: string, args: string[], opts?: { timeout?: number }): Promise<ExecResult>
+  // TODO: timeout contract is undefined — callers currently sniff the error
+  // message string for "timeout". A future version should throw a recognizable
+  // error: either an AbortError (err.name === 'AbortError') or attach a
+  // structured flag ({ timedOut: true }) so callers can reliably distinguish
+  // timeout from ENOENT/EACCES without message parsing.
+}
+
+// ── Prerequisites ─────────────────────────────────────────────────────────────
+
+export interface PrerequisitesCapability {
+  check(): Promise<import('./connector.js').SetupStep[]>
 }
 
 // ── Bundle ──────────────────────────────────────────────────────────────────
@@ -128,6 +139,7 @@ export interface ConnectorCapabilities {
   log: LogCapability
   sqlite: SqliteCapability
   exec: ExecCapability
+  prerequisites?: PrerequisitesCapability
 }
 
 // ── Manifest allowed values ────────────────────────────────────────────────
@@ -143,6 +155,7 @@ export const KNOWN_CAPABILITIES_V1 = [
   'log',
   'sqlite',
   'exec',
+  'prerequisites',
 ] as const
 
 export type KnownCapabilityV1 = typeof KNOWN_CAPABILITIES_V1[number]

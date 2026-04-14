@@ -48,7 +48,8 @@
       "author": "spool-lab",
       "category": "dev",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github",
+      "packageDescription": "What you star and the notifications GitHub sends you."
     },
     {
       "name": "@spool-lab/connector-github",
@@ -60,7 +61,20 @@
       "author": "spool-lab",
       "category": "dev",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github",
+      "packageDescription": "What you star and the notifications GitHub sends you."
+    },
+    {
+      "name": "@spool-lab/connector-xiaohongshu",
+      "id": "xiaohongshu-notes",
+      "platform": "xiaohongshu",
+      "label": "Xiaohongshu Notes",
+      "description": "Notes you have published",
+      "color": "#FF2442",
+      "author": "spool-lab",
+      "category": "social",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
     }
   ]
 }
