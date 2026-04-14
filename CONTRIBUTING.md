@@ -22,6 +22,16 @@ pnpm run rebuild:native:electron  # Electron app / Playwright e2e
 
 If you hit a `NODE_MODULE_VERSION` mismatch, rerun the matching rebuild command and try again.
 
+## Installing a local build (macOS)
+
+To test a production build of the app locally — builds, installs to `/Applications/Spool.app`, and launches it:
+
+```bash
+pnpm dev:install:mac
+```
+
+Requires Apple Silicon. The script quits any running Spool instance before replacing the bundle and strips the quarantine attribute so Gatekeeper doesn't block the unsigned local build.
+
 ## Project structure
 
 ```
