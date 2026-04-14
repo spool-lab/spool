@@ -503,18 +503,19 @@ app.whenReady().then(async () => {
   mainWindow = createWindow()
 
   mainWindow.on('focus', () => {
+    // Always re-check on focus, including for packages that are currently
+    // all-ok — extensions can be removed and CLIs uninstalled without our
+    // knowledge, and skipping the recheck would leave stale green status
+    // until the user manually clicks Re-check.
     for (const pkg of connectorRegistry.listPackages()) {
-      const cached = prerequisiteChecker.getCached(pkg.id)
-      if (!cached || cached.some(s => s.status !== 'ok')) {
-        const before = cached
-        prerequisiteChecker.check(pkg).then((after) => {
-          const changed = !before || before.length !== after.length ||
-            before.some((s, i) => s.status !== after[i]?.status)
-          if (changed) {
-            mainWindow?.webContents.send('connector:status-changed', { packageId: pkg.id })
-          }
-        }).catch(() => undefined)
-      }
+      const before = prerequisiteChecker.getCached(pkg.id)
+      prerequisiteChecker.check(pkg).then((after) => {
+        const changed = !before || before.length !== after.length ||
+          before.some((s, i) => s.status !== after[i]?.status)
+        if (changed) {
+          mainWindow?.webContents.send('connector:status-changed', { packageId: pkg.id })
+        }
+      }).catch(() => undefined)
     }
   })
 
@@ -834,6 +835,7 @@ ipcMain.handle('connector:list', (): ConnectorStatus[] => {
   }
   const result = syncScheduler.getStatus().connectors.map(c => {
     const pkgId = connIdToPackageId.get(c.id)
+    const pkg = pkgId ? connectorRegistry.getPackage(pkgId) : undefined
     const cached = pkgId ? prerequisiteChecker?.getCached(pkgId) : undefined
     const status: ConnectorStatus = {
       ...c,
@@ -842,7 +844,23 @@ ipcMain.handle('connector:list', (): ConnectorStatus[] => {
       packageName: pkgNameMap.get(c.id) ?? '',
     }
     if (pkgId !== undefined) status.packageId = pkgId
-    if (cached !== undefined) status.setup = cached
+    // Always send a setup array when the package declares prerequisites, so
+    // the UI can render the prereq card immediately. If we haven't checked
+    // yet, fill with pending steps from the manifest so the user sees the
+    // structure right away rather than nothing-then-flash.
+    if (cached !== undefined) {
+      status.setup = cached
+    } else if (pkg?.prerequisites && pkg.prerequisites.length > 0) {
+      status.setup = pkg.prerequisites.map(p => ({
+        id: p.id,
+        label: p.name,
+        kind: p.kind,
+        status: 'pending' as const,
+        ...(p.minVersion !== undefined ? { minVersion: p.minVersion } : {}),
+        ...(p.install ? { install: p.install } : {}),
+        ...(p.docsUrl ? { docsUrl: p.docsUrl } : {}),
+      }))
+    }
     return status
   })
   // Kick off background prereq checks for packages not yet cached so the
