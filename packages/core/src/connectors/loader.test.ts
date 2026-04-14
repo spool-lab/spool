@@ -29,6 +29,7 @@ function fakeCapabilityImpls() {
     fetch: globalThis.fetch,
     cookies: { get: async () => [] },
     sqlite: { openReadonly: () => { throw new Error('not available') } },
+    exec: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
     logFor: () => ({
       debug: () => {}, info: () => {}, warn: () => {}, error: () => {},
       span: async (_name: string, fn: () => Promise<any>) => fn(),
@@ -229,6 +230,110 @@ describe('loadConnectors', () => {
     )
     expect(statuses['@spool-lab/connector-typeless']).toBe('loaded')
     expect(statuses['@spool-lab/connector-twitter-bookmarks']).toBe('failed')
+    expect(registry.list().length).toBe(1)
+  })
+
+  it('loads multi-connector package with spool.connectors array', async () => {
+    const registry = new ConnectorRegistry()
+    writePkg(
+      join(connectorsDir, 'node_modules'),
+      '@spool-lab/connector-multi',
+      {
+        spool: {
+          type: 'connector',
+          connectors: [
+            {
+              id: 'multi-a',
+              platform: 'multi',
+              label: 'Multi A',
+              description: 'A',
+              color: '#aaa',
+              ephemeral: false,
+              capabilities: ['log'],
+            },
+            {
+              id: 'multi-b',
+              platform: 'multi',
+              label: 'Multi B',
+              description: 'B',
+              color: '#bbb',
+              ephemeral: true,
+              capabilities: ['log'],
+            },
+          ],
+        },
+      },
+      `
+      class A {
+        id = 'multi-a'; platform = 'multi'; label = 'Multi A';
+        description = 'A'; color = '#aaa'; ephemeral = false;
+        constructor(caps) { this.caps = caps }
+        async checkAuth() { return { ok: true } }
+        async fetchPage() { return { items: [], nextCursor: null } }
+      }
+      class B {
+        id = 'multi-b'; platform = 'multi'; label = 'Multi B';
+        description = 'B'; color = '#bbb'; ephemeral = true;
+        constructor(caps) { this.caps = caps }
+        async checkAuth() { return { ok: true } }
+        async fetchPage() { return { items: [], nextCursor: null } }
+      }
+      export const connectors = [A, B];
+      `,
+    )
+
+    const report = await loadConnectors({
+      bundledConnectorsDir: bundledDir,
+      connectorsDir,
+      capabilityImpls: fakeCapabilityImpls(),
+      registry,
+      log: silentLogger(),
+      trustStore: makeTrustStore(),
+    })
+
+    const loaded = report.loadResults.filter(r => r.status === 'loaded')
+    expect(loaded.length).toBe(2)
+    expect(registry.list().length).toBe(2)
+    expect(registry.has('multi-a')).toBe(true)
+    expect(registry.has('multi-b')).toBe(true)
+  })
+
+  it('loads single-connector package unchanged (backward compat)', async () => {
+    const registry = new ConnectorRegistry()
+    writePkg(
+      join(connectorsDir, 'node_modules'),
+      '@spool-lab/connector-single',
+      {
+        spool: {
+          type: 'connector',
+          id: 'single',
+          platform: 'test',
+          label: 'Single',
+          description: 'S',
+          color: '#000',
+          ephemeral: false,
+          capabilities: ['log'],
+        },
+      },
+      `export default class {
+        id = 'single'; platform = 'test'; label = 'Single';
+        description = 'S'; color = '#000'; ephemeral = false;
+        constructor(caps) {}
+        async checkAuth() { return { ok: true } }
+        async fetchPage() { return { items: [], nextCursor: null } }
+      }`,
+    )
+
+    const report = await loadConnectors({
+      bundledConnectorsDir: bundledDir,
+      connectorsDir,
+      capabilityImpls: fakeCapabilityImpls(),
+      registry,
+      log: silentLogger(),
+      trustStore: makeTrustStore(),
+    })
+
+    expect(report.loadResults.find(r => r.name === '@spool-lab/connector-single')?.status).toBe('loaded')
     expect(registry.list().length).toBe(1)
   })
 

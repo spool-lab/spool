@@ -286,6 +286,18 @@ function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 1')
   }
 
+  if (version < 2) {
+    // v2: rebuild captures FTS indexes to fix corruption from old opencli data
+    // that causes DELETE triggers to fail with SQLITE_CORRUPT
+    try {
+      db.exec("INSERT INTO captures_fts(captures_fts) VALUES('rebuild')")
+      db.exec("INSERT INTO captures_fts_trigram(captures_fts_trigram) VALUES('rebuild')")
+    } catch {
+      // FTS tables may not exist yet on fresh installs — safe to skip
+    }
+    db.pragma('user_version = 2')
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'captures', 'captures_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')

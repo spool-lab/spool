@@ -103,6 +103,18 @@ export interface SqliteCapability {
   openReadonly(path: string): SqliteDatabase
 }
 
+// ── Exec ───────────────────────────────────────────────────────────────────
+
+export interface ExecResult {
+  stdout: string
+  stderr: string
+  exitCode: number
+}
+
+export interface ExecCapability {
+  run(bin: string, args: string[], opts?: { timeout?: number }): Promise<ExecResult>
+}
+
 // ── Bundle ──────────────────────────────────────────────────────────────────
 
 /**
@@ -115,6 +127,7 @@ export interface ConnectorCapabilities {
   cookies: CookiesCapability
   log: LogCapability
   sqlite: SqliteCapability
+  exec: ExecCapability
 }
 
 // ── Manifest allowed values ────────────────────────────────────────────────
@@ -129,6 +142,7 @@ export const KNOWN_CAPABILITIES_V1 = [
   'cookies:chrome',
   'log',
   'sqlite',
+  'exec',
 ] as const
 
 export type KnownCapabilityV1 = typeof KNOWN_CAPABILITIES_V1[number]

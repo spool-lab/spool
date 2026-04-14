@@ -96,6 +96,16 @@ export class SyncScheduler {
     this.queue = []
   }
 
+  /** Cancel an in-flight sync and remove queued jobs for a connector. */
+  cancelIfRunning(connectorId: string): void {
+    const cancel = this.running.get(connectorId)
+    if (cancel) {
+      Effect.runSync(Deferred.succeed(cancel, void 0))
+      this.running.delete(connectorId)
+    }
+    this.queue = this.queue.filter(j => j.connectorId !== connectorId)
+  }
+
   /** Manually trigger sync for a specific connector. */
   triggerNow(connectorId: string, direction: Direction = 'both'): void {
     this.enqueue({ connectorId, direction, priority: 100, queuedAt: Date.now() })
@@ -131,6 +141,7 @@ export class SyncScheduler {
         syncing: this.running.has(c.id),
         bundled: false,
         version: '0.0.0',
+        packageName: '',
         state,
       }
     })

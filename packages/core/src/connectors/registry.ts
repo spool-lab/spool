@@ -27,6 +27,10 @@ export class ConnectorRegistry {
     return this.connectors.delete(id)
   }
 
+  clear(): void {
+    this.connectors.clear()
+  }
+
   list(): Connector[] {
     return Array.from(this.connectors.values())
   }

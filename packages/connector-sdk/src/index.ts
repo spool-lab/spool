@@ -20,8 +20,13 @@ export type {
   SqliteBindValue,
   ConnectorCapabilities,
   KnownCapabilityV1,
+  ExecCapability,
+  ExecResult,
 } from './capabilities.js'
 export { KNOWN_CAPABILITIES_V1 } from './capabilities.js'
 
 // Utilities
 export { abortableSleep } from './utils.js'
+
+// CLI parsing helper
+export { parseCliJsonOutput } from './cli-parser.js'

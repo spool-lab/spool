@@ -1,6 +1,45 @@
 ---
 import registry from '../../../public/registry.json'
 const connectors = registry.connectors
+
+// Group multi-connector packages by npm name
+interface SubConnector { label: string; description: string }
+interface GroupedPackage {
+  name: string
+  label: string
+  color: string
+  category: string
+  bundled: boolean
+  firstParty: boolean
+  description: string
+  subs: SubConnector[]
+}
+const packageMap = new Map<string, GroupedPackage>()
+for (const c of connectors) {
+  const existing = packageMap.get(c.name)
+  if (existing) {
+    existing.subs.push({ label: c.label, description: c.description })
+  } else {
+    packageMap.set(c.name, {
+      name: c.name,
+      label: c.label,
+      color: c.color,
+      category: c.category,
+      bundled: !!c.bundled,
+      firstParty: c.firstParty,
+      description: c.description,
+      subs: [{ label: c.label, description: c.description }],
+    })
+  }
+}
+for (const pkg of packageMap.values()) {
+  if (pkg.subs.length > 1) {
+    const words = pkg.subs[0].label.split(' ')
+    const common = words.filter(w => pkg.subs.every(s => s.label.includes(w)))
+    pkg.label = common.length > 0 ? common.join(' ') : pkg.subs[0].label.split(' ')[0]
+  }
+}
+const packages = [...packageMap.values()]
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -122,6 +161,7 @@ const connectors = registry.connectors
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-auto-rows: 1fr;
       gap: 16px;
     }
 
@@ -133,6 +173,7 @@ const connectors = registry.connectors
       display: flex;
       flex-direction: column;
       gap: 12px;
+      height: 100%;
     }
 
     .card-header {
@@ -179,7 +220,7 @@ const connectors = registry.connectors
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 4px;
+      margin-top: auto;
     }
 
     .cli-hint {
@@ -228,6 +269,30 @@ const connectors = registry.connectors
       background: var(--surface2);
       color: var(--muted);
     }
+
+    .card-subs {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .card-sub {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .sub-label {
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .sub-desc {
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -242,27 +307,41 @@ const connectors = registry.connectors
     <p class="subtitle">Install connectors to index your data sources into Spool.</p>
 
     <div class="grid">
-      {connectors.map(c => (
+      {packages.map(pkg => (
         <div class="card">
           <div class="card-header">
-            <span class="color-dot" style={`background: ${c.color}`}></span>
-            <span class="card-title">{c.label}</span>
-            <span class="badge category">{c.category}</span>
-            {c.bundled
+            <span class="color-dot" style={`background: ${pkg.color}`}></span>
+            <span class="card-title">{pkg.label}</span>
+            <span class="badge category">{pkg.category}</span>
+            {pkg.bundled
               ? <span class="badge bundled">built-in</span>
-              : c.firstParty && <span class="badge">official</span>}
+              : pkg.firstParty && <span class="badge">official</span>}
           </div>
-          <p class="card-desc">{c.description}</p>
+          {pkg.subs.length > 1 ? (
+            <div class="card-subs">
+              {pkg.subs.map(sub => {
+                const stripped = sub.label.startsWith(pkg.label + ' ') ? sub.label.slice(pkg.label.length + 1) : sub.label
+                return (
+                  <div class="card-sub">
+                    <span class="sub-label">{stripped}</span>
+                    <span class="sub-desc">{sub.description}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p class="card-desc">{pkg.description}</p>
+          )}
           <div class="card-footer">
-            {c.bundled ? (
+            {pkg.bundled ? (
               <>
                 <span class="cli-hint">Included with Spool</span>
                 <span class="included-label"><span class="check">&#10003;</span> Included</span>
               </>
             ) : (
               <>
-                <span class="cli-hint">spool connector install {c.name}</span>
-                <a href={`spool://connector/install/${c.name}`} class="install-btn">Install</a>
+                <span class="cli-hint">spool connector install {pkg.name}</span>
+                <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
               </>
             )}
           </div>

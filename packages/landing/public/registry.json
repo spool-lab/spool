@@ -37,6 +37,30 @@
       "category": "productivity",
       "firstParty": true,
       "npm": "https://www.npmjs.com/package/@spool-lab/connector-typeless"
+    },
+    {
+      "name": "@spool-lab/connector-github",
+      "id": "github-stars",
+      "platform": "github",
+      "label": "GitHub Stars",
+      "description": "Repos you recently starred on GitHub",
+      "color": "#333333",
+      "author": "spool-lab",
+      "category": "dev",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
+    },
+    {
+      "name": "@spool-lab/connector-github",
+      "id": "github-notifications",
+      "platform": "github",
+      "label": "GitHub Notifications",
+      "description": "Your GitHub notifications",
+      "color": "#333333",
+      "author": "spool-lab",
+      "category": "dev",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
     }
   ]
 }

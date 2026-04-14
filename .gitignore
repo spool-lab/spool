@@ -49,3 +49,8 @@ packages/*/src/**/*.d.ts.map
 # Playwright
 test-results/
 playwright-report/
+.playwright-mcp/
+
+# Superpowers (agent-generated plans/specs)
+.superpowers/
+docs/superpowers/
