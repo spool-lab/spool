@@ -325,7 +325,7 @@ async function loadOneConnector(
     }
 
     const instance: Connector = new ConnectorClass(caps)
-    validateMetadataConsistency(pkg, instance)
+    applyManifestMetadata(instance, pkg, deps.log)
 
     deps.registry.register(instance)
     const connectorPkg: import('./types.js').ConnectorPackage = {
@@ -405,17 +405,37 @@ function makeUndeclaredError(name: string, accessor: string): SyncError {
   )
 }
 
-function validateMetadataConsistency(pkg: PkgInfo, instance: Connector): void {
+/**
+ * Manifest is the single source of truth for connector metadata.
+ *
+ * Any `readonly id/platform/label/description/color/ephemeral` declared on the
+ * connector class is treated as a default and overwritten with the manifest
+ * value so that runtime behavior always matches what the package declared.
+ *
+ * If the class field disagrees with the manifest, we log a warning so authors
+ * can clean it up — but loading proceeds, since silently dropping a connector
+ * because two redundant declarations drifted is worse than the inconsistency.
+ */
+function applyManifestMetadata(instance: Connector, pkg: PkgInfo, log: LoadDeps['log']): void {
   const fields: Array<keyof typeof pkg.manifest & keyof Connector> = [
     'id', 'platform', 'label', 'description', 'color', 'ephemeral',
   ]
   for (const field of fields) {
-    if (instance[field] !== pkg.manifest[field]) {
-      throw new Error(
-        `metadata mismatch for ${pkg.name}: ` +
-        `instance.${field}=${JSON.stringify(instance[field])} ` +
-        `but manifest.${field}=${JSON.stringify(pkg.manifest[field])}`,
-      )
+    const classValue = (instance as any)[field]
+    const manifestValue = pkg.manifest[field]
+    if (classValue !== undefined && classValue !== manifestValue) {
+      log.warn('connector class field disagrees with manifest; manifest wins', {
+        package: pkg.name,
+        field,
+        classValue,
+        manifestValue,
+      })
     }
+    Object.defineProperty(instance, field, {
+      value: manifestValue,
+      writable: false,
+      configurable: true,
+      enumerable: true,
+    })
   }
 }

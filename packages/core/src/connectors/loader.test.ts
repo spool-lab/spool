@@ -101,6 +101,49 @@ describe('loadConnectors', () => {
     expect(registry.list().length).toBe(1)
   })
 
+  it('manifest metadata wins over class field declarations', async () => {
+    const registry = new ConnectorRegistry()
+    writePkg(
+      join(connectorsDir, 'node_modules'),
+      '@spool-lab/connector-drift',
+      {
+        spool: {
+          type: 'connector',
+          id: 'drift',
+          platform: 'drift',
+          label: 'Manifest Label',
+          description: 'manifest description',
+          color: '#abcdef',
+          ephemeral: true,
+          capabilities: ['log'],
+        },
+      },
+      `export default class DriftConn {
+        id = 'drift'; platform = 'drift'; label = 'Stale Class Label';
+        description = 'class description'; color = '#000000'; ephemeral = false;
+        constructor(caps) { this.caps = caps }
+        async checkAuth() { return { ok: true } }
+        async fetchPage() { return { items: [], nextCursor: null } }
+      }`,
+    )
+
+    const report = await loadConnectors({
+      bundledConnectorsDir: bundledDir,
+      connectorsDir,
+      capabilityImpls: fakeCapabilityImpls(),
+      registry,
+      log: silentLogger(),
+      trustStore: makeTrustStore(),
+    })
+
+    expect(report.loadResults.find(r => r.name === '@spool-lab/connector-drift')?.status)
+      .toBe('loaded')
+    const loaded = registry.list()[0]!
+    expect(loaded.label).toBe('Manifest Label')
+    expect(loaded.color).toBe('#abcdef')
+    expect(loaded.ephemeral).toBe(true)
+  })
+
   it('skips packages without spool.type === "connector"', async () => {
     const registry = new ConnectorRegistry()
     writePkg(
