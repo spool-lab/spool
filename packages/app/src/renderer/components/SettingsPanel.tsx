@@ -740,10 +740,12 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                 style={{ background: pkg.color }}
               />
               <div className="flex-1 min-w-0 leading-4">
-                <span className="text-xs text-warm-muted dark:text-dark-muted">{pkg.label}</span>
-                {meta && (
-                  <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">{meta}</span>
-                )}
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-xs text-warm-muted dark:text-dark-muted flex-none">{pkg.label}</span>
+                  {meta && (
+                    <span className="text-[11px] text-warm-faint dark:text-dark-muted truncate min-w-0" title={meta}>{meta}</span>
+                  )}
+                </div>
                 {installErrors[pkg.name] && installingPackage !== pkg.name && (
                   <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
                 )}
