@@ -12,6 +12,4 @@ Spool will guide you through installing each when you enable the connector.
 
 ## Sub-connectors
 
-- `xiaohongshu-feed` — home feed (ephemeral)
 - `xiaohongshu-notes` — your published notes (persistent)
-- `xiaohongshu-notifications` — messages/likes/comments (ephemeral)

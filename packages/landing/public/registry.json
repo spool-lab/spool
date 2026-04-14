@@ -66,19 +66,6 @@
     },
     {
       "name": "@spool-lab/connector-xiaohongshu",
-      "id": "xiaohongshu-feed",
-      "platform": "xiaohongshu",
-      "label": "Xiaohongshu Feed",
-      "description": "Your Xiaohongshu home feed",
-      "color": "#FF2442",
-      "author": "spool-lab",
-      "category": "social",
-      "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
-      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
-    },
-    {
-      "name": "@spool-lab/connector-xiaohongshu",
       "id": "xiaohongshu-notes",
       "platform": "xiaohongshu",
       "label": "Xiaohongshu Notes",
@@ -87,21 +74,7 @@
       "author": "spool-lab",
       "category": "social",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
-      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
-    },
-    {
-      "name": "@spool-lab/connector-xiaohongshu",
-      "id": "xiaohongshu-notifications",
-      "platform": "xiaohongshu",
-      "label": "Xiaohongshu Notifications",
-      "description": "Messages, likes, and comments",
-      "color": "#FF2442",
-      "author": "spool-lab",
-      "category": "social",
-      "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
-      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
     }
   ]
 }
