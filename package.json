@@ -13,7 +13,8 @@
     "rebuild:native:electron": "pnpm --filter @spool/app run rebuild:native:electron",
     "lint": "turbo lint",
     "clean": "turbo clean",
-    "check:phantom-independence": "scripts/phantom-independence-check.sh"
+    "check:phantom-independence": "scripts/phantom-independence-check.sh",
+    "dev:install:mac": "scripts/dev-install-mac.sh"
   },
   "devDependencies": {
     "turbo": "^2.9.6",
