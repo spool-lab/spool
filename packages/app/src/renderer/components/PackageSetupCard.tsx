@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, X, AlertTriangle, Circle, Terminal, Puzzle, KeyRound, Loader2 } from 'lucide-react'
+import { Check, X, AlertTriangle, Circle, Terminal, Puzzle, KeyRound, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import type { SetupStep } from '@spool/core'
 import { ManualInstallModal } from './ManualInstallModal.js'
 
@@ -8,6 +8,12 @@ interface Props {
   packageLabel: string
   steps: SetupStep[]
   onChanged: () => void
+  /**
+   * When true, render even if all prerequisites are OK; default collapsed
+   * behind a summary row that the user can click to expand. Used in the
+   * connector detail page so users can inspect prereq state any time.
+   */
+  alwaysShow?: boolean
 }
 
 function StatusIcon({ status }: { status: SetupStep['status'] }) {
@@ -86,7 +92,7 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
         )
       }
       return (
-        <button onClick={runCliInstall} className="text-[11px] px-2 py-0.5 rounded bg-accent text-white hover:opacity-90">
+        <button onClick={runCliInstall} className="text-[11px] font-medium px-2 py-0.5 rounded border border-accent/30 text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/10">
           {step.status === 'outdated' ? 'Upgrade' : 'Install'}
         </button>
       )
@@ -95,14 +101,14 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
     if (install.kind === 'browser-extension') {
       if (install.webstoreUrl) {
         return (
-          <button onClick={() => window.spool?.connectors?.openExternal(install.webstoreUrl!)} className="text-[11px] px-2 py-0.5 rounded bg-accent text-white hover:opacity-90">
+          <button onClick={() => window.spool?.connectors?.openExternal(install.webstoreUrl!)} className="text-[11px] font-medium px-2 py-0.5 rounded border border-accent/30 text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/10">
             Install from Chrome Store
           </button>
         )
       }
       if (install.manual) {
         return (
-          <button onClick={() => setManualOpen(true)} className="text-[11px] px-2 py-0.5 rounded bg-accent text-white hover:opacity-90">
+          <button onClick={() => setManualOpen(true)} className="text-[11px] font-medium px-2 py-0.5 rounded border border-accent/30 text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/10">
             Install extension
           </button>
         )
@@ -111,7 +117,7 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
 
     if (install.kind === 'site-session') {
       return (
-        <button onClick={() => window.spool?.connectors?.openExternal(install.openUrl)} className="text-[11px] px-2 py-0.5 rounded bg-accent text-white hover:opacity-90">
+        <button onClick={() => window.spool?.connectors?.openExternal(install.openUrl)} className="text-[11px] font-medium px-2 py-0.5 rounded border border-accent/30 text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/10">
           Open site
         </button>
       )
@@ -120,8 +126,8 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
   }
 
   return (
-    <div className="flex items-start gap-2 py-1">
-      <span className="mt-0.5"><StatusIcon status={step.status} /></span>
+    <div className="flex items-center gap-2 py-1 min-h-[24px]">
+      <StatusIcon status={step.status} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <KindIcon kind={step.kind} />
@@ -134,7 +140,7 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
           <div className="text-[10px] text-warm-faint dark:text-dark-faint mt-0.5">{step.hint}</div>
         )}
       </div>
-      {renderAction()}
+      <div className="flex-shrink-0">{renderAction()}</div>
       {install?.kind === 'browser-extension' && install.manual && (
         <ManualInstallModal
           open={manualOpen}
@@ -151,22 +157,57 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
   )
 }
 
-export function PackageSetupCard({ packageId, packageLabel, steps, onChanged }: Props) {
+export function PackageSetupCard({ packageId, packageLabel: _packageLabel, steps, onChanged, alwaysShow }: Props) {
   const okCount = steps.filter(s => s.status === 'ok').length
   const allOk = okCount === steps.length
 
-  // When everything is set up, get out of the user's way entirely.
+  // Default: when everything is set up, get out of the user's way entirely.
   // The card reappears automatically if any step regresses (focus recheck).
-  if (allOk) return null
+  // alwaysShow=true keeps the card visible (collapsed) so users can inspect.
+  const [expanded, setExpanded] = useState(!allOk)
+  if (allOk && !alwaysShow) return null
 
   const recheck = async () => {
     await window.spool?.connectors?.recheckPrerequisites(packageId)
   }
 
+  // Collapsed summary for the "all ok + alwaysShow" case
+  if (allOk && alwaysShow && !expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="w-full px-3 py-2 bg-warm-panel dark:bg-dark-panel rounded-[6px] border border-warm-border dark:border-dark-border flex items-center justify-between text-left hover:border-warm-border-focus dark:hover:border-dark-border-focus transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <ChevronRight className="w-3 h-3 text-warm-faint dark:text-dark-faint" />
+          <span className="text-[11px] font-medium text-warm-text dark:text-dark-text">Prerequisites</span>
+        </div>
+        <span className="text-[10px] text-warm-muted dark:text-dark-muted flex items-center gap-1">
+          <Check className="w-3 h-3 text-green-500" />
+          {steps.length} of {steps.length} ready
+        </span>
+      </button>
+    )
+  }
+
   return (
     <div className="px-3 py-2 bg-warm-panel dark:bg-dark-panel rounded-[6px] border border-warm-border dark:border-dark-border">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-medium text-warm-text dark:text-dark-text">Setup</span>
+        {alwaysShow ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-warm-text dark:text-dark-text hover:text-warm-muted dark:hover:text-dark-muted"
+            disabled={!allOk}
+            title={allOk ? 'Collapse' : undefined}
+          >
+            {allOk && <ChevronDown className="w-3 h-3 text-warm-faint dark:text-dark-faint" />}
+            <span>Prerequisites</span>
+          </button>
+        ) : (
+          <span className="text-[11px] font-medium text-warm-text dark:text-dark-text">Setup</span>
+        )}
         <div className="flex items-center gap-2 text-[10px] text-warm-muted dark:text-dark-muted">
           <span>{okCount} of {steps.length} ✓</span>
           <button onClick={recheck} className="hover:text-warm-text dark:hover:text-dark-text">Re-check</button>

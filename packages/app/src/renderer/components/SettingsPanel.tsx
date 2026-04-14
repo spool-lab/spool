@@ -538,7 +538,10 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           </div>
         </div>
 
-        {/* Setup card (package-level prerequisites) */}
+        {/* Setup card (package-level prerequisites) — alwaysShow on the
+            detail page so users can inspect prereq state any time, not only
+            when something is wrong. Defaults to a collapsed summary row when
+            everything is OK. */}
         {(() => {
           const setup = pkgConnectors.find(c => c.setup && c.setup.length > 0)?.setup
           if (!setup) return null
@@ -549,6 +552,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               packageLabel={pkgLabel}
               steps={setup}
               onChanged={loadConnectors}
+              alwaysShow
             />
           )
         })()}
