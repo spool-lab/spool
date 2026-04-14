@@ -1,0 +1,46 @@
+{
+  "name": "@spool-lab/connector-reddit",
+  "version": "0.1.0",
+  "description": "Reddit Saved and Upvoted posts for Spool",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "keywords": ["spool-connector", "reddit"],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@spool/connector-sdk": "workspace:^"
+  },
+  "devDependencies": {
+    "@spool/connector-sdk": "workspace:^",
+    "@types/node": "^22.15.3",
+    "typescript": "^5.7.3"
+  },
+  "spool": {
+    "type": "connector",
+    "connectors": [
+      {
+        "id": "reddit-saved",
+        "platform": "reddit",
+        "label": "Reddit Saved",
+        "description": "Posts and comments you saved on Reddit",
+        "color": "#FF4500",
+        "ephemeral": false,
+        "capabilities": ["fetch", "cookies:chrome", "log"]
+      },
+      {
+        "id": "reddit-upvoted",
+        "platform": "reddit",
+        "label": "Reddit Upvoted",
+        "description": "Posts you upvoted on Reddit",
+        "color": "#FF4500",
+        "ephemeral": false,
+        "capabilities": ["fetch", "cookies:chrome", "log"]
+      }
+    ]
+  }
+}
