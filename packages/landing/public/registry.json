@@ -48,7 +48,8 @@
       "author": "spool-lab",
       "category": "dev",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github",
+      "packageDescription": "What you star and the notifications GitHub sends you."
     },
     {
       "name": "@spool-lab/connector-github",
@@ -60,7 +61,8 @@
       "author": "spool-lab",
       "category": "dev",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-github",
+      "packageDescription": "What you star and the notifications GitHub sends you."
     },
     {
       "name": "@spool-lab/connector-xiaohongshu",
@@ -72,7 +74,8 @@
       "author": "spool-lab",
       "category": "social",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
+      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
     },
     {
       "name": "@spool-lab/connector-xiaohongshu",
@@ -84,7 +87,8 @@
       "author": "spool-lab",
       "category": "social",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
+      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
     },
     {
       "name": "@spool-lab/connector-xiaohongshu",
@@ -96,7 +100,8 @@
       "author": "spool-lab",
       "category": "social",
       "firstParty": true,
-      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu",
+      "packageDescription": "Your Xiaohongshu feed, the notes you've published, and your notifications."
     }
   ]
 }
