@@ -19,6 +19,14 @@ function commonLabel(labels: string[]): string {
   return shared.length > 0 ? shared.join(' ') : words[0]!
 }
 
+// Strip the common package prefix from a sub-label when the parent context is already visible.
+// e.g. stripLabelPrefix("GitHub Stars", "GitHub") → "Stars"
+function stripLabelPrefix(label: string, prefix: string): string {
+  if (!prefix || label === prefix) return label
+  const withSpace = prefix + ' '
+  return label.startsWith(withSpace) ? label.slice(withSpace.length) : label
+}
+
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_OPTIONS = [
   { value: '', label: 'Auto-detect' },
@@ -522,7 +530,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
               )}
             </div>
             <p className="text-[11px] text-warm-faint dark:text-dark-muted">
-              {pkgConnectors.length === 1 ? first.description : pkgConnectors.map(c => c.label).join(', ')}
+              {pkgConnectors.length === 1 ? first.description : pkgConnectors.map(c => stripLabelPrefix(c.label, pkgLabel)).join(', ')}
             </p>
             {updateErrors[first.id] && updatingConnector !== first.id && (
               <p className="text-[11px] text-red-400 mt-1">{updateErrors[first.id]}</p>
@@ -538,7 +546,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
             <div key={c.id} className="space-y-3">
               {pkgConnectors.length > 1 && (
                 <div>
-                  <h5 className="text-[11px] font-medium text-warm-text dark:text-dark-text">{c.label}</h5>
+                  <h5 className="text-[11px] font-medium text-warm-text dark:text-dark-text">{stripLabelPrefix(c.label, pkgLabel)}</h5>
                   <p className="text-[10px] text-warm-faint dark:text-dark-muted">{c.description}</p>
                 </div>
               )}
@@ -676,7 +684,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                   {g.items.length > 1 ? (
                     <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
                       {!anyEnabled
-                        ? g.items.map(c => c.label).join(', ')
+                        ? g.items.map(c => stripLabelPrefix(c.label, g.label)).join(', ')
                         : anySyncing
                           ? 'Syncing…'
                           : totalItems > 0
@@ -737,7 +745,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                   {pkg.subs.map((sub, i) => (
                     <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
                       <span className="text-warm-faint dark:text-dark-faint">·</span>
-                      <span className="text-warm-muted dark:text-dark-muted">{sub.label}</span>
+                      <span className="text-warm-muted dark:text-dark-muted">{stripLabelPrefix(sub.label, pkg.label)}</span>
                       <span className="text-warm-faint dark:text-dark-faint">{sub.description}</span>
                     </div>
                   ))}

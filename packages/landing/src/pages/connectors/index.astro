@@ -161,6 +161,7 @@ const packages = [...packageMap.values()]
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-auto-rows: 1fr;
       gap: 16px;
     }
 
@@ -172,6 +173,7 @@ const packages = [...packageMap.values()]
       display: flex;
       flex-direction: column;
       gap: 12px;
+      height: 100%;
     }
 
     .card-header {
@@ -271,15 +273,15 @@ const packages = [...packageMap.values()]
     .card-subs {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
     }
 
     .card-sub {
       display: flex;
       align-items: baseline;
-      gap: 8px;
-      font-size: 13px;
-      line-height: 1.4;
+      gap: 6px;
+      font-size: 12px;
+      line-height: 1.3;
     }
 
     .sub-label {
@@ -317,12 +319,15 @@ const packages = [...packageMap.values()]
           </div>
           {pkg.subs.length > 1 ? (
             <div class="card-subs">
-              {pkg.subs.map(sub => (
-                <div class="card-sub">
-                  <span class="sub-label">{sub.label}</span>
-                  <span class="sub-desc">{sub.description}</span>
-                </div>
-              ))}
+              {pkg.subs.map(sub => {
+                const stripped = sub.label.startsWith(pkg.label + ' ') ? sub.label.slice(pkg.label.length + 1) : sub.label
+                return (
+                  <div class="card-sub">
+                    <span class="sub-label">{stripped}</span>
+                    <span class="sub-desc">{sub.description}</span>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p class="card-desc">{pkg.description}</p>
