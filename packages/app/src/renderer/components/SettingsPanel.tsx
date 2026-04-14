@@ -711,59 +711,54 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         })()}
       </Section>
 
-      {!registryLoading && !registryError && discoverPackages.length > 0 && (
-        <Section title="Available Connectors">
-          {discoverPackages.map(pkg => (
-            <div
-              key={pkg.name}
-              className="flex items-center gap-3 py-2.5"
-            >
-              <span
-                className="w-2 h-2 rounded-full flex-none opacity-50"
-                style={{ background: pkg.color }}
-              />
-              <div className="flex-1 min-w-0 leading-4">
-                <span className="text-xs text-warm-muted dark:text-dark-muted">{pkg.label}</span>
-                {pkg.subs.length > 1 ? (
-                  <div className="mt-1 space-y-0.5">
-                    {pkg.subs.map((sub, i) => (
-                      <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
-                        <span className="text-warm-faint dark:text-dark-faint">·</span>
-                        <span className="text-warm-muted dark:text-dark-muted">{sub.label}</span>
-                        <span className="text-warm-faint dark:text-dark-faint">{sub.description}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{pkg.description}</span>
-                )}
-                {installErrors[pkg.name] && installingPackage !== pkg.name && (
-                  <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
-                )}
-              </div>
-              <button
-                onClick={() => handleInstall(pkg.name)}
-                disabled={installingPackage === pkg.name}
-                className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
-              >
-                {installingPackage === pkg.name ? 'Installing\u2026' : 'Install'}
-              </button>
+      <Section title="Available Connectors">
+        {registryLoading && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Loading connector directory…</p>
+        )}
+        {registryError && !registryLoading && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Couldn't load connector directory</p>
+        )}
+        {!registryLoading && !registryError && discoverPackages.length === 0 && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted">All connectors installed</p>
+        )}
+        {!registryLoading && !registryError && discoverPackages.map(pkg => (
+          <div
+            key={pkg.name}
+            className="flex items-center gap-3 py-2.5"
+          >
+            <span
+              className="w-2 h-2 rounded-full flex-none opacity-50"
+              style={{ background: pkg.color }}
+            />
+            <div className="flex-1 min-w-0 leading-4">
+              <span className="text-xs text-warm-muted dark:text-dark-muted">{pkg.label}</span>
+              {pkg.subs.length > 1 ? (
+                <div className="mt-1 space-y-0.5">
+                  {pkg.subs.map((sub, i) => (
+                    <div key={i} className="flex items-baseline gap-1.5 text-[11px]">
+                      <span className="text-warm-faint dark:text-dark-faint">·</span>
+                      <span className="text-warm-muted dark:text-dark-muted">{sub.label}</span>
+                      <span className="text-warm-faint dark:text-dark-faint">{sub.description}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[11px] text-warm-faint dark:text-dark-faint ml-2">{pkg.description}</span>
+              )}
+              {installErrors[pkg.name] && installingPackage !== pkg.name && (
+                <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
+              )}
             </div>
-          ))}
-        </Section>
-      )}
-
-      {registryLoading && (
-        <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
-          Loading connector directory\u2026
-        </div>
-      )}
-
-      {registryError && !registryLoading && (
-        <div className="text-[11px] text-warm-faint dark:text-dark-faint px-2">
-          Couldn't load connector directory
-        </div>
-      )}
+            <button
+              onClick={() => handleInstall(pkg.name)}
+              disabled={installingPackage === pkg.name}
+              className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
+            >
+              {installingPackage === pkg.name ? 'Installing…' : 'Install'}
+            </button>
+          </div>
+        ))}
+      </Section>
 
       {syncError && (
         <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
