@@ -1,5 +1,18 @@
 // Public plugin contract types
-export type { Connector, AuthStatus, PageResult, FetchContext } from './connector.js'
+export type {
+  Connector,
+  AuthStatus,
+  PageResult,
+  FetchContext,
+  Prerequisite,
+  PrerequisiteKind,
+  Detect,
+  Install,
+  ManualInstall,
+  SetupStep,
+  SetupStatus,
+} from './connector.js'
+export { checkAuthViaPrerequisites } from './connector.js'
 export type { CapturedItem } from './captured-item.js'
 export type { SyncState } from './sync-state.js'
 
@@ -22,6 +35,7 @@ export type {
   KnownCapabilityV1,
   ExecCapability,
   ExecResult,
+  PrerequisitesCapability,
 } from './capabilities.js'
 export { KNOWN_CAPABILITIES_V1 } from './capabilities.js'
 
