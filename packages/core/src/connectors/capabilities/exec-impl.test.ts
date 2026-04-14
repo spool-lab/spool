@@ -28,9 +28,23 @@ describe('makeExecCapability', () => {
     ).rejects.toThrow()
   })
 
-  it('rejects when binary not found', async () => {
-    await expect(
-      exec.run('nonexistent-binary-xyz', []),
-    ).rejects.toThrow()
+  it('returns exit 127 when binary not found (login shell semantics)', async () => {
+    const result = await exec.run('nonexistent-binary-xyz', [])
+    expect(result.exitCode).toBe(127)
+    expect(result.stderr).toMatch(/not found|no such/i)
+  })
+
+  it('runs through a login shell so subprocesses inherit user env (e.g. proxy vars)', async () => {
+    // Sanity check: the spawned process can see at least one inherited env var
+    // that login shells typically set. HOME is reliable across macOS/Linux.
+    const result = await exec.run('printenv', ['HOME'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBeTruthy()
+  })
+
+  it('quotes args safely (no shell injection)', async () => {
+    const result = await exec.run('echo', ['hello world', `it's a $(date) test`])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBe(`hello world it's a $(date) test`)
   })
 })
