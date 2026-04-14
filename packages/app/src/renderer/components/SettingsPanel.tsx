@@ -542,86 +542,104 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         {pkgConnectors.map(c => {
           const isSyncing = syncingConnector === c.id || c.syncing
           const progress = syncProgress[c.id]
+          const hasError = c.enabled && !!c.state.lastErrorCode
+          const dotClass = !c.enabled
+            ? 'bg-warm-faint dark:bg-dark-faint'
+            : isSyncing
+              ? 'bg-accent dark:bg-accent-dark animate-pulse'
+              : hasError
+                ? 'bg-red-400'
+                : 'bg-green-500'
+          const statusText = !c.enabled
+            ? 'Disabled'
+            : isSyncing
+              ? 'Syncing…'
+              : c.state.lastErrorCode?.startsWith('AUTH_')
+                ? 'Needs login'
+                : hasError
+                  ? 'Error'
+                  : 'Connected'
           return (
-            <div key={c.id} className="space-y-3">
+            <div key={c.id} className="space-y-2">
               {pkgConnectors.length > 1 && (
-                <div>
+                <div className="px-0.5">
                   <h5 className="text-[11px] font-medium text-warm-text dark:text-dark-text">{stripLabelPrefix(c.label, pkgLabel)}</h5>
                   <p className="text-[10px] text-warm-faint dark:text-dark-muted">{c.description}</p>
                 </div>
               )}
-              {/* Status */}
-              <div className="px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
-                  <span className={`text-[11px] font-medium ${c.enabled ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
-                    {!c.enabled
-                      ? 'Disabled'
-                      : isSyncing
-                        ? 'Syncing…'
-                        : c.state.lastErrorCode?.startsWith('AUTH_')
-                          ? 'Needs login'
-                          : 'Connected'}
-                  </span>
+              <div className="bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] overflow-hidden divide-y divide-warm-border dark:divide-dark-border">
+                {/* Status summary */}
+                <div className="px-3 py-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass}`} />
+                      <span className={`text-[11px] ${c.enabled && !hasError ? 'text-warm-text dark:text-dark-text' : 'text-warm-faint dark:text-dark-muted'}`}>
+                        {statusText}
+                      </span>
+                    </span>
+                  </div>
+                  {c.enabled && (connectorCounts[c.id] ?? 0) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-warm-muted dark:text-dark-muted">Items</span>
+                      <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted tabular-nums">
+                        {connectorCounts[c.id]} · {formatSyncTime(c.state.lastForwardSyncAt)}
+                      </span>
+                    </div>
+                  )}
+                  {isSyncing && progress && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
+                      <span className="text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+                        {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
+                      </span>
+                    </div>
+                  )}
+                  {c.enabled && !isSyncing && c.state.lastErrorCode && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-warm-muted dark:text-dark-muted flex-none">Error</span>
+                      <span className="text-[11px] text-red-400 truncate text-right" title={c.state.lastErrorMessage ?? undefined}>
+                        {c.state.lastErrorMessage ?? c.state.lastErrorCode}
+                      </span>
+                    </div>
+                  )}
+                  {c.enabled && !c.state.tailComplete && !isSyncing && !c.state.lastErrorCode && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
+                      <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
+                    </div>
+                  )}
                 </div>
-                {c.enabled && (connectorCounts[c.id] ?? 0) > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-warm-muted dark:text-dark-muted">Items</span>
-                    <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted">
-                      {connectorCounts[c.id]} · {formatSyncTime(c.state.lastForwardSyncAt)}
-                    </span>
-                  </div>
-                )}
-                {isSyncing && progress && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
-                    <span className="text-[11px] text-warm-faint dark:text-dark-muted">
-                      {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
-                    </span>
-                  </div>
-                )}
-                {c.enabled && !isSyncing && c.state.lastErrorCode && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-warm-muted dark:text-dark-muted">Error</span>
-                    <span className="text-[11px] text-red-400 max-w-[60%] truncate text-right" title={c.state.lastErrorMessage ?? undefined}>
-                      {c.state.lastErrorMessage ?? c.state.lastErrorCode}
-                    </span>
-                  </div>
-                )}
-                {c.enabled && !c.state.tailComplete && !isSyncing && !c.state.lastErrorCode && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
-                    <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
-                  </div>
-                )}
-              </div>
 
-              {/* Enable toggle */}
-              <div className="flex items-center justify-between px-3 py-2.5 bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px]">
-                <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
-                <button
-                  disabled={uninstalling}
-                  onClick={() => handleToggleEnabled(c.id, !c.enabled)}
-                  className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 ${
-                    c.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
-                  }`}
-                >
-                  <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
-                    c.enabled ? 'left-[16px]' : 'left-[2px]'
-                  }`} />
-                </button>
+                {/* Controls: toggle + inline sync */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
+                  <div className="flex items-center gap-4">
+                    {c.enabled && (
+                      <button
+                        onClick={() => handleSync(c.id)}
+                        disabled={isSyncing || uninstalling}
+                        className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 disabled:no-underline"
+                      >
+                        {isSyncing ? 'Syncing…' : 'Sync now'}
+                      </button>
+                    )}
+                    <button
+                      disabled={uninstalling}
+                      aria-pressed={c.enabled}
+                      aria-label={c.enabled ? 'Disable connector' : 'Enable connector'}
+                      onClick={() => handleToggleEnabled(c.id, !c.enabled)}
+                      className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-warm-surface dark:focus-visible:ring-offset-dark-surface ${
+                        c.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
+                      }`}
+                    >
+                      <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
+                        c.enabled ? 'left-[16px]' : 'left-[2px]'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              {/* Sync button */}
-              {c.enabled && (
-                <button
-                  onClick={() => handleSync(c.id)}
-                  disabled={isSyncing || uninstalling}
-                  className="w-full py-2 text-xs font-medium text-accent dark:text-accent-dark border border-accent/30 dark:border-accent-dark/30 rounded-[8px] hover:bg-accent-bg dark:hover:bg-[#2A1800] disabled:opacity-50 transition-colors"
-                >
-                  {isSyncing ? 'Syncing…' : 'Sync now'}
-                </button>
-              )}
             </div>
           )
         })}
@@ -637,7 +655,7 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
 
   // ── List view ──
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <Section title="Agent Sessions">
         <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
         <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
@@ -952,7 +970,10 @@ function BuiltInSource({ name, color, count }: { name: string; color: string; co
       <span className="text-[11px] text-warm-faint dark:text-dark-muted tabular-nums font-mono">
         {count === null ? '…' : `${count} sessions`}
       </span>
-      <span className="text-[10px] text-green-500 font-medium">auto</span>
+      <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.06em] text-warm-faint dark:text-dark-muted">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-none" />
+        auto
+      </span>
     </div>
   )
 }
