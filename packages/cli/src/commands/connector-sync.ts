@@ -19,10 +19,10 @@ import type { SyncState } from '@spool/core'
 
 export const connectorSyncCommand = new Command('connector-sync')
   .description('Sync a connector until fully complete')
-  .argument('[connector-id]', 'Connector ID (default: twitter-bookmarks)', 'twitter-bookmarks')
+  .argument('[connector-id]', 'Connector ID (omit to list available)')
   .option('--reset', 'Delete all data for this connector and sync from scratch')
   .option('--delay <ms>', 'Delay between page requests in ms', '600')
-  .action(async (connectorId: string, opts: { reset?: boolean; delay?: string }) => {
+  .action(async (connectorId: string | undefined, opts: { reset?: boolean; delay?: string }) => {
     const db = getDB()
     const registry = new ConnectorRegistry()
     const spoolDir = join(homedir(), '.spool')
@@ -42,9 +42,22 @@ export const connectorSyncCommand = new Command('connector-sync')
       trustStore: new TrustStore(spoolDir),
     })
 
+    const available = registry.list().map(c => c.id)
+
+    if (!connectorId) {
+      if (available.length === 0) {
+        console.error('No connectors installed.')
+        process.exit(1)
+      }
+      console.log('Available connectors:')
+      for (const id of available) console.log(`  ${id}`)
+      console.log('\nUsage: spool connector-sync <connector-id>')
+      process.exit(0)
+    }
+
     if (!registry.has(connectorId)) {
       console.error(`Unknown connector: ${connectorId}`)
-      console.error(`Available: ${registry.list().map(c => c.id).join(', ')}`)
+      console.error(`Available: ${available.join(', ')}`)
       process.exit(1)
     }
 
