@@ -1,17 +1,11 @@
 import chokidar, { type FSWatcher } from 'chokidar'
 import type { Syncer } from './syncer.js'
 import type { SessionSource } from '../types.js'
-import { detectSessionSource, getSessionRoots } from './source-paths.js'
+import { detectSessionSource, getSessionRoots, getSessionWatchPatterns } from './source-paths.js'
 // No native module dependencies — uses node:sqlite via @spool/core
 
 export type WatcherEvent = 'new-sessions'
 export type WatcherEventCallback = (event: WatcherEvent, data: { count: number }) => void
-
-/** Check if a file path is a session file we care about */
-function isSessionFile(filePath: string): boolean {
-  return filePath.endsWith('.jsonl')
-    || (filePath.endsWith('.json') && /(?:^|[/\\])session-[^/\\]*\.json$/.test(filePath))
-}
 
 export class SpoolWatcher {
   private watcher: FSWatcher | null = null
@@ -32,18 +26,15 @@ export class SpoolWatcher {
       codex: getSessionRoots('codex'),
       gemini: getSessionRoots('gemini'),
     }
-    // chokidar v4 removed glob support — watch directories directly
-    // and use `ignored` to filter for session files only
-    const dirs = [
-      ...this.sourceRoots.claude,
-      ...this.sourceRoots.codex,
-      ...this.sourceRoots.gemini,
+    const patterns = [
+      ...getSessionWatchPatterns('claude', this.sourceRoots.claude),
+      ...getSessionWatchPatterns('codex', this.sourceRoots.codex),
+      ...getSessionWatchPatterns('gemini', this.sourceRoots.gemini),
     ]
 
-    this.watcher = chokidar.watch(dirs, {
+    this.watcher = chokidar.watch(patterns, {
       persistent: true,
       ignoreInitial: true, // initial sync is done by Syncer.syncAll()
-      ignored: (path, stats) => stats?.isFile() === true && !isSessionFile(path),
       awaitWriteFinish: {
         stabilityThreshold: 2000,
         pollInterval: 200,
