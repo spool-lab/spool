@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
-  searchFragments, searchAll, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
+  searchFragments, searchAll, searchSessionPreview, searchCaptures, listRecentSessions, getSessionWithMessages, getStatus,
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability, makeExecCapability,
@@ -686,9 +686,24 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
   const cached = searchCache.get(cacheKey)
   if (cached) return cached
 
-  const results = source === 'claude' || source === 'codex' || source === 'gemini'
-    ? searchSessionPreview(db, query, { limit, source })
-    : searchSessionPreview(db, query, { limit })
+  // Session-scoped preview stays sessions-only.
+  if (source === 'claude' || source === 'codex' || source === 'gemini') {
+    const fragments = searchSessionPreview(db, query, { limit, source })
+      .map(f => ({ ...f, kind: 'fragment' as const }))
+    searchCache.set(cacheKey, fragments)
+    return fragments
+  }
+
+  // Unfiltered preview: fragments first (historical behavior), captures fill
+  // any remaining slots. Captures now appear when a query matches only
+  // connector content (e.g. a Reddit post).
+  const fragments = searchSessionPreview(db, query, { limit })
+    .map(f => ({ ...f, kind: 'fragment' as const }))
+  const capLimit = Math.max(0, limit - fragments.length)
+  const captures = capLimit > 0
+    ? searchCaptures(db, query, { limit: capLimit }).map(c => ({ ...c, kind: 'capture' as const }))
+    : []
+  const results = [...fragments, ...captures]
 
   searchCache.set(cacheKey, results)
   return results

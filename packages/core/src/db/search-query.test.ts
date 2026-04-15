@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildFtsQuery, buildSearchPlan, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
-import { searchFragments } from './queries.js'
+import { buildLikeSnippet, searchFragments } from './queries.js'
 
 const dbs: Database.Database[] = []
 
@@ -40,6 +40,38 @@ describe('buildFtsQuery', () => {
     expect(shouldUseSessionFallback('查看 4242')).toBe(true)
     expect(shouldUseSessionFallback('查看一下 4242')).toBe(false)
     expect(shouldUseSessionFallback('"查看 4242"')).toBe(false)
+  })
+})
+
+describe('buildLikeSnippet', () => {
+  it('centers the window around the first hit (case-insensitive)', () => {
+    const longPrefix = 'x'.repeat(200)
+    const text = `${longPrefix} Dark Fantasy Realms tail`
+    const snippet = buildLikeSnippet(text, ['dark', 'fantasy'])
+    // Must contain the matched segment (original casing, ignoring <mark>).
+    const stripped = snippet.replace(/<\/?mark>/g, '')
+    expect(stripped).toContain('Dark Fantasy Realms')
+    // Leading ellipsis proves the window slid off the start rather than
+    // falling back to position 0 (the pre-fix behavior).
+    expect(snippet.startsWith('…')).toBe(true)
+  })
+
+  it('wraps matches in <mark> preserving original casing', () => {
+    const snippet = buildLikeSnippet('A quick Dark Fantasy adventure', ['dark', 'fantasy'])
+    expect(snippet).toContain('<mark>Dark</mark>')
+    expect(snippet).toContain('<mark>Fantasy</mark>')
+  })
+
+  it('returns empty string for empty input', () => {
+    expect(buildLikeSnippet('   ', ['anything'])).toBe('')
+    expect(buildLikeSnippet('', [])).toBe('')
+  })
+
+  it('escapes regex metacharacters in terms', () => {
+    // A term containing regex special chars must not blow up and must still
+    // match literally.
+    const snippet = buildLikeSnippet('Look at v1.2.3 release', ['1.2.3'])
+    expect(snippet).toContain('<mark>1.2.3</mark>')
   })
 })
 

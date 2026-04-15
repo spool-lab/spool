@@ -33,7 +33,7 @@ interface RuntimeInfo {
 export default function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [previewSuggestions, setPreviewSuggestions] = useState<FragmentResult[]>([])
+  const [previewSuggestions, setPreviewSuggestions] = useState<SearchResult[]>([])
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(null)
   const [view, setView] = useState<View>('search')
@@ -62,6 +62,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
+  const [platformColors, setPlatformColors] = useState<Record<string, string>>({})
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [connectorToast, setConnectorToast] = useState<string | null>(null)
@@ -176,11 +177,14 @@ export default function App() {
     if (!window.spool?.connectors) return
     window.spool.connectors.list().then(async connectors => {
       const results: Array<{ label: string; count: number }> = []
+      const colors: Record<string, string> = {}
       for (const c of connectors) {
+        if (c.platform && c.color) colors[c.platform] = c.color
         const count = await window.spool.connectors.getCaptureCount(c.id)
         if (count > 0) results.push({ label: c.label, count })
       }
       setCaptureSources(results)
+      setPlatformColors(colors)
     }).catch(console.error)
   }, [])
   refreshCaptureSourcesRef.current = refreshCaptureSources
@@ -320,9 +324,10 @@ export default function App() {
     }
   }, [query, doSearch])
 
-  const handleSelectSuggestion = useCallback((uuid: string) => {
+  const handleSelectSuggestion = useCallback((uuid: string, messageId?: number) => {
     setHomeMode(false)
     setSelectedSession(uuid)
+    setTargetMessageId(messageId ?? null)
     setView('session')
   }, [])
 
@@ -372,6 +377,7 @@ export default function App() {
             codexCount={status?.codexSessions ?? null}
             geminiCount={status?.geminiSessions ?? null}
             captureSources={captureSources}
+            platformColors={platformColors}
             mode={searchMode}
             {...(hasAgents ? { onModeChange: handleModeChange } : {})}
             onConnectClick={handleConnectClick}
@@ -437,6 +443,7 @@ export default function App() {
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
+                        platformColors={platformColors}
                       />
                     </div>
                   )}

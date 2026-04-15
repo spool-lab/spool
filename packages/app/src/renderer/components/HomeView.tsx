@@ -1,4 +1,4 @@
-import type { FragmentResult } from '@spool/core'
+import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
 import SearchBar, { type SearchMode } from './SearchBar.js'
 import { getSessionSourceColor } from '../../shared/sessionSources.js'
 
@@ -6,8 +6,8 @@ interface Props {
   query: string
   onChange: (q: string) => void
   onSubmit: () => void
-  onSelectSuggestion: (uuid: string) => void
-  suggestions: FragmentResult[]
+  onSelectSuggestion: (uuid: string, messageId?: number) => void
+  suggestions: SearchResult[]
   isSearching: boolean
   hasSettledQuery: boolean
   isDev: boolean
@@ -18,9 +18,10 @@ interface Props {
   mode: SearchMode
   onModeChange?: ((mode: SearchMode) => void) | undefined
   onConnectClick: () => void
+  platformColors: Record<string, string>
 }
 
-export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, hasSettledQuery, isDev, claudeCount, codexCount, geminiCount, captureSources, mode, onModeChange, onConnectClick }: Props) {
+export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion, suggestions, isSearching, hasSettledQuery, isDev, claudeCount, codexCount, geminiCount, captureSources, mode, onModeChange, onConnectClick, platformColors }: Props) {
   const showPreview = query.trim().length > 0
   const previewState = suggestions.length > 0
     ? 'results'
@@ -63,29 +64,11 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
             ].join(' ')}
           >
             <div className={`transition-opacity duration-180 ${isSearching ? 'opacity-95' : 'opacity-100'}`}>
-              {previewState === 'results' && suggestions.slice(0, 3).map(s => (
-                <button
-                  key={s.sessionUuid}
-                  onClick={() => onSelectSuggestion(s.sessionUuid)}
-                  className="w-full text-left px-4 py-2.5 flex items-center gap-3
-                             hover:bg-warm-surface dark:hover:bg-dark-surface
-                             transition-[background-color,color] duration-150"
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full flex-none"
-                    style={{ background: getSessionSourceColor(s.source) }}
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-sm text-warm-text dark:text-dark-text truncate">
-                      {s.sessionTitle ?? '(no title)'}
-                    </span>
-                    <span className="block text-xs text-warm-faint dark:text-dark-muted truncate">
-                      {s.project}
-                      {s.matchCount > 1 && ` · ${s.matchCount} matches`}
-                    </span>
-                  </span>
-                </button>
-              ))}
+              {previewState === 'results' && suggestions.slice(0, 3).map(s =>
+                s.kind === 'capture'
+                  ? <CaptureSuggestionRow key={`cap-${s.captureId}`} result={s} platformColors={platformColors} />
+                  : <FragmentSuggestionRow key={`frag-${s.sessionUuid}`} result={s} onSelect={onSelectSuggestion} />
+              )}
               {previewState === 'loading' && (
                 <div className="px-4 py-3 flex items-center gap-3 text-sm text-warm-muted dark:text-dark-muted">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent dark:bg-accent-dark animate-pulse" />
@@ -111,6 +94,76 @@ export default function HomeView({ query, onChange, onSubmit, onSelectSuggestion
       </div>
       <SourceChips claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} captureSources={captureSources} onConnectClick={onConnectClick} />
     </div>
+  )
+}
+
+function SuggestionDot({ color }: { color: string }) {
+  // h-5 matches text-sm line-height (20px) so the dot aligns to the
+  // first line's vertical center instead of the 2-line block center.
+  return (
+    <span className="flex items-center h-5 flex-none">
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+    </span>
+  )
+}
+
+function FragmentSuggestionRow({ result, onSelect }: {
+  result: FragmentResult & { kind: 'fragment' }
+  onSelect: (uuid: string, messageId?: number) => void
+}) {
+  const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
+  return (
+    <button
+      data-testid="home-suggestion"
+      data-kind="fragment"
+      onClick={() => onSelect(result.sessionUuid, result.messageId)}
+      className="w-full text-left px-4 py-2.5 flex items-start gap-3
+                 hover:bg-warm-surface dark:hover:bg-dark-surface
+                 transition-[background-color,color] duration-150"
+    >
+      <SuggestionDot color={getSessionSourceColor(result.source)} />
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm text-warm-text dark:text-dark-text truncate">
+          {result.sessionTitle ?? '(no title)'}
+        </span>
+        <span
+          className="block text-xs text-warm-faint dark:text-dark-muted truncate
+                     [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark"
+          dangerouslySetInnerHTML={{ __html: snippet }}
+        />
+      </span>
+    </button>
+  )
+}
+
+function CaptureSuggestionRow({ result, platformColors }: {
+  result: CaptureResult & { kind: 'capture' }
+  platformColors: Record<string, string>
+}) {
+  const origin = result.author
+    ? `${result.platform} · You saved this · ${result.author}`
+    : `${result.platform} · You saved this`
+  return (
+    <a
+      data-testid="home-suggestion"
+      data-kind="capture"
+      href={result.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="w-full text-left px-4 py-2.5 flex items-start gap-3
+                 hover:bg-warm-surface dark:hover:bg-dark-surface
+                 transition-[background-color,color] duration-150"
+    >
+      <SuggestionDot color={platformColors[result.platform] ?? '#C85A00'} />
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm text-warm-text dark:text-dark-text truncate">
+          {result.title || result.url}
+        </span>
+        <span className="block text-xs text-warm-faint dark:text-dark-muted truncate">
+          {origin}
+        </span>
+      </span>
+    </a>
   )
 }
 

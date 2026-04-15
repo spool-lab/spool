@@ -10,9 +10,10 @@ type Props = {
   onOpenSession: (uuid: string, messageId?: number) => void
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
+  platformColors: Record<string, string>
 }
 
-export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId }: Props) {
+export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, platformColors }: Props) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
 
@@ -94,7 +95,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
         <div className="divide-y divide-warm-border dark:divide-dark-border">
           {sortedResults.map((result, i) =>
             result.kind === 'capture'
-              ? <CaptureRow key={`cap-${result.captureId}`} result={result} />
+              ? <CaptureRow key={`cap-${result.captureId}`} result={result} platformColors={platformColors} />
               : <FragmentRow key={`frag-${result.sessionUuid}-${i}`} result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
           )}
         </div>
@@ -155,7 +156,10 @@ function FragmentRow({
   )
 }
 
-function CaptureRow({ result }: { result: CaptureResult & { kind: 'capture' } }) {
+function CaptureRow({ result, platformColors }: {
+  result: CaptureResult & { kind: 'capture' }
+  platformColors: Record<string, string>
+}) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatDate(result.capturedAt)
 
@@ -167,7 +171,7 @@ function CaptureRow({ result }: { result: CaptureResult & { kind: 'capture' } })
       className="block px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
     >
       <div className="flex items-center gap-2 mb-1.5">
-        <PlatformBadge platform={result.platform} />
+        <PlatformBadge platform={result.platform} color={platformColors[result.platform] ?? '#C85A00'} />
         <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
           {result.author ? `You saved this · ${result.author}` : 'You saved this'}
         </span>
@@ -186,24 +190,11 @@ function CaptureRow({ result }: { result: CaptureResult & { kind: 'capture' } })
   )
 }
 
-const PLATFORM_BADGE_COLORS: Record<string, string> = {
-  twitter: '#3A3A3A',
-  github: '#555555',
-  youtube: '#B22222',
-  reddit: '#FF4500',
-  hackernews: '#FF6600',
-  bilibili: '#FB7299',
-  weibo: '#E6162D',
-  xiaohongshu: '#FE2C55',
-  douban: '#007722',
-  linkedin: '#0A66C2',
-}
-
-function PlatformBadge({ platform }: { platform: string }) {
+function PlatformBadge({ platform, color }: { platform: string; color: string }) {
   return (
     <span
       className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
-      style={{ background: PLATFORM_BADGE_COLORS[platform] ?? '#C85A00' }}
+      style={{ background: color }}
     >
       {platform}
     </span>
