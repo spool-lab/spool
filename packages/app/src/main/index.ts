@@ -380,6 +380,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(appMenu)
 
   db = getDB()
+  installE2ETestHooks(db)
   acpManager = new AcpManager()
   syncer = new Syncer(db)
   watcher = new SpoolWatcher(syncer)
@@ -1105,3 +1106,46 @@ ipcMain.handle('connector:open-external', async (_e, { url }: { url: string }) =
   await shell.openExternal(url)
   return { ok: true }
 })
+
+// ── E2E test hooks ──────────────────────────────────────────────────────────
+// Only active when SPOOL_E2E_TEST=1. Exposes a small seeding surface on
+// globalThis so Playwright's app.evaluate() can insert fixture rows using
+// the app's already-loaded, electron-ABI better-sqlite3 (the test process
+// itself can't import better-sqlite3 without ABI mismatches, and the
+// system `sqlite3` CLI on macOS runners lacks FTS5, which breaks the
+// captures_fts triggers).
+function installE2ETestHooks(sharedDb: Database.Database): void {
+  if (process.env['SPOOL_E2E_TEST'] !== '1') return
+  const g = globalThis as unknown as Record<string, unknown>
+  g['__spoolSeedCapture'] = (args: {
+    platform: string
+    platformId: string
+    title: string
+    url: string
+    content?: string
+    connectorId: string
+    author?: string
+    captureUuid: string
+  }): void => {
+    const source = sharedDb.prepare("SELECT id FROM sources WHERE name = 'connector'").get() as
+      | { id: number }
+      | undefined
+    if (!source) throw new Error("'connector' source row missing")
+
+    const info = sharedDb.prepare(`
+      INSERT INTO captures
+        (source_id, capture_uuid, url, title, content_text, author,
+         platform, platform_id, content_type, thumbnail_url, metadata,
+         captured_at, raw_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'post', NULL, '{}',
+              datetime('now'), NULL)
+    `).run(
+      source.id, args.captureUuid, args.url, args.title,
+      args.content ?? args.title, args.author ?? null,
+      args.platform, args.platformId,
+    )
+    sharedDb.prepare(
+      'INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id) VALUES (?, ?)',
+    ).run(info.lastInsertRowid, args.connectorId)
+  }
+}

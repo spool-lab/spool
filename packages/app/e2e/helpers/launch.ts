@@ -34,6 +34,7 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
     SPOOL_GEMINI_DIR: geminiCliHome,
     GEMINI_CLI_HOME: geminiCliHome,
     ELECTRON_DISABLE_GPU: '1',
+    SPOOL_E2E_TEST: '1',
   }
 
   if (opts.mockAgent) {

@@ -10,7 +10,7 @@ test.beforeAll(async () => {
   // Seed a connector capture whose text is unique so no session fixture
   // accidentally matches the same keyword. This proves the preview surfaces
   // captures even when there are zero session hits.
-  seedCapture(ctx.dbPath, {
+  await seedCapture(ctx.app, {
     platform: 'reddit',
     platformId: 't3_seedtest',
     title: 'ZZQCAPTURE_ONLY_UNIQUE post title',

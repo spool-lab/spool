@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import type { ElectronApplication } from '@playwright/test'
 
 export interface SeedCapture {
   platform: string
@@ -12,39 +12,28 @@ export interface SeedCapture {
 }
 
 /**
- * Insert a capture + its M:N attribution directly into the DB. Uses the
- * sqlite3 CLI (preinstalled on macOS and ubuntu-latest) instead of better-
- * sqlite3, so the test process doesn't need a node-ABI native binding when
- * the app is built against the electron ABI.
+ * Insert a capture + its M:N attribution into the app's DB by delegating
+ * to a test-only hook installed on `globalThis` in the main process. The
+ * hook is registered in `main/index.ts` when `SPOOL_E2E_TEST=1` is set,
+ * which the launch helper always does. This avoids:
  *
- * Safe to call after `waitForSync` — the app opens WAL-mode, which allows
- * a second writer without locking issues for a handful of rows.
+ * - Loading `better-sqlite3` in the test process (the app rebuilds it for
+ *   the electron ABI, which can't be `require`d from a plain Node process).
+ * - Shelling out to the `sqlite3` CLI, whose FTS5 support is missing on
+ *   macOS GitHub runners (the captures_fts triggers would fail).
  */
-export function seedCapture(dbPath: string, capture: SeedCapture): void {
+export async function seedCapture(
+  app: ElectronApplication,
+  capture: SeedCapture,
+): Promise<void> {
   const captureUuid = randomUUID()
-  const sql = `
-    INSERT INTO captures
-      (source_id, capture_uuid, url, title, content_text, author,
-       platform, platform_id, content_type, thumbnail_url, metadata,
-       captured_at, raw_json)
-    VALUES (
-      (SELECT id FROM sources WHERE name = 'connector'),
-      '${captureUuid}',
-      '${sqlEscape(capture.url)}',
-      '${sqlEscape(capture.title)}',
-      '${sqlEscape(capture.content ?? capture.title)}',
-      ${capture.author ? `'${sqlEscape(capture.author)}'` : 'NULL'},
-      '${sqlEscape(capture.platform)}',
-      '${sqlEscape(capture.platformId)}',
-      'post', NULL, '{}',
-      datetime('now'), NULL
-    );
-    INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id)
-    VALUES (last_insert_rowid(), '${sqlEscape(capture.connectorId)}');
-  `
-  execFileSync('sqlite3', [dbPath, sql], { stdio: 'pipe' })
-}
-
-function sqlEscape(value: string): string {
-  return value.replace(/'/g, "''")
+  await app.evaluate(({}, args) => {
+    const g = globalThis as unknown as {
+      __spoolSeedCapture?: (args: unknown) => void
+    }
+    if (!g.__spoolSeedCapture) {
+      throw new Error('SPOOL_E2E_TEST hook not installed; did launchApp set the env var?')
+    }
+    g.__spoolSeedCapture(args)
+  }, { ...capture, captureUuid })
 }
