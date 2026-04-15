@@ -17,10 +17,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @spool/connector-sdk build
+      - run: pnpm --filter @spool-lab/connector-sdk build
       - run: pnpm --filter @spool/core build
       - run: pnpm --filter @spool/core test
-      - run: pnpm --filter @spool/connector-sdk test
+      - run: pnpm --filter @spool-lab/connector-sdk test
       - run: pnpm --filter @spool/cli build
       - run: pnpm --filter @spool/cli test
 
@@ -45,7 +45,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build SDK
-        run: pnpm --filter @spool/connector-sdk build
+        run: pnpm --filter @spool-lab/connector-sdk build
 
       - name: Build core
         run: pnpm --filter @spool/core build

@@ -5,8 +5,8 @@ import type {
   PageResult,
   FetchContext,
   CapturedItem,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 import {
   fetchTranscriptPage,
   DEFAULT_DB_PATH,

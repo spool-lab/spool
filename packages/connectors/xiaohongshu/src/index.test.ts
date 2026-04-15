@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { XhsNotesConnector } from './index.js'
-import type { ConnectorCapabilities } from '@spool/connector-sdk'
+import type { ConnectorCapabilities } from '@spool-lab/connector-sdk'
 
 function mockCaps(runImpl: (cmd: string, args: string[]) => Promise<{ exitCode: number; stdout: string; stderr: string }>): ConnectorCapabilities {
   return {

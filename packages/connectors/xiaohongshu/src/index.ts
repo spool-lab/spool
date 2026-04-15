@@ -4,8 +4,8 @@ import type {
   AuthStatus,
   PageResult,
   FetchContext,
-} from '@spool/connector-sdk'
-import { checkAuthViaPrerequisites, SyncError, SyncErrorCode, parseCliJsonOutput } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { checkAuthViaPrerequisites, SyncError, SyncErrorCode, parseCliJsonOutput } from '@spool-lab/connector-sdk'
 
 // opencli xiaohongshu subcommands return a single snapshot of the current
 // top-N items and don't accept any cursor/page/offset flag. We always do a

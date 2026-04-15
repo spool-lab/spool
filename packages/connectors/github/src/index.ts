@@ -5,8 +5,8 @@ import type {
   PageResult,
   FetchContext,
   CapturedItem,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode, parseCliJsonOutput } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode, parseCliJsonOutput } from '@spool-lab/connector-sdk'
 
 async function checkGhAuth(caps: ConnectorCapabilities): Promise<AuthStatus> {
   try {

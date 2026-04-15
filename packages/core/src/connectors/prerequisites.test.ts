@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { PrerequisiteChecker } from './prerequisites.js'
 import { validatePrerequisites } from './loader.js'
-import type { Prerequisite } from '@spool/connector-sdk'
+import type { Prerequisite } from '@spool-lab/connector-sdk'
 import type { ConnectorPackage } from './types.js'
 
 function mkPkg(id: string, prerequisites: Prerequisite[]): ConnectorPackage {

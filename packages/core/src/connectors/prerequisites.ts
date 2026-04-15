@@ -1,4 +1,4 @@
-import type { Prerequisite, SetupStep, SetupStatus, ExecCapability } from '@spool/connector-sdk'
+import type { Prerequisite, SetupStep, SetupStatus, ExecCapability } from '@spool-lab/connector-sdk'
 import type { ConnectorPackage } from './types.js'
 import { valid, gte } from 'semver'
 

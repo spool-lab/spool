@@ -65,7 +65,7 @@ export function linkDevConnectors(spoolDir: string, workspaceRoot: string): void
   const nodeModules = join(spoolDir, 'connectors', 'node_modules')
 
   const sdkSource = join(workspaceRoot, 'packages', 'connector-sdk')
-  const sdkScopeDir = join(nodeModules, '@spool')
+  const sdkScopeDir = join(nodeModules, '@spool-lab')
   mkdirSync(sdkScopeDir, { recursive: true })
   ensureSymlink(sdkSource, join(sdkScopeDir, 'connector-sdk'))
 

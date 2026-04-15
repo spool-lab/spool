@@ -4,8 +4,8 @@ import type {
   AuthStatus,
   PageResult,
   FetchContext,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 import { buildAuth, fetchUsername, fetchListingPage } from './fetch.js'
 
 interface RedditSession {

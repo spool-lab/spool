@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { ExecCapability, ExecResult } from '@spool/connector-sdk'
+import type { ExecCapability, ExecResult } from '@spool-lab/connector-sdk'
 
 const DEFAULT_TIMEOUT = 60_000
 

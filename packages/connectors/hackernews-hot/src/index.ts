@@ -5,8 +5,8 @@ import type {
   PageResult,
   FetchContext,
   CapturedItem,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 
 const HN_API = 'https://hacker-news.firebaseio.com/v0'
 const TOP_N = 30

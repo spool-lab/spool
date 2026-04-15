@@ -17,10 +17,10 @@
     "prepack": "pnpm run build"
   },
   "peerDependencies": {
-    "@spool/connector-sdk": "workspace:^"
+    "@spool-lab/connector-sdk": "workspace:^"
   },
   "devDependencies": {
-    "@spool/connector-sdk": "workspace:^",
+    "@spool-lab/connector-sdk": "workspace:^",
     "@types/node": "^22.15.3",
     "typescript": "^5.7.3"
   },

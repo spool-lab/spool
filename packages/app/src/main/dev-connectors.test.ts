@@ -134,7 +134,7 @@ ${pluginList}
 
     // packages/connector-sdk
     mkdirSync(join(dir, 'packages', 'connector-sdk'), { recursive: true })
-    writeFileSync(join(dir, 'packages', 'connector-sdk', 'package.json'), '{"name":"@spool/connector-sdk"}')
+    writeFileSync(join(dir, 'packages', 'connector-sdk', 'package.json'), '{"name":"@spool-lab/connector-sdk"}')
 
     // packages/connectors/<name>
     for (const c of connectors) {
@@ -178,7 +178,7 @@ ${pluginList}
 
     linkDevConnectors(spoolDir, workspace)
 
-    const sdkLink = join(spoolDir, 'connectors', 'node_modules', '@spool', 'connector-sdk')
+    const sdkLink = join(spoolDir, 'connectors', 'node_modules', '@spool-lab', 'connector-sdk')
     expect(lstatSync(sdkLink).isSymbolicLink()).toBe(true)
     expect(readlinkSync(sdkLink)).toBe(join(workspace, 'packages', 'connector-sdk'))
   })

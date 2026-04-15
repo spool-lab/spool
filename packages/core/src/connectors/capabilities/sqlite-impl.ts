@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import type { SqliteCapability, SqliteDatabase, SqliteStatement } from '@spool/connector-sdk'
+import type { SqliteCapability, SqliteDatabase, SqliteStatement } from '@spool-lab/connector-sdk'
 
 export function makeSqliteCapability(): SqliteCapability {
   return {

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { ConnectorCapabilities, FetchContext, SqliteCapability, SqliteDatabase, SqliteStatement } from '@spool/connector-sdk'
+import type { ConnectorCapabilities, FetchContext, SqliteCapability, SqliteDatabase, SqliteStatement } from '@spool-lab/connector-sdk'
 import TypelessConnector from './index.js'
 
 // ── Mock capabilities ─────────────────────────────────────────────────────────

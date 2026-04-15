@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { makeChromeCookiesCapability, getMatchingHostKeys } from './cookies-chrome.js'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 
 describe('getMatchingHostKeys', () => {
   it('matches host-only and same-host domain cookies', () => {
