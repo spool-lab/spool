@@ -14,7 +14,7 @@ interface RedditSession {
 }
 
 async function readCookieHeader(caps: ConnectorCapabilities): Promise<string> {
-  const cookies = await caps.cookies.get({ browser: 'chrome', url: 'https://www.reddit.com' })
+  const cookies = await caps.cookies.get({ browser: 'chrome', url: 'https://reddit.com' })
   const auth = buildAuth(cookies)
   if (!auth) {
     throw new SyncError(
