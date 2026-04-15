@@ -14,6 +14,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [showFindBar, setShowFindBar] = useState(false)
+  const [showTargetHighlight, setShowTargetHighlight] = useState(false)
   const [findFocusNonce, setFindFocusNonce] = useState(0)
   const [findResultNonce, setFindResultNonce] = useState(0)
   const [findQuery, setFindQuery] = useState('')
@@ -85,7 +86,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   useEffect(() => {
     if (!loading && targetMessageId && targetRef.current) {
       targetRef.current.scrollIntoView({ behavior: 'instant', block: 'center' })
+      setShowTargetHighlight(true)
+      const timer = setTimeout(() => setShowTargetHighlight(false), 2000)
+      return () => clearTimeout(timer)
     }
+    return undefined
   }, [loading, targetMessageId])
 
   useEffect(() => {
@@ -240,6 +245,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           <div
             key={msg.id}
             ref={msg.id === targetMessageId ? targetRef : undefined}
+            {...(msg.id === targetMessageId ? { 'data-testid': 'target-message' } : {})}
+            {...(msg.id === targetMessageId && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
+            className={msg.id === targetMessageId
+              ? `transition-colors duration-700 ${showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''}`
+              : undefined}
           >
             <MessageBubble
               message={msg}

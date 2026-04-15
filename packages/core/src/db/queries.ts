@@ -803,12 +803,16 @@ function selectBestSessionSnippets(
   return new Map(rows.map(row => [row.sessionId, row]))
 }
 
-function buildLikeSnippet(text: string, terms: string[]): string {
+export function buildLikeSnippet(text: string, terms: string[]): string {
   const normalizedText = text.trim()
   if (!normalizedText) return ''
 
+  // Case-insensitive hit search: the upstream SQL uses LIKE which is ASCII
+  // case-insensitive, so the matched content may differ in case from the
+  // query terms (e.g. user typed "dark fantasy", text has "Dark Fantasy").
+  const lowerText = normalizedText.toLowerCase()
   const firstHit = terms
-    .map(term => normalizedText.indexOf(term))
+    .map(term => lowerText.indexOf(term.toLowerCase()))
     .filter(index => index >= 0)
     .sort((a, b) => a - b)[0] ?? 0
 
@@ -819,12 +823,19 @@ function buildLikeSnippet(text: string, terms: string[]): string {
   if (start > 0) snippet = `…${snippet}`
   if (end < normalizedText.length) snippet = `${snippet}…`
 
+  // Highlight preserving original casing via case-insensitive regex.
   const uniqueTerms = Array.from(new Set(terms)).sort((a, b) => b.length - a.length)
   for (const term of uniqueTerms) {
-    snippet = snippet.split(term).join(`<mark>${term}</mark>`)
+    if (!term) continue
+    const pattern = new RegExp(escapeRegex(term), 'gi')
+    snippet = snippet.replace(pattern, m => `<mark>${m}</mark>`)
   }
 
   return snippet
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function toLikePattern(term: string): string {

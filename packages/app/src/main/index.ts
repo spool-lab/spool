@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
-  searchFragments, searchAll, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
+  searchFragments, searchAll, searchSessionPreview, searchCaptures, listRecentSessions, getSessionWithMessages, getStatus,
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability, makeExecCapability,
@@ -380,6 +380,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(appMenu)
 
   db = getDB()
+  installE2ETestHooks(db)
   acpManager = new AcpManager()
   syncer = new Syncer(db)
   watcher = new SpoolWatcher(syncer)
@@ -686,9 +687,24 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
   const cached = searchCache.get(cacheKey)
   if (cached) return cached
 
-  const results = source === 'claude' || source === 'codex' || source === 'gemini'
-    ? searchSessionPreview(db, query, { limit, source })
-    : searchSessionPreview(db, query, { limit })
+  // Session-scoped preview stays sessions-only.
+  if (source === 'claude' || source === 'codex' || source === 'gemini') {
+    const fragments = searchSessionPreview(db, query, { limit, source })
+      .map(f => ({ ...f, kind: 'fragment' as const }))
+    searchCache.set(cacheKey, fragments)
+    return fragments
+  }
+
+  // Unfiltered preview: fragments first (historical behavior), captures fill
+  // any remaining slots. Captures now appear when a query matches only
+  // connector content (e.g. a Reddit post).
+  const fragments = searchSessionPreview(db, query, { limit })
+    .map(f => ({ ...f, kind: 'fragment' as const }))
+  const capLimit = Math.max(0, limit - fragments.length)
+  const captures = capLimit > 0
+    ? searchCaptures(db, query, { limit: capLimit }).map(c => ({ ...c, kind: 'capture' as const }))
+    : []
+  const results = [...fragments, ...captures]
 
   searchCache.set(cacheKey, results)
   return results
@@ -1090,3 +1106,46 @@ ipcMain.handle('connector:open-external', async (_e, { url }: { url: string }) =
   await shell.openExternal(url)
   return { ok: true }
 })
+
+// ── E2E test hooks ──────────────────────────────────────────────────────────
+// Only active when SPOOL_E2E_TEST=1. Exposes a small seeding surface on
+// globalThis so Playwright's app.evaluate() can insert fixture rows using
+// the app's already-loaded, electron-ABI better-sqlite3 (the test process
+// itself can't import better-sqlite3 without ABI mismatches, and the
+// system `sqlite3` CLI on macOS runners lacks FTS5, which breaks the
+// captures_fts triggers).
+function installE2ETestHooks(sharedDb: Database.Database): void {
+  if (process.env['SPOOL_E2E_TEST'] !== '1') return
+  const g = globalThis as unknown as Record<string, unknown>
+  g['__spoolSeedCapture'] = (args: {
+    platform: string
+    platformId: string
+    title: string
+    url: string
+    content?: string
+    connectorId: string
+    author?: string
+    captureUuid: string
+  }): void => {
+    const source = sharedDb.prepare("SELECT id FROM sources WHERE name = 'connector'").get() as
+      | { id: number }
+      | undefined
+    if (!source) throw new Error("'connector' source row missing")
+
+    const info = sharedDb.prepare(`
+      INSERT INTO captures
+        (source_id, capture_uuid, url, title, content_text, author,
+         platform, platform_id, content_type, thumbnail_url, metadata,
+         captured_at, raw_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'post', NULL, '{}',
+              datetime('now'), NULL)
+    `).run(
+      source.id, args.captureUuid, args.url, args.title,
+      args.content ?? args.title, args.author ?? null,
+      args.platform, args.platformId,
+    )
+    sharedDb.prepare(
+      'INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id) VALUES (?, ?)',
+    ).run(info.lastInsertRowid, args.connectorId)
+  }
+}

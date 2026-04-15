@@ -11,6 +11,7 @@ const APP_DIR = join(__dirname, '..', '..')
 export interface AppContext {
   app: ElectronApplication
   window: Page
+  dbPath: string
   cleanup: () => Promise<void>
 }
 
@@ -33,6 +34,7 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
     SPOOL_GEMINI_DIR: geminiCliHome,
     GEMINI_CLI_HOME: geminiCliHome,
     ELECTRON_DISABLE_GPU: '1',
+    SPOOL_E2E_TEST: '1',
   }
 
   if (opts.mockAgent) {
@@ -55,6 +57,7 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
   return {
     app,
     window,
+    dbPath: join(tmpDir, 'data', 'spool.db'),
     cleanup: async () => {
       await app.close()
       rmSync(tmpDir, { recursive: true, force: true })

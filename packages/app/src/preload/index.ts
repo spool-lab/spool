@@ -44,7 +44,7 @@ const api = {
   search: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search', { query, limit, source }),
 
-  searchPreview: (query: string, limit?: number, source?: string): Promise<FragmentResult[]> =>
+  searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search-preview', { query, limit, source }),
 
   listSessions: (limit?: number): Promise<Session[]> =>
