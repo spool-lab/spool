@@ -89,10 +89,15 @@ export class PrerequisiteChecker {
         return baseStep(p, 'error', { hint: 'Could not parse version' })
       }
       const detectedVersion = vm[1]
-      if (!valid(detectedVersion)) {
+      // Normalize for semver: strip leading zeros from numeric segments so
+      // zero-padded CalVer (yt-dlp, Ubuntu, Postgres) like `2026.03.17`
+      // validates as `2026.3.17`. Ordering is preserved.
+      const normalizedDetected = stripLeadingZeros(detectedVersion)
+      const normalizedMin = stripLeadingZeros(p.minVersion)
+      if (!valid(normalizedDetected)) {
         return baseStep(p, 'error', { hint: 'Could not parse detected version' })
       }
-      if (gte(detectedVersion, p.minVersion)) {
+      if (gte(normalizedDetected, normalizedMin)) {
         return baseStep(p, 'ok', { detectedVersion })
       }
       return baseStep(p, 'outdated', {
@@ -103,4 +108,8 @@ export class PrerequisiteChecker {
 
     return result.exitCode === 0 ? baseStep(p, 'ok') : baseStep(p, 'missing')
   }
+}
+
+function stripLeadingZeros(version: string): string {
+  return version.replace(/(^|\.)0+(\d)/g, '$1$2')
 }
