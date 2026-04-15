@@ -48,6 +48,42 @@ describe('PrerequisiteChecker', () => {
     expect(steps[0].status).toBe('missing')
   })
 
+  it('accepts zero-padded CalVer (e.g. yt-dlp 2026.03.17) by stripping leading zeros', async () => {
+    const exec = { run: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '2026.03.17\n', stderr: '' }) }
+    const checker = new PrerequisiteChecker(exec as any)
+    const pkg = mkPkg('p1', [
+      {
+        id: 'yt-dlp',
+        name: 'yt-dlp',
+        kind: 'cli',
+        detect: { type: 'exec', command: 'yt-dlp', args: ['--version'], versionRegex: '(\\d{4}\\.\\d{2}\\.\\d{2})' },
+        minVersion: '2024.01.01',
+        install: { kind: 'cli', command: { darwin: 'brew install yt-dlp' } },
+      },
+    ])
+    const steps = await checker.check(pkg)
+    expect(steps[0].status).toBe('ok')
+    expect(steps[0].detectedVersion).toBe('2026.03.17')
+  })
+
+  it('correctly compares zero-padded CalVer across years/months', async () => {
+    const exec = { run: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '2024.02.05\n', stderr: '' }) }
+    const checker = new PrerequisiteChecker(exec as any)
+    const pkg = mkPkg('p1', [
+      {
+        id: 'yt-dlp',
+        name: 'yt-dlp',
+        kind: 'cli',
+        detect: { type: 'exec', command: 'yt-dlp', args: ['--version'], versionRegex: '(\\d{4}\\.\\d{2}\\.\\d{2})' },
+        minVersion: '2024.03.01',
+        install: { kind: 'cli', command: { darwin: 'brew install yt-dlp' } },
+      },
+    ])
+    const steps = await checker.check(pkg)
+    expect(steps[0].status).toBe('outdated')
+    expect(steps[0].detectedVersion).toBe('2024.02.05')
+  })
+
   it('marks outdated when version is below minVersion', async () => {
     const exec = { run: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'v0.2.1\n', stderr: '' }) }
     const checker = new PrerequisiteChecker(exec as any)

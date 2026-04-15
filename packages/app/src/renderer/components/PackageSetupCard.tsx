@@ -126,8 +126,10 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
   }
 
   return (
-    <div className="flex items-center gap-2 py-1 min-h-[24px]">
-      <StatusIcon status={step.status} />
+    <div className="flex items-start gap-2 py-1 min-h-[24px]">
+      <span className="flex items-center h-[18px]">
+        <StatusIcon status={step.status} />
+      </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <KindIcon kind={step.kind} />
@@ -140,7 +142,7 @@ function StepRow({ packageId, step, onChanged }: { packageId: string; step: Setu
           <div className="text-[10px] text-warm-faint dark:text-dark-faint mt-0.5">{step.hint}</div>
         )}
       </div>
-      <div className="flex-shrink-0">{renderAction()}</div>
+      <div className="flex-shrink-0 flex items-center h-[18px]">{renderAction()}</div>
       {install?.kind === 'browser-extension' && install.manual && (
         <ManualInstallModal
           open={manualOpen}
