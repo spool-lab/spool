@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import type { LogCapability, LogFields } from '@spool/connector-sdk'
+import type { LogCapability, LogFields } from '@spool-lab/connector-sdk'
 
 export function makeLogCapabilityFor(connectorId: string): LogCapability {
   const baseAttrs: LogFields = { 'connector.id': connectorId }

@@ -11,8 +11,8 @@ import type {
   Prerequisite,
   PrerequisitesCapability,
   SqliteCapability,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool-lab/connector-sdk'
 import type { ConnectorRegistry } from './registry.js'
 import { extractBundledConnectorsIfNeeded, type BundleLogger, type BundleReport } from './bundle-extract.js'
 import { TrustStore } from './trust-store.js'

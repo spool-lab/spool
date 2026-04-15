@@ -812,7 +812,7 @@ Package it as `@your-scope/connector-my-platform-bookmarks` (or any npm name) wi
   "main": "dist/index.js",
   "keywords": ["spool-connector"],
   "peerDependencies": {
-    "@spool/connector-sdk": "^1.0.0"
+    "@spool-lab/connector-sdk": "^1.0.0"
   },
   "spool": {
     "type": "connector",

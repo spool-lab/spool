@@ -1,5 +1,5 @@
-import type { FetchCapability, CapturedItem } from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode, abortableSleep } from '@spool/connector-sdk'
+import type { FetchCapability, CapturedItem } from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode, abortableSleep } from '@spool-lab/connector-sdk'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 

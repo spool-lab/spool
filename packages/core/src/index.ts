@@ -64,5 +64,5 @@ export type {
   SetupStep,
   SetupStatus,
   PrerequisitesCapability,
-} from '@spool/connector-sdk'
-export { checkAuthViaPrerequisites } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+export { checkAuthViaPrerequisites } from '@spool-lab/connector-sdk'

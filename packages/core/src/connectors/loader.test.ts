@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { loadConnectors } from './loader.js'
 import { ConnectorRegistry } from './registry.js'
 import { TrustStore } from './trust-store.js'
-import type { Connector } from '@spool/connector-sdk'
+import type { Connector } from '@spool-lab/connector-sdk'
 
 function writePkg(nodeModulesDir: string, name: string, manifest: object, entrySource: string) {
   const segments = name.startsWith('@') ? name.split('/') : [name]

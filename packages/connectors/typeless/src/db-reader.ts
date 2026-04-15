@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from '@spool/connector-sdk'
+import type { SqliteDatabase } from '@spool-lab/connector-sdk'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 

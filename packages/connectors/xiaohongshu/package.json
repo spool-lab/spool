@@ -1,20 +1,23 @@
 {
   "name": "@spool-lab/connector-xiaohongshu",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Xiaohongshu (小红书) creator notes via opencli",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@spool/connector-sdk": "workspace:*"
+    "@spool-lab/connector-sdk": "workspace:*"
   },
   "devDependencies": {
-    "@spool/connector-sdk": "workspace:*",
+    "@spool-lab/connector-sdk": "workspace:*",
     "@types/node": "^22.15.3",
     "typescript": "^5.4.0",
     "vitest": "^3.2.4"
@@ -29,7 +32,9 @@
         "detect": {
           "type": "exec",
           "command": "opencli",
-          "args": ["--version"],
+          "args": [
+            "--version"
+          ],
           "versionRegex": "v?(\\d+\\.\\d+\\.\\d+)",
           "timeoutMs": 5000
         },
@@ -48,11 +53,15 @@
         "id": "opencli-extension",
         "name": "Browser Bridge",
         "kind": "browser-extension",
-        "requires": ["opencli"],
+        "requires": [
+          "opencli"
+        ],
         "detect": {
           "type": "exec",
           "command": "opencli",
-          "args": ["doctor"],
+          "args": [
+            "doctor"
+          ],
           "matchStdout": "\\[OK\\].*Extension",
           "timeoutMs": 10000
         },
@@ -74,11 +83,15 @@
         "id": "xhs-login",
         "name": "Logged into Xiaohongshu",
         "kind": "site-session",
-        "requires": ["opencli-extension"],
+        "requires": [
+          "opencli-extension"
+        ],
         "detect": {
           "type": "exec",
           "command": "opencli",
-          "args": ["doctor"],
+          "args": [
+            "doctor"
+          ],
           "matchStdout": "\\[OK\\].*Connectivity",
           "timeoutMs": 10000
         },
@@ -96,7 +109,11 @@
         "description": "Notes you have published",
         "color": "#FF2442",
         "ephemeral": false,
-        "capabilities": ["exec", "log", "prerequisites"]
+        "capabilities": [
+          "exec",
+          "log",
+          "prerequisites"
+        ]
       }
     ]
   }

@@ -5,8 +5,8 @@ import type {
   PageResult,
   FetchContext,
   Cookie,
-} from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 import { fetchBookmarkPage } from './graphql-fetch.js'
 
 interface TwitterAuth {

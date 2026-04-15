@@ -1,22 +1,27 @@
 {
   "name": "@spool-lab/connector-hackernews-hot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Top stories on Hacker News right now for Spool",
-  "keywords": ["spool-connector", "hackernews"],
+  "keywords": [
+    "spool-connector",
+    "hackernews"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prepack": "pnpm run build",
     "build": "tsc",
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@spool/connector-sdk": "workspace:^"
+    "@spool-lab/connector-sdk": "workspace:^"
   },
   "devDependencies": {
-    "@spool/connector-sdk": "workspace:^",
+    "@spool-lab/connector-sdk": "workspace:^",
     "@types/node": "^22.15.3",
     "typescript": "^5.7.3"
   },
@@ -28,6 +33,9 @@
     "description": "Top stories on Hacker News right now",
     "color": "#FF6600",
     "ephemeral": true,
-    "capabilities": ["fetch", "log"]
+    "capabilities": [
+      "fetch",
+      "log"
+    ]
   }
 }

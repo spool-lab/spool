@@ -11,8 +11,8 @@ import { existsSync, unlinkSync, copyFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir, platform, homedir } from 'node:os'
 import { pbkdf2Sync, createDecipheriv, randomUUID } from 'node:crypto'
-import type { CookiesCapability, Cookie, CookieQuery } from '@spool/connector-sdk'
-import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+import type { CookiesCapability, Cookie, CookieQuery } from '@spool-lab/connector-sdk'
+import { SyncError, SyncErrorCode } from '@spool-lab/connector-sdk'
 
 function getMacOSChromeKey(): Buffer {
   const candidates = [

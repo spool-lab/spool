@@ -31,8 +31,8 @@ fi
 echo "==> Building $FULL_NAME"
 (cd "$REPO_ROOT" && pnpm --filter "$FULL_NAME" build)
 
-echo "==> Building @spool/connector-sdk"
-(cd "$REPO_ROOT" && pnpm --filter "@spool/connector-sdk" build)
+echo "==> Building @spool-lab/connector-sdk"
+(cd "$REPO_ROOT" && pnpm --filter "@spool-lab/connector-sdk" build)
 
 # Create a staging temp dir — use a local name to avoid overriding $TMPDIR
 WORK_DIR="$(mktemp -d -t spool-phantom-check-XXXXXX)"
@@ -49,12 +49,11 @@ if [[ -z "$TARBALL" ]]; then
   exit 1
 fi
 
-# Pack the SDK — it is marked private so pnpm pack refuses; use npm pack directly.
-# The SDK has no workspace: deps so npm pack is fine here.
-echo "==> Packing @spool/connector-sdk to $WORK_DIR"
+# Pack the SDK. The SDK has no workspace: deps so npm pack is fine here.
+echo "==> Packing @spool-lab/connector-sdk to $WORK_DIR"
 (cd "$SDK_DIR" && npm pack --pack-destination "$WORK_DIR" 2>/dev/null)
 
-SDK_TARBALL="$(ls "$WORK_DIR"/spool-connector-sdk-*.tgz 2>/dev/null | head -1)"
+SDK_TARBALL="$(ls "$WORK_DIR"/spool-lab-connector-sdk-*.tgz 2>/dev/null | head -1)"
 if [[ -z "$SDK_TARBALL" ]]; then
   echo "SDK tarball not found after pack in $WORK_DIR:" >&2
   ls "$WORK_DIR" >&2
@@ -81,7 +80,7 @@ cat > package.json <<EOF
   "type": "module",
   "dependencies": {
     "$FULL_NAME": "file:plugin.tgz",
-    "@spool/connector-sdk": "file:sdk.tgz"
+    "@spool-lab/connector-sdk": "file:sdk.tgz"
   }
 }
 EOF

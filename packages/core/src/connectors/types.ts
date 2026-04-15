@@ -7,14 +7,14 @@ import type {
   FetchContext,
   CapturedItem,
   SyncState,
-} from '@spool/connector-sdk'
-import { SyncError as SdkSyncError, SyncErrorCode, SYNC_ERROR_HINTS } from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
+import { SyncError as SdkSyncError, SyncErrorCode, SYNC_ERROR_HINTS } from '@spool-lab/connector-sdk'
 
 // ── Re-exports from SDK ────────────────────────────────────────────────────
 export {
   SyncErrorCode,
   SYNC_ERROR_HINTS,
-} from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
 export type {
   Connector,
   AuthStatus,
@@ -22,7 +22,7 @@ export type {
   FetchContext,
   CapturedItem,
   SyncState,
-} from '@spool/connector-sdk'
+} from '@spool-lab/connector-sdk'
 
 // ── Internal Effect-tagged SyncError ──────────────────────────────────────
 const RETRYABLE_CODES = new Set<SyncErrorCode>([
@@ -38,7 +38,7 @@ const RETRYABLE_CODES = new Set<SyncErrorCode>([
 /**
  * Internal Effect-tagged version of SyncError used inside @spool/core for
  * Effect's typed error channel. External callers (connectors) use the plain
- * class exported from @spool/connector-sdk. Translation between the two
+ * class exported from @spool-lab/connector-sdk. Translation between the two
  * happens in SyncError.from().
  */
 export class SyncError extends Data.TaggedError('SyncError')<{
@@ -155,7 +155,7 @@ export interface ConnectorPackage {
   packageName: string
   rootDir: string
   connectors: Connector[]
-  prerequisites?: import('@spool/connector-sdk').Prerequisite[]
+  prerequisites?: import('@spool-lab/connector-sdk').Prerequisite[]
 }
 
 export interface ConnectorStatus {
@@ -170,7 +170,7 @@ export interface ConnectorStatus {
   version: string
   packageName: string
   packageId?: string
-  setup?: import('@spool/connector-sdk').SetupStep[]
+  setup?: import('@spool-lab/connector-sdk').SetupStep[]
   state: SyncState
 }
 
