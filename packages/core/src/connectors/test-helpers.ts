@@ -15,7 +15,9 @@ export function createTestDB(): InstanceType<typeof Database> {
       base_path TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    INSERT INTO sources (name, base_path) VALUES ('claude', '~/.claude/projects');
+    INSERT INTO sources (name, base_path) VALUES
+      ('claude',    '~/.claude/projects'),
+      ('connector', '<plugin>');
 
     CREATE TABLE captures (
       id              INTEGER PRIMARY KEY,
@@ -34,6 +36,13 @@ export function createTestDB(): InstanceType<typeof Database> {
       indexed_at      TEXT NOT NULL DEFAULT (datetime('now')),
       raw_json        TEXT
     );
+
+    CREATE TABLE capture_connectors (
+      capture_id   INTEGER NOT NULL REFERENCES captures(id) ON DELETE CASCADE,
+      connector_id TEXT NOT NULL,
+      PRIMARY KEY (capture_id, connector_id)
+    );
+    CREATE INDEX idx_capture_connectors_connector ON capture_connectors(connector_id);
 
     CREATE TABLE connector_sync_state (
       connector_id        TEXT PRIMARY KEY,

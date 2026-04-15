@@ -38,9 +38,10 @@ function runMigrations(db: Database.Database): void {
     );
 
     INSERT OR IGNORE INTO sources (name, base_path) VALUES
-      ('claude', '~/.claude/projects'),
-      ('codex',  '~/.codex/sessions'),
-      ('gemini', '~/.gemini/tmp');
+      ('claude',    '~/.claude/projects'),
+      ('codex',     '~/.codex/sessions'),
+      ('gemini',    '~/.gemini/tmp'),
+      ('connector', '<plugin>');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,
@@ -159,7 +160,6 @@ function runMigrations(db: Database.Database): void {
       raw_json        TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_captures_source   ON captures(source_id);
     CREATE INDEX IF NOT EXISTS idx_captures_platform ON captures(platform);
     CREATE INDEX IF NOT EXISTS idx_captures_url      ON captures(url);
     CREATE INDEX IF NOT EXISTS idx_captures_captured ON captures(captured_at DESC);
@@ -181,6 +181,15 @@ function runMigrations(db: Database.Database): void {
     );
 
     -- ── Connector sync state ────────────────────────────────────────────────
+
+    CREATE TABLE IF NOT EXISTS capture_connectors (
+      capture_id   INTEGER NOT NULL REFERENCES captures(id) ON DELETE CASCADE,
+      connector_id TEXT NOT NULL,
+      PRIMARY KEY (capture_id, connector_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_capture_connectors_connector
+      ON capture_connectors(connector_id);
 
     CREATE TABLE IF NOT EXISTS connector_sync_state (
       connector_id        TEXT PRIMARY KEY,
@@ -296,6 +305,36 @@ function runMigrations(db: Database.Database): void {
       // FTS tables may not exist yet on fresh installs — safe to skip
     }
     db.pragma('user_version = 2')
+  }
+
+  if (version < 3) {
+    // v3: migrate connector provenance from metadata.connectorId (single-valued,
+    // clobbered on UPSERT) to the M:N capture_connectors table, and stop
+    // claiming connector captures came from source_id=claude.
+    db.transaction(() => {
+      // Backfill M:N from existing metadata.connectorId.
+      db.exec(`
+        INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id)
+        SELECT id, json_extract(metadata, '$.connectorId')
+        FROM captures
+        WHERE json_extract(metadata, '$.connectorId') IS NOT NULL
+      `)
+      // Strip the now-redundant field from metadata.
+      db.exec(`
+        UPDATE captures
+        SET metadata = json_remove(metadata, '$.connectorId')
+        WHERE json_extract(metadata, '$.connectorId') IS NOT NULL
+      `)
+      // Point connector captures at the 'connector' source row instead of claude.
+      db.exec(`
+        UPDATE captures
+        SET source_id = (SELECT id FROM sources WHERE name = 'connector')
+        WHERE id IN (SELECT capture_id FROM capture_connectors)
+      `)
+      // idx_captures_source was never used by any query — drop it.
+      db.exec(`DROP INDEX IF EXISTS idx_captures_source`)
+    })()
+    db.pragma('user_version = 3')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
