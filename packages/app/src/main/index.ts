@@ -926,9 +926,15 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
   for (const sib of siblings) {
     tryRun(() => db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId), `sync state for ${sib.connectorId}`)
     tryRun(
-      () => db.prepare("DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?").run(sib.connectorId),
+      () => {
+        db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(sib.connectorId)
+        db.prepare(`
+          DELETE FROM captures
+          WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
+            AND NOT EXISTS (SELECT 1 FROM capture_connectors WHERE capture_id = captures.id)
+        `).run()
+      },
       `captures for ${sib.connectorId}`,
-      () => db.prepare('DELETE FROM captures WHERE platform = ?').run(sib.platform),
     )
   }
 
@@ -982,10 +988,10 @@ ipcMain.handle('connector:update', async (_e, { id }: { id: string }) => {
 })
 
 ipcMain.handle('connector:get-capture-count', (_e, { connectorId }: { connectorId: string }) => {
-  const connector = connectorRegistry.get(connectorId)
+  connectorRegistry.get(connectorId)
   const row = db.prepare(
-    "SELECT COUNT(*) as cnt FROM captures WHERE platform = ? AND json_extract(metadata, '$.connectorId') = ?",
-  ).get(connector.platform, connectorId) as { cnt: number }
+    'SELECT COUNT(*) as cnt FROM capture_connectors WHERE connector_id = ?',
+  ).get(connectorId) as { cnt: number }
   return row.cnt
 })
 

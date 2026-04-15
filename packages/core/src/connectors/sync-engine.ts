@@ -70,12 +70,6 @@ function interruptibleSleep(ms: number, cancel: CancelSignal): Effect.Effect<voi
   ).pipe(Effect.asVoid)
 }
 
-function tagConnectorId(items: CapturedItem[], connectorId: string): void {
-  for (const item of items) {
-    (item.metadata as Record<string, unknown>)['connectorId'] = connectorId
-  }
-}
-
 const nowIso: Effect.Effect<string> = Effect.map(
   Clock.currentTimeMillis,
   (ms) => new Date(ms).toISOString(),
@@ -171,6 +165,7 @@ interface UpsertResult {
 function upsertItems(
   db: Database.Database,
   sourceId: number,
+  connectorId: string,
   items: CapturedItem[],
 ): UpsertResult {
   let newCount = 0
@@ -192,8 +187,13 @@ function upsertItems(
        metadata, captured_at, raw_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
+  const linkStmt = db.prepare(
+    'INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id) VALUES (?, ?)',
+  )
 
   for (const item of items) {
+    let captureId: number | bigint | null = null
+
     if (item.platformId) {
       const existing = checkStmt.get(item.platform, item.platformId) as
         | { id: number }
@@ -204,43 +204,52 @@ function upsertItems(
           JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
           item.thumbnailUrl, existing.id,
         )
+        captureId = existing.id
         updatedCount++
-        continue
       }
     }
 
-    insertStmt.run(
-      sourceId, randomUUID(), item.url, item.title, item.contentText,
-      item.author, item.platform, item.platformId, item.contentType,
-      item.thumbnailUrl, JSON.stringify(item.metadata), item.capturedAt,
-      item.rawJson,
-    )
-    newCount++
+    if (captureId === null) {
+      const info = insertStmt.run(
+        sourceId, randomUUID(), item.url, item.title, item.contentText,
+        item.author, item.platform, item.platformId, item.contentType,
+        item.thumbnailUrl, JSON.stringify(item.metadata), item.capturedAt,
+        item.rawJson,
+      )
+      captureId = info.lastInsertRowid
+      newCount++
+    }
+
+    linkStmt.run(captureId, connectorId)
   }
 
   return { newCount, updatedCount }
 }
 
 function deleteConnectorItems(db: Database.Database, connectorId: string): void {
-  // connectorId format is e.g. 'twitter-bookmarks', platform is 'twitter'
-  // We need the connector to know which platform+content_type to delete.
-  // For now, delete by matching connector_id pattern in metadata or by platform.
-  // Since we store connector_id in captures metadata, let's use a convention:
-  // captures from connectors have metadata.connectorId set.
-  db.prepare(
-    `DELETE FROM captures WHERE json_extract(metadata, '$.connectorId') = ?`,
-  ).run(connectorId)
+  // 1. Drop this connector's M:N claims.
+  db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(connectorId)
+  // 2. Delete captures that belonged to this connector and have no other
+  //    connector attribution left. Scoped to source='connector' so we never
+  //    touch session-world captures.
+  db.prepare(`
+    DELETE FROM captures
+    WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
+      AND NOT EXISTS (
+        SELECT 1 FROM capture_connectors WHERE capture_id = captures.id
+      )
+  `).run()
 }
 
 // ── Sync Engine ─────────────────────────────────────────────────────────────
 
 function getSourceId(db: Database.Database): number {
-  // All connector items share the 'claude' source_id for the FK constraint.
-  // The connector_id in metadata and connector_sync_state table distinguish them.
-  const row = db.prepare("SELECT id FROM sources WHERE name = 'claude'").get() as
+  // Connector captures all share a single generic 'connector' source row.
+  // Per-connector attribution lives in the capture_connectors M:N table.
+  const row = db.prepare("SELECT id FROM sources WHERE name = 'connector'").get() as
     | { id: number }
     | undefined
-  if (!row) throw new Error("Source 'claude' not found in DB")
+  if (!row) throw new Error("Source 'connector' not found in DB")
   return row.id
 }
 
@@ -447,10 +456,8 @@ export class SyncEngine {
           }
         }
 
-        tagConnectorId(result.items, connector.id)
-
         const { newCount } = yield* Effect.sync(() =>
-          db.transaction(() => upsertItems(db, sourceId, result.items))(),
+          db.transaction(() => upsertItems(db, sourceId, connector.id, result.items))(),
         ).pipe(
           Effect.withSpan('sync.upsert', {
             attributes: { 'items.count': result.items.length },
@@ -738,10 +745,8 @@ export class SyncEngine {
         const result = outcome.right
         totalPages++
 
-        tagConnectorId(result.items, connector.id)
-
         const { newCount } = yield* Effect.sync(() =>
-          db.transaction(() => upsertItems(db, sourceId, result.items))(),
+          db.transaction(() => upsertItems(db, sourceId, connector.id, result.items))(),
         ).pipe(
           Effect.withSpan('sync.upsert', {
             attributes: { 'items.count': result.items.length },
