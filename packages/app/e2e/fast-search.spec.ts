@@ -130,6 +130,32 @@ test('session page can submit a new search without returning home first', async 
   await expect(window.locator('[data-testid="fragment-row"]').first()).toContainText('TROMBONE_CANARY_99')
 })
 
+test('clicking an All-view fragment row jumps to message with flash highlight', async () => {
+  const { window } = ctx
+
+  await search(window, 'XYLOPHONE_CANARY_42')
+  await window.locator('[data-testid="fragment-row"]').first().click()
+
+  const target = window.locator('[data-testid="target-message"]')
+  await expect(target).toBeVisible({ timeout: 5000 })
+  await expect(target).toHaveAttribute('data-highlighted', '1')
+  await expect(target).not.toHaveAttribute('data-highlighted', '1', { timeout: 5000 })
+})
+
+test('source-filtered click still jumps to message with flash highlight', async () => {
+  const { window } = ctx
+
+  // Multi-source query so the filter tabs render.
+  await search(window, 'CANARY')
+  // Switch to the claude filter tab, then click a surviving row.
+  await window.getByRole('button', { name: 'Claude Code' }).click()
+  await window.locator('[data-testid="fragment-row"]').first().click()
+
+  const target = window.locator('[data-testid="target-message"]')
+  await expect(target).toBeVisible({ timeout: 5000 })
+  await expect(target).toHaveAttribute('data-highlighted', '1')
+})
+
 test('session page supports cmd or ctrl + f find-in-page', async () => {
   const { window } = ctx
 
