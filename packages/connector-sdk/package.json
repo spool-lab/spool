@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/connector-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Public plugin contract for Spool connectors.",
   "type": "module",
   "main": "./dist/index.js",
