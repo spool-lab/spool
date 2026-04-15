@@ -1,7 +1,7 @@
 {
   "name": "@spool/connector-sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Public plugin contract for Spool connectors.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,11 +15,26 @@
     "dist",
     "README.md"
   ],
+  "keywords": [
+    "spool",
+    "spool-connector",
+    "plugin-sdk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spool-lab/spool.git",
+    "directory": "packages/connector-sdk"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
