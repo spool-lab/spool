@@ -123,9 +123,33 @@ interface RawCookieFull {
   is_httponly: string
 }
 
-function queryAllCookiesForDomain(
+/**
+ * Enumerate every Chrome `host_key` value that should match a request to `host`
+ * per RFC 6265 §5.1.3. Chrome stores host-only cookies under the bare hostname
+ * and domain cookies under `.parent.example.com`; a request to `www.example.com`
+ * must see cookies at `www.example.com`, `.www.example.com`, and `.example.com`
+ * but not anything scoped to a sibling (`.other.example.com`) or a TLD alone.
+ */
+export function getMatchingHostKeys(host: string): string[] {
+  const normalized = host.toLowerCase().replace(/^\./, '')
+  if (!normalized || !normalized.includes('.')) return []
+
+  const keys = [normalized, `.${normalized}`]
+  let cur = normalized
+  while (true) {
+    const idx = cur.indexOf('.')
+    if (idx < 0) break
+    const parent = cur.substring(idx + 1)
+    if (!parent.includes('.')) break
+    keys.push(`.${parent}`)
+    cur = parent
+  }
+  return keys
+}
+
+function queryAllCookiesForHost(
   dbPath: string,
-  domain: string,
+  host: string,
 ): { cookies: RawCookieFull[]; dbVersion: number } {
   if (!existsSync(dbPath)) {
     throw new SyncError(
@@ -134,9 +158,12 @@ function queryAllCookiesForDomain(
     )
   }
 
-  const safeDomain = domain.replace(/'/g, "''")
+  const keys = getMatchingHostKeys(host)
+  if (keys.length === 0) return { cookies: [], dbVersion: 0 }
+
+  const quoted = keys.map(k => `'${k.replace(/'/g, "''")}'`).join(',')
   // Fetch cookies and DB version in one sqlite3 invocation to avoid double process spawn
-  const sql = `SELECT name, host_key, path, hex(encrypted_value) as encrypted_value_hex, value, expires_utc, is_secure, is_httponly, (SELECT value FROM meta WHERE key='version') as db_version FROM cookies WHERE host_key LIKE '%${safeDomain}';`
+  const sql = `SELECT name, host_key, path, hex(encrypted_value) as encrypted_value_hex, value, expires_utc, is_secure, is_httponly, (SELECT value FROM meta WHERE key='version') as db_version FROM cookies WHERE host_key IN (${quoted});`
 
   const output = runSqliteQuery(dbPath, sql)
 
@@ -190,8 +217,7 @@ export function makeChromeCookiesCapability(): CookiesCapability {
       const key = getMacOSChromeKey()
 
       const host = domainFromUrl(query.url)
-      const dotHost = host.startsWith('.') ? host : `.${host}`
-      const result = queryAllCookiesForDomain(dbPath, dotHost)
+      const result = queryAllCookiesForHost(dbPath, host)
 
       const cookies: Cookie[] = []
       for (const raw of result.cookies) {

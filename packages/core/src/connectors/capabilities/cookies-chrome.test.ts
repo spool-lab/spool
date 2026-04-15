@@ -1,6 +1,59 @@
 import { describe, it, expect } from 'vitest'
-import { makeChromeCookiesCapability } from './cookies-chrome.js'
+import { makeChromeCookiesCapability, getMatchingHostKeys } from './cookies-chrome.js'
 import { SyncError, SyncErrorCode } from '@spool/connector-sdk'
+
+describe('getMatchingHostKeys', () => {
+  it('matches host-only and same-host domain cookies', () => {
+    expect(getMatchingHostKeys('reddit.com')).toEqual([
+      'reddit.com',
+      '.reddit.com',
+    ])
+  })
+
+  it('matches parent domain cookies for subdomain requests', () => {
+    expect(getMatchingHostKeys('www.reddit.com')).toEqual([
+      'www.reddit.com',
+      '.www.reddit.com',
+      '.reddit.com',
+    ])
+  })
+
+  it('walks all parent labels for deep subdomains', () => {
+    expect(getMatchingHostKeys('a.b.example.co.uk')).toEqual([
+      'a.b.example.co.uk',
+      '.a.b.example.co.uk',
+      '.b.example.co.uk',
+      '.example.co.uk',
+      '.co.uk',
+    ])
+  })
+
+  it('does not walk into a bare TLD', () => {
+    const keys = getMatchingHostKeys('reddit.com')
+    expect(keys).not.toContain('.com')
+    expect(keys).not.toContain('com')
+  })
+
+  it('lower-cases the input host', () => {
+    expect(getMatchingHostKeys('WWW.Reddit.COM')).toEqual([
+      'www.reddit.com',
+      '.www.reddit.com',
+      '.reddit.com',
+    ])
+  })
+
+  it('strips a leading dot from the input', () => {
+    expect(getMatchingHostKeys('.reddit.com')).toEqual([
+      'reddit.com',
+      '.reddit.com',
+    ])
+  })
+
+  it('returns empty for single-label or empty hosts', () => {
+    expect(getMatchingHostKeys('localhost')).toEqual([])
+    expect(getMatchingHostKeys('')).toEqual([])
+  })
+})
 
 describe('makeChromeCookiesCapability', () => {
   it('returns a capability with a get method', () => {
