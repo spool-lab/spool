@@ -101,6 +101,18 @@
       "category": "social",
       "firstParty": true,
       "npm": "https://www.npmjs.com/package/@spool-lab/connector-xiaohongshu"
+    },
+    {
+      "name": "@graydawnc/connector-youtube",
+      "id": "youtube-liked",
+      "platform": "youtube",
+      "label": "YouTube Liked Videos",
+      "description": "Videos you've liked on YouTube",
+      "color": "#FF0000",
+      "author": "graydawnc",
+      "category": "media",
+      "firstParty": false,
+      "npm": "https://www.npmjs.com/package/@graydawnc/connector-youtube"
     }
   ]
 }
