@@ -65,6 +65,32 @@
       "packageDescription": "What you star and the notifications GitHub sends you."
     },
     {
+      "name": "@spool-lab/connector-reddit",
+      "id": "reddit-saved",
+      "platform": "reddit",
+      "label": "Reddit Saved",
+      "description": "Posts and comments you saved on Reddit",
+      "color": "#FF4500",
+      "author": "spool-lab",
+      "category": "social",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-reddit",
+      "packageDescription": "Your saved and upvoted posts from Reddit."
+    },
+    {
+      "name": "@spool-lab/connector-reddit",
+      "id": "reddit-upvoted",
+      "platform": "reddit",
+      "label": "Reddit Upvoted",
+      "description": "Posts you upvoted on Reddit",
+      "color": "#FF4500",
+      "author": "spool-lab",
+      "category": "social",
+      "firstParty": true,
+      "npm": "https://www.npmjs.com/package/@spool-lab/connector-reddit",
+      "packageDescription": "Your saved and upvoted posts from Reddit."
+    },
+    {
       "name": "@spool-lab/connector-xiaohongshu",
       "id": "xiaohongshu-notes",
       "platform": "xiaohongshu",
