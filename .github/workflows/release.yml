@@ -121,7 +121,6 @@ jobs:
           merge-multiple: true
 
       - name: Generate release notes
-        id: notes
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
@@ -130,10 +129,23 @@ jobs:
           else
             COMMITS=$(git log "$TAG" --pretty=format:"- %s" --no-merges -20 | grep -v "^- release:")
           fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "notes<<$EOF" >> "$GITHUB_OUTPUT"
-          echo "$COMMITS" >> "$GITHUB_OUTPUT"
-          echo "$EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "## What's new"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "## Install"
+            echo ""
+            echo '**macOS (Apple Silicon)**'
+            echo '```bash'
+            echo 'curl -fsSL https://spool.pro/install.sh | bash'
+            echo '```'
+            echo ""
+            echo '**Linux (x86_64)**'
+            echo 'Download the AppImage from the assets below.'
+            echo ""
+            echo '> This is an early release — feedback and bug reports welcome via [Issues](https://github.com/spool-lab/spool/issues).'
+          } > /tmp/release-notes.md
 
       - name: Upload to existing release
         env:
@@ -141,25 +153,10 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           ASSETS=$(find artifacts -type f | tr '\n' ' ')
-          # Upload assets to existing release, or create one if missing
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" $ASSETS --clobber
           else
             gh release create "$TAG" $ASSETS \
               --title "Spool ${{ steps.version.outputs.version }}" \
-              --notes "## What's new
-
-          ${{ steps.notes.outputs.notes }}
-
-          ## Install
-
-          **macOS (Apple Silicon)**
-          \`\`\`bash
-          curl -fsSL https://spool.pro/install.sh | bash
-          \`\`\`
-
-          **Linux (x86_64)**
-          Download the AppImage or tar.gz from the assets below.
-
-          > This is an early release — feedback and bug reports welcome via [Issues](https://github.com/spool-lab/spool/issues)."
+              --notes-file /tmp/release-notes.md
           fi
