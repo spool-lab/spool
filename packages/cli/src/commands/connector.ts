@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import {
   downloadAndInstall,
@@ -151,7 +152,12 @@ const installSubcommand = new Command('install')
 
       console.log(`Installed ${result.name} v${result.version}`)
       console.log(`  → ${result.installPath}`)
-      console.log('Run `spool connector sync` to start syncing, or restart the Spool app to activate.')
+
+      const connectorIds = readConnectorIds(result.installPath)
+      if (connectorIds.length > 0) {
+        const syncCmds = connectorIds.map(id => `spool connector sync ${id}`).join('\n  ')
+        console.log(`Run:\n  ${syncCmds}\nor restart the Spool app to activate.`)
+      }
     } catch (err) {
       console.error(`Failed: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
@@ -455,6 +461,17 @@ function printSetupSteps(steps?: SetupStep[]): void {
     }
     if (s.docsUrl) console.log(`         docs: ${s.docsUrl}`)
   }
+}
+
+function readConnectorIds(installPath: string): string[] {
+  try {
+    const pkg = JSON.parse(readFileSync(join(installPath, 'package.json'), 'utf8'))
+    if (Array.isArray(pkg.spool?.connectors)) {
+      return pkg.spool.connectors.map((c: { id: string }) => c.id)
+    }
+    if (pkg.spool?.id) return [pkg.spool.id]
+  } catch {}
+  return []
 }
 
 function tryRun(fn: () => void): void {
