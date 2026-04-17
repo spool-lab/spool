@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { ProxyAgent, type Dispatcher } from 'undici'
 import {
   getDB,
   ConnectorRegistry,
@@ -9,6 +10,26 @@ import {
 } from '@spool-lab/core'
 import type { PrerequisitesCapability } from '@spool-lab/core'
 import type Database from 'better-sqlite3'
+
+function getProxyUrl(): string | undefined {
+  return process.env['https_proxy'] || process.env['HTTPS_PROXY']
+    || process.env['http_proxy'] || process.env['HTTP_PROXY']
+    || undefined
+}
+
+let _proxyDispatcher: Dispatcher | undefined
+function getProxyDispatcher(): Dispatcher | undefined {
+  const url = getProxyUrl()
+  if (!url) return undefined
+  if (!_proxyDispatcher) _proxyDispatcher = new ProxyAgent(url)
+  return _proxyDispatcher
+}
+
+export function proxyFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  const dispatcher = getProxyDispatcher()
+  if (!dispatcher) return globalThis.fetch(input, init)
+  return globalThis.fetch(input, { ...init, dispatcher } as unknown as RequestInit)
+}
 
 export interface BootstrapResult {
   db: Database.Database
@@ -35,7 +56,7 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
   const report = await loadConnectors({
     connectorsDir,
     capabilityImpls: {
-      fetch: makeFetchCapability(),
+      fetch: makeFetchCapability(proxyFetch),
       cookies: makeChromeCookiesCapability(),
       sqlite: makeSqliteCapability(),
       exec: execImpl,
