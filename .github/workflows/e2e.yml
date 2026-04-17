@@ -18,11 +18,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @spool-lab/connector-sdk build
-      - run: pnpm --filter @spool/core build
-      - run: pnpm --filter @spool/core test
+      - run: pnpm --filter @spool-lab/core build
+      - run: pnpm --filter @spool-lab/core test
       - run: pnpm --filter @spool-lab/connector-sdk test
-      - run: pnpm --filter @spool/cli build
-      - run: pnpm --filter @spool/cli test
+      - run: pnpm --filter @spool-lab/cli build
+      - run: pnpm --filter @spool-lab/cli test
 
   e2e:
     strategy:
@@ -48,7 +48,7 @@ jobs:
         run: pnpm --filter @spool-lab/connector-sdk build
 
       - name: Build core
-        run: pnpm --filter @spool/core build
+        run: pnpm --filter @spool-lab/core build
 
       - name: Rebuild native modules for Electron
         run: cd packages/app && npx @electron/rebuild -f -w better-sqlite3

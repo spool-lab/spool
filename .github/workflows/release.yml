@@ -27,7 +27,7 @@ jobs:
 
       - name: Build app (arm64 DMG + ZIP)
         run: |
-          pnpm --filter @spool/core build
+          pnpm --filter @spool-lab/core build
           cd packages/app
           npx electron-vite build
           npx electron-builder --mac --arm64 --publish never
@@ -77,7 +77,7 @@ jobs:
 
       - name: Build app (AppImage + tar.gz)
         run: |
-          pnpm --filter @spool/core build
+          pnpm --filter @spool-lab/core build
           cd packages/app
           npx electron-vite build
           npx electron-builder --linux --publish never
