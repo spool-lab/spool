@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { FragmentResult } from '@spool/core'
+import type { FragmentResult } from '@spool-lab/core'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 
 type Props = {

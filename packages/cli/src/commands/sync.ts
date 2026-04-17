@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { getDB, Syncer, SpoolWatcher } from '@spool/core'
+import { getDB, Syncer, SpoolWatcher } from '@spool-lab/core'
 
 export const syncCommand = new Command('sync')
   .description('Sync AI sessions to the local index')

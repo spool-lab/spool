@@ -2,7 +2,7 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import type { Syncer } from './syncer.js'
 import type { SessionSource } from '../types.js'
 import { detectSessionSource, getSessionRoots, getSessionWatchPatterns } from './source-paths.js'
-// No native module dependencies — uses node:sqlite via @spool/core
+// No native module dependencies — uses node:sqlite via @spool-lab/core
 
 export type WatcherEvent = 'new-sessions'
 export type WatcherEventCallback = (event: WatcherEvent, data: { count: number }) => void

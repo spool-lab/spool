@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
+import type { FragmentResult, CaptureResult, SearchResult } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import { getSessionSourceColor, getSessionSourceLabel, getSessionSourceShortLabel } from '../../shared/sessionSources.js'

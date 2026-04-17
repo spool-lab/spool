@@ -1,4 +1,4 @@
-import type { FragmentResult } from '@spool/core'
+import type { FragmentResult } from '@spool-lab/core'
 
 interface ToolCallInfo {
   title: string

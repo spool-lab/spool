@@ -8,8 +8,8 @@ import {
   loadSyncState,
   SyncEngine,
   TrustStore,
-} from '@spool/core'
-import type { SetupStep } from '@spool/core'
+} from '@spool-lab/core'
+import type { SetupStep } from '@spool-lab/core'
 import * as readline from 'node:readline'
 import { bootstrap } from './connector-shared.js'
 

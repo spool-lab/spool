@@ -7,7 +7,7 @@
   "scripts": {
     "rebuild:native": "pnpm run rebuild:native:electron",
     "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
-    "build:core": "pnpm --filter @spool/core build",
+    "build:core": "pnpm --filter @spool-lab/core build",
     "dev": "pnpm run build:core && pnpm run rebuild:native && electron-vite dev",
     "build": "pnpm run build:core && electron-vite build && electron-builder --publish never",
     "build:mac": "pnpm run build:core && electron-vite build && electron-builder --mac --arm64",
@@ -22,7 +22,7 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
     "@shipany/open-agent-sdk": "link:/Users/claw/code/linkclaw/open-agent-sdk",
-    "@spool/core": "workspace:*",
+    "@spool-lab/core": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
     "acp-extension-codex": "^0.10.0",

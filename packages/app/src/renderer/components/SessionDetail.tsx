@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Session, Message } from '@spool/core'
+import type { Session, Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 import SessionFindBar from './SessionFindBar.js'
 

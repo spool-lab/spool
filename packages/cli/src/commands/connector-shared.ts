@@ -6,8 +6,8 @@ import {
   TrustStore,
   PrerequisiteChecker,
   loadConnectors,
-} from '@spool/core'
-import type { PrerequisitesCapability } from '@spool/core'
+} from '@spool-lab/core'
+import type { PrerequisitesCapability } from '@spool-lab/core'
 import type Database from 'better-sqlite3'
 
 export interface BootstrapResult {
@@ -27,7 +27,7 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
   const trustStore = new TrustStore(spoolDir)
 
   const { makeFetchCapability, makeChromeCookiesCapability, makeSqliteCapability, makeExecCapability, makeLogCapabilityFor } =
-    await import('@spool/core')
+    await import('@spool-lab/core')
 
   const execImpl = makeExecCapability()
   const prereqChecker = new PrerequisiteChecker(execImpl)

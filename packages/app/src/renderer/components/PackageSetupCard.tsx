@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, X, AlertTriangle, Circle, Terminal, Puzzle, KeyRound, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
-import type { SetupStep } from '@spool/core'
+import type { SetupStep } from '@spool-lab/core'
 import { ManualInstallModal } from './ManualInstallModal.js'
 
 interface Props {

@@ -1,5 +1,5 @@
 {
-  "name": "@spool/cli",
+  "name": "@spool-lab/cli",
   "version": "0.3.3",
   "private": false,
   "type": "module",
@@ -12,14 +12,22 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && chmod +x bin/spool.js",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@spool/core": "workspace:*",
+    "@spool-lab/core": "workspace:^",
     "commander": "^13.1.0"
   },
   "devDependencies": {

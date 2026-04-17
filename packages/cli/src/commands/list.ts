@@ -1,6 +1,6 @@
 import { Command } from 'commander'
-import { getDB, listRecentSessions } from '@spool/core'
-import type { Session } from '@spool/core'
+import { getDB, listRecentSessions } from '@spool-lab/core'
+import type { Session } from '@spool-lab/core'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini'])
 

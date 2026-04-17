@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { StatusInfo } from '@spool/core'
+import type { StatusInfo } from '@spool-lab/core'
 import type { SearchMode } from './SearchBar.js'
 
 interface Props {

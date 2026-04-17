@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { ConnectorStatus } from '@spool/core'
+import type { ConnectorStatus } from '@spool-lab/core'
 import { PackageSetupCard } from './PackageSetupCard.js'
 import { commonLabel } from '../lib/common-label.js'
 
