@@ -11,7 +11,6 @@
       "author": "spool-lab",
       "category": "social",
       "firstParty": true,
-      "bundled": true,
       "npm": "https://www.npmjs.com/package/@spool-lab/connector-twitter-bookmarks"
     },
     {

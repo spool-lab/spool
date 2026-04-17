@@ -166,7 +166,6 @@ export interface ConnectorStatus {
   color: string
   enabled: boolean
   syncing: boolean
-  bundled: boolean
   version: string
   packageName: string
   packageId?: string

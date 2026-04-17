@@ -172,7 +172,7 @@ const uninstallSubcommand = new Command('uninstall')
       process.exit(1)
     }
 
-    const { db, registry, connectorsDir, trustStore, bundledPackages } = await bootstrap()
+    const { db, registry, connectorsDir, trustStore } = await bootstrap()
 
     const pkg = registry.getPackage(connectorId)
       ?? registry.listPackages().find(p => p.connectors.some(c => c.id === connectorId))
@@ -180,11 +180,6 @@ const uninstallSubcommand = new Command('uninstall')
     if (!pkg) {
       console.error(`Unknown connector: ${connectorId}`)
       console.error(`Available: ${registry.list().map(c => c.id).join(', ')}`)
-      process.exit(1)
-    }
-
-    if (bundledPackages.has(pkg.packageName)) {
-      console.error(`Cannot uninstall "${connectorId}" — it is a built-in connector.`)
       process.exit(1)
     }
 
@@ -205,7 +200,7 @@ const uninstallSubcommand = new Command('uninstall')
     }
 
     try {
-      // Delete files + write .do-not-restore
+      // Delete connector files
       uninstallConnector(pkg.packageName, connectorsDir)
       trustStore.remove(pkg.packageName)
 
