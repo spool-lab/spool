@@ -399,17 +399,15 @@ describe('connector install', () => {
   })
 })
 
-describe('connector-sync', () => {
+describe('connector sync', () => {
   it('lists connectors or reports none when no arg given', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spool-cli-csync-'))
     try {
-      // With bundled connectors: exits 0 with "Available connectors"
-      // Without (CI): exits 1 with "No connectors installed"
       let out: string
       try {
-        out = run(['connector-sync'], { SPOOL_DATA_DIR: dir })
+        out = run(['connector', 'sync'], { SPOOL_DATA_DIR: dir })
       } catch {
-        out = runFail(['connector-sync'], { SPOOL_DATA_DIR: dir })
+        out = runFail(['connector', 'sync'], { SPOOL_DATA_DIR: dir })
       }
       expect(out).toMatch(/Available connectors|No connectors installed/)
     } finally {
@@ -420,7 +418,81 @@ describe('connector-sync', () => {
   it('exits with error for unknown connector', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spool-cli-csync-'))
     try {
-      const out = runFail(['connector-sync', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
+      const out = runFail(['connector', 'sync', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
+      expect(out).toContain('Unknown connector')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('connector list', () => {
+  it('lists connectors or reports none', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-clist-'))
+    try {
+      const out = run(['connector', 'list'], { SPOOL_DATA_DIR: dir })
+      expect(out).toMatch(/items|No connectors installed/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('outputs JSON with --json', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-clist-'))
+    try {
+      const out = run(['connector', 'list', '--json'], { SPOOL_DATA_DIR: dir })
+      const parsed = JSON.parse(out)
+      expect(Array.isArray(parsed)).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('connector status', () => {
+  it('exits with error for unknown connector', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cstatus-'))
+    try {
+      const out = runFail(['connector', 'status', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
+      expect(out).toContain('Unknown connector')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('exits with error when id is missing', () => {
+    const out = runFail(['connector', 'status'])
+    expect(out).toContain("missing required argument")
+  })
+})
+
+describe('connector uninstall', () => {
+  it('exits with error for unknown connector', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cuninstall-'))
+    try {
+      const out = runFail(['connector', 'uninstall', 'nonexistent-connector', '-y'], { SPOOL_DATA_DIR: dir })
+      expect(out).toContain('Unknown connector')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('connector update', () => {
+  it('checks for updates without error', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cupdate-'))
+    try {
+      const out = run(['connector', 'update'], { SPOOL_DATA_DIR: dir })
+      expect(out).toMatch(/up to date|No connectors to check|→/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('exits with error for unknown connector', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cupdate-'))
+    try {
+      const out = runFail(['connector', 'update', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
       expect(out).toContain('Unknown connector')
     } finally {
       rmSync(dir, { recursive: true, force: true })
