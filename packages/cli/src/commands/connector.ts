@@ -147,7 +147,7 @@ const installSubcommand = new Command('install')
 
       console.log(`Installed ${result.name} v${result.version}`)
       console.log(`  → ${result.installPath}`)
-      console.log('Restart the Spool app to activate.')
+      console.log('Run `spool connector sync` to start syncing, or restart the Spool app to activate.')
     } catch (err) {
       console.error(`Failed: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
