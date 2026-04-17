@@ -160,10 +160,16 @@ const uninstallSubcommand = new Command('uninstall')
   .description('Uninstall a connector plugin')
   .argument('<id>', 'Connector ID')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (connectorId: string, opts: { yes?: boolean }) => {
+  .option('-f, --force', 'Proceed even if the Spool app is running')
+  .action(async (connectorId: string, opts: { yes?: boolean; force?: boolean }) => {
+    if (!opts.force && isSpoolAppRunning()) {
+      console.error('The Spool app is currently running.')
+      console.error('Please quit the app first, or use --force to proceed anyway.')
+      process.exit(1)
+    }
+
     const { registry, connectorsDir, trustStore } = await bootstrap({ readonly: true })
 
-    // Find the package for this connector
     const pkg = registry.getPackage(connectorId)
       ?? registry.listPackages().find(p => p.connectors.some(c => c.id === connectorId))
 
@@ -191,7 +197,9 @@ const uninstallSubcommand = new Command('uninstall')
       uninstallConnector(pkg.packageName, connectorsDir)
       trustStore.remove(pkg.packageName)
       console.log(`Uninstalled ${pkg.packageName}`)
-      console.log('Restart the Spool app to apply.')
+      if (opts.force) {
+        console.log('Restart the Spool app to apply.')
+      }
     } catch (err) {
       console.error(`Failed: ${err instanceof Error ? err.message : String(err)}`)
       process.exit(1)
@@ -383,4 +391,19 @@ function timeSince(iso: string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   return `${days}d ago`
+}
+
+function isSpoolAppRunning(): boolean {
+  try {
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+    if (process.platform === 'win32') {
+      const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq Spool.exe', '/NH'], { encoding: 'utf8', stdio: 'pipe' })
+      return out.includes('Spool.exe')
+    }
+    // macOS and Linux
+    execFileSync('pgrep', ['-xi', 'spool'], { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
 }
