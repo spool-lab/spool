@@ -125,7 +125,7 @@ importers:
   packages/cli:
     dependencies:
       '@spool-lab/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       commander:
         specifier: ^13.1.0
