@@ -1,4 +1,4 @@
-import { mkdirSync, createWriteStream, existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, createWriteStream, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { tmpdir } from 'node:os'
@@ -75,7 +75,7 @@ export async function downloadAndInstall(
   const fileStream = createWriteStream(tmpPath)
   await pipeline(res.body as unknown as NodeJS.ReadableStream, fileStream)
 
-  // Extract to node_modules — same pattern as bundle-extract.ts
+  // Extract to node_modules
   const nameSegments = info.name.startsWith('@') ? info.name.split('/') : [info.name]
   const installPath = join(connectorsDir, 'node_modules', ...nameSegments)
   mkdirSync(installPath, { recursive: true })
@@ -111,13 +111,4 @@ export function uninstallConnector(
   const installPath = join(connectorsDir, 'node_modules', ...nameSegments)
 
   rmSync(installPath, { recursive: true, force: true })
-
-  // Prevent bundled connectors from being re-extracted on next startup
-  const doNotRestorePath = join(connectorsDir, '.do-not-restore')
-  const lines = existsSync(doNotRestorePath)
-    ? readFileSync(doNotRestorePath, 'utf8').split('\n').map(l => l.trim()).filter(Boolean)
-    : []
-  const entries = new Set(lines)
-  entries.add(packageName)
-  writeFileSync(doNotRestorePath, [...entries].join('\n') + '\n')
 }

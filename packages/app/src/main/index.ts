@@ -69,7 +69,6 @@ let trustStore: TrustStore | null = null
 let isSyncActive = false
 let proxyFetch: typeof globalThis.fetch
 let spoolDir: string
-const bundledConnectorIds = new Set<string>()
 let updateCache = new Map<string, UpdateInfo>()
 let prerequisiteChecker: PrerequisiteChecker
 let execCapabilityImpl: ReturnType<typeof makeExecCapability>
@@ -422,23 +421,17 @@ app.whenReady().then(async () => {
     })
   }
 
-  const isDev = !app.isPackaged
-  const bundledConnectorsDir = isDev
-    ? join(process.cwd(), 'dist/bundled-connectors')
-    : join(process.resourcesPath, 'bundled-connectors')
-
   spoolDir = join(homedir(), '.spool')
   trustStore = new TrustStore(spoolDir)
 
   execCapabilityImpl = makeExecCapability()
   prerequisiteChecker = new PrerequisiteChecker(execCapabilityImpl)
 
-  if (isDev) {
+  if (!app.isPackaged) {
     linkDevConnectors(spoolDir, resolve(process.cwd(), '../..'))
   }
 
-  const loadReport = await loadConnectors({
-    bundledConnectorsDir,
+  await loadConnectors({
     connectorsDir: join(spoolDir, 'connectors'),
     capabilityImpls: {
       fetch: makeFetchCapability(proxyFetch),
@@ -456,26 +449,6 @@ app.whenReady().then(async () => {
     },
     trustStore,
   })
-
-  // Track which connectors came from bundled tarballs
-  const bundledNames = new Set([...loadReport.bundleReport.extracted, ...loadReport.bundleReport.skipped])
-  for (const result of loadReport.loadResults) {
-    if (result.status === 'loaded' && bundledNames.has(result.name)) {
-      // Find the connector ID from the installed package
-      const segs = result.name.startsWith('@') ? result.name.split('/') : [result.name]
-      const pkgPath = join(spoolDir, 'connectors', 'node_modules', ...segs, 'package.json')
-      try {
-        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-        if (pkg.spool?.id) {
-          bundledConnectorIds.add(pkg.spool.id)
-        } else if (Array.isArray(pkg.spool?.connectors)) {
-          for (const c of pkg.spool.connectors) {
-            if (c.id) bundledConnectorIds.add(c.id)
-          }
-        }
-      } catch {}
-    }
-  }
 
   syncScheduler = new SyncScheduler(db, connectorRegistry)
   syncScheduler.on((event: SchedulerEvent) => {
@@ -590,11 +563,11 @@ function getInstalledConnectorPackages(): InstalledConnectorInfo[] {
         if (pkg.spool?.type !== 'connector') continue
         if (Array.isArray(pkg.spool.connectors)) {
           for (const c of pkg.spool.connectors) {
-            if (c.id && !bundledConnectorIds.has(c.id)) {
+            if (c.id) {
               results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: c.id, platform: c.platform ?? '' })
             }
           }
-        } else if (pkg.spool.id && !bundledConnectorIds.has(pkg.spool.id)) {
+        } else if (pkg.spool.id) {
           results.push({ packageName: pkg.name, currentVersion: pkg.version ?? '0.0.0', connectorId: pkg.spool.id, platform: pkg.spool.platform ?? '' })
         }
       } catch {}
@@ -606,9 +579,6 @@ function getInstalledConnectorPackages(): InstalledConnectorInfo[] {
 async function reloadConnectors(): Promise<void> {
   const connectorsDir = join(spoolDir, 'connectors')
   await loadConnectors({
-    bundledConnectorsDir: !app.isPackaged
-      ? join(process.cwd(), 'dist/bundled-connectors')
-      : join(process.resourcesPath, 'bundled-connectors'),
     connectorsDir,
     capabilityImpls: {
       fetch: makeFetchCapability(proxyFetch),
@@ -855,7 +825,6 @@ ipcMain.handle('connector:list', (): ConnectorStatus[] => {
     const cached = pkgId ? prerequisiteChecker?.getCached(pkgId) : undefined
     const status: ConnectorStatus = {
       ...c,
-      bundled: bundledConnectorIds.has(c.id),
       version: versionMap.get(c.id) ?? '0.0.0',
       packageName: pkgNameMap.get(c.id) ?? '',
     }
@@ -935,7 +904,6 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
     syncScheduler.cancelIfRunning(sib.connectorId)
   }
 
-  // Files before DB: ensures .do-not-restore is written even if DB ops fail
   uninstallConnector(packageName, connectorsDir)
 
   // Best-effort DB cleanup — captures_fts_delete trigger can fail on corrupted FTS rows

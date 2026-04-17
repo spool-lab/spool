@@ -14,7 +14,11 @@ import type {
 } from '@spool-lab/connector-sdk'
 import { SyncError, SyncErrorCode, KNOWN_CAPABILITIES_V1 } from '@spool-lab/connector-sdk'
 import type { ConnectorRegistry } from './registry.js'
-import { extractBundledConnectorsIfNeeded, type BundleLogger, type BundleReport } from './bundle-extract.js'
+interface BaseLogger {
+  info(msg: string, fields?: Record<string, unknown>): void
+  warn(msg: string, fields?: Record<string, unknown>): void
+  error(msg: string, fields?: Record<string, unknown>): void
+}
 import { TrustStore } from './trust-store.js'
 
 export function validatePrerequisites(prereqs: unknown[], packageName: string): Prerequisite[] {
@@ -61,12 +65,11 @@ export interface CapabilityImpls {
   prerequisitesFor?: (packageId: string) => PrerequisitesCapability
 }
 
-export interface LoaderLogger extends BundleLogger {
+export interface LoaderLogger extends BaseLogger {
   child?(attrs: Record<string, unknown>): LoaderLogger
 }
 
 export interface LoadDeps {
-  bundledConnectorsDir: string
   connectorsDir: string
   capabilityImpls: CapabilityImpls
   registry: ConnectorRegistry
@@ -80,7 +83,6 @@ export type LoadResult =
   | { status: 'skipped'; name: string; reason: 'not-in-allowlist' | 'bad-manifest' }
 
 export interface LoadReport {
-  bundleReport: BundleReport
   loadResults: LoadResult[]
 }
 
@@ -107,17 +109,10 @@ const KNOWN_CAPS_SET = new Set<string>(KNOWN_CAPABILITIES_V1)
 const importedModules = new Map<string, any>()
 
 export async function loadConnectors(deps: LoadDeps): Promise<LoadReport> {
-  const { bundledConnectorsDir, connectorsDir, log } = deps
+  const { connectorsDir, log } = deps
 
   importedModules.clear()
-  // Clear before re-populating so connectors deleted from disk don't linger
   deps.registry.clear()
-
-  const bundleReport = await extractBundledConnectorsIfNeeded({
-    bundledDir: bundledConnectorsDir,
-    connectorsDir,
-    log,
-  })
 
   const discovered = discoverConnectorPackages(connectorsDir, log)
 
@@ -127,7 +122,7 @@ export async function loadConnectors(deps: LoadDeps): Promise<LoadReport> {
     loadResults.push(result)
   }
 
-  return { bundleReport, loadResults }
+  return { loadResults }
 }
 
 function discoverConnectorPackages(

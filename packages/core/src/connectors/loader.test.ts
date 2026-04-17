@@ -49,11 +49,9 @@ function silentLogger() {
 
 describe('loadConnectors', () => {
   let connectorsDir: string
-  let bundledDir: string
 
   beforeEach(() => {
     connectorsDir = mkdtempSync(join(tmpdir(), 'loader-connectors-'))
-    bundledDir = mkdtempSync(join(tmpdir(), 'loader-bundled-'))
   })
 
   function makeTrustStore(): TrustStore {
@@ -88,8 +86,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -128,8 +125,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -154,8 +150,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -183,8 +178,7 @@ describe('loadConnectors', () => {
 
     const log = silentLogger()
     await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log,
@@ -212,8 +206,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -261,8 +254,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -327,8 +319,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -369,8 +360,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),
@@ -406,8 +396,7 @@ describe('loadConnectors', () => {
     )
 
     const report = await loadConnectors({
-      bundledConnectorsDir: bundledDir,
-      connectorsDir,
+            connectorsDir,
       capabilityImpls: fakeCapabilityImpls(),
       registry,
       log: silentLogger(),

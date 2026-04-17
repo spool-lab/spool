@@ -470,7 +470,6 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
   // ── Detail view (drill-down) — package level ──
   if (selectedPkg && pkgConnectors.length > 0) {
     const first = pkgConnectors[0]!
-    const isBundled = pkgConnectors.every(c => c.bundled)
     const pkgLabel = commonLabel(pkgConnectors.map(c => c.label))
 
     return (
@@ -493,8 +492,8 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h4 className="text-xs font-medium text-warm-text dark:text-dark-text">{pkgLabel}</h4>
-              {!isBundled && <span className="text-[10px] font-mono text-warm-faint dark:text-dark-faint">v{first.version}</span>}
-              {!isBundled && (
+              <span className="text-[10px] font-mono text-warm-faint dark:text-dark-faint">v{first.version}</span>
+              {(
                 <div className="flex items-center gap-2 ml-auto text-[11px]">
                   {availableUpdates[first.id] && (
                     <button
