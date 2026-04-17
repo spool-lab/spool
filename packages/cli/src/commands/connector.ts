@@ -173,8 +173,14 @@ const uninstallSubcommand = new Command('uninstall')
       process.exit(1)
     }
 
+    const siblingIds = pkg.connectors.map(c => c.id).filter(id => id !== connectorId)
+
     if (!opts.yes) {
-      const confirmed = await confirm(`Uninstall "${pkg.packageName}"? [y/N] `)
+      let prompt = `Uninstall "${pkg.packageName}"?`
+      if (siblingIds.length > 0) {
+        prompt += ` This will also remove: ${siblingIds.join(', ')}`
+      }
+      const confirmed = await confirm(`${prompt} [y/N] `)
       if (!confirmed) {
         console.log('Cancelled.')
         process.exit(0)
