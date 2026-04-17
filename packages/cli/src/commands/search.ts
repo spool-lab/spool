@@ -48,12 +48,26 @@ function printResult(r: FragmentResult, n: number, total: number): void {
   console.log(`Session: "${r.sessionTitle}"`)
   console.log(`Date:    ${formatDate(r.startedAt)}`)
   console.log(`UUID:    ${r.sessionUuid}`)
+
+  const resumeCmd = buildResumeCommand(r)
+  if (resumeCmd) console.log(`Resume:  ${resumeCmd}`)
+
   console.log(``)
-  // Strip mark tags and wrap text
   const snippet = r.snippet
     .replace(/<mark>/g, '\x1b[1m\x1b[33m')
     .replace(/<\/mark>/g, '\x1b[0m')
   console.log(`  ${snippet}`)
+}
+
+function buildResumeCommand(r: FragmentResult): string | null {
+  switch (r.source) {
+    case 'claude':
+      return `claude -r ${r.sessionUuid}`
+    case 'codex':
+      return `codex resume ${r.sessionUuid}`
+    default:
+      return null
+  }
 }
 
 function formatDate(iso: string): string {
