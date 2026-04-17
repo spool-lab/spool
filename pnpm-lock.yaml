@@ -29,7 +29,7 @@ importers:
       '@shipany/open-agent-sdk':
         specifier: link:/Users/claw/code/linkclaw/open-agent-sdk
         version: link:../../../../../claw/code/linkclaw/open-agent-sdk
-      '@spool/core':
+      '@spool-lab/core':
         specifier: workspace:*
         version: link:../core
       '@tanstack/react-virtual':
@@ -124,7 +124,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@spool/core':
+      '@spool-lab/core':
         specifier: workspace:*
         version: link:../core
       commander:

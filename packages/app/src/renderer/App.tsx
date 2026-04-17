@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
-import type { FragmentResult, SearchResult, StatusInfo } from '@spool/core'
+import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import HomeView from './components/HomeView.js'

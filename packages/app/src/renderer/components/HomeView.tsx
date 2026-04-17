@@ -1,4 +1,4 @@
-import type { FragmentResult, CaptureResult, SearchResult } from '@spool/core'
+import type { FragmentResult, CaptureResult, SearchResult } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './SearchBar.js'
 import { getSessionSourceColor } from '../../shared/sessionSources.js'
 

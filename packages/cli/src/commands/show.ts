@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { getDB, getSessionWithMessages } from '@spool/core'
+import { getDB, getSessionWithMessages } from '@spool-lab/core'
 
 export const showCommand = new Command('show')
   .description('Print full session as text')

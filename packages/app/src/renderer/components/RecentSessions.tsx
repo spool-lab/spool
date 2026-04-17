@@ -1,4 +1,4 @@
-import type { Session } from '@spool/core'
+import type { Session } from '@spool-lab/core'
 import { getSessionSourceColor } from '../../shared/sessionSources.js'
 
 interface Props {

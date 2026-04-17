@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import WebSocketImpl from 'ws'
-import { cachedResolve, type FragmentResult } from '@spool/core'
+import { cachedResolve, type FragmentResult } from '@spool-lab/core'
 import type {
   Client as AcpClient,
   CreateTerminalRequest,

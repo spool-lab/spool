@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { getDB, getStatus } from '@spool/core'
+import { getDB, getStatus } from '@spool-lab/core'
 
 export const statusCommand = new Command('status')
   .description('Show index status')

@@ -1,6 +1,6 @@
 import { Command } from 'commander'
-import { getDB, searchFragments } from '@spool/core'
-import type { FragmentResult, SessionSource } from '@spool/core'
+import { getDB, searchFragments } from '@spool-lab/core'
+import type { FragmentResult, SessionSource } from '@spool-lab/core'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini'])
 

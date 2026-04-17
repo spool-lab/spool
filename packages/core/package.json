@@ -1,7 +1,7 @@
 {
-  "name": "@spool/core",
+  "name": "@spool-lab/core",
   "version": "0.3.3",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,13 +11,20 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "rebuild:native": "pnpm run rebuild:native:node",
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
     "build": "pnpm --filter @spool-lab/connector-sdk build && tsc",
     "dev": "tsc --watch",
     "test": "pnpm run rebuild:native && vitest run",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@spool-lab/connector-sdk": "workspace:^",

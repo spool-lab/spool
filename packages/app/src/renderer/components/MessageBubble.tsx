@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Message } from '@spool/core'
+import type { Message } from '@spool-lab/core'
 
 export type FindRange = {
   start: number

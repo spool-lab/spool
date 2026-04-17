@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ManualInstall } from '@spool/core'
+import type { ManualInstall } from '@spool-lab/core'
 
 interface Props {
   open: boolean

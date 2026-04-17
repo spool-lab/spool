@@ -13,9 +13,9 @@ import {
   TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
   fetchRegistry,
   PrerequisiteChecker,
-} from '@spool/core'
-import type { UpdateInfo } from '@spool/core'
-import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool/core'
+} from '@spool-lab/core'
+import type { UpdateInfo } from '@spool-lab/core'
+import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -616,7 +616,7 @@ type ResolvedCli =
   | { ok: true; pkg: ReturnType<ConnectorRegistry['getPackage']> & {}; command: string }
   | { ok: false; reason: 'package-not-found' | 'not-cli-prereq' | 'no-command-for-platform' | 'requires-manual' }
 
-function stepsDiffer(a: import('@spool/core').SetupStep[] | undefined, b: import('@spool/core').SetupStep[]): boolean {
+function stepsDiffer(a: import('@spool-lab/core').SetupStep[] | undefined, b: import('@spool-lab/core').SetupStep[]): boolean {
   if (!a || a.length !== b.length) return true
   return a.some((s, i) => s.status !== b[i]?.status)
 }
@@ -774,7 +774,7 @@ ipcMain.handle('spool:ai-set-config', (_e, { config }: { config: import('./acp.j
   return { ok: true }
 })
 
-ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { query: string; agentId: string; context: import('@spool/core').FragmentResult[] }) => {
+ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { query: string; agentId: string; context: import('@spool-lab/core').FragmentResult[] }) => {
   try {
     const fullText = await acpManager.query(agentId, query, context, (text) => {
       mainWindow?.webContents.send('spool:ai-chunk', { text })

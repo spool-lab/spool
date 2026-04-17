@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ConnectorStatus, AuthStatus, SchedulerStatus, RegistryConnector } from '@spool/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ConnectorStatus, AuthStatus, SchedulerStatus, RegistryConnector } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 

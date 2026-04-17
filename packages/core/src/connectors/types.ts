@@ -36,7 +36,7 @@ const RETRYABLE_CODES = new Set<SyncErrorCode>([
 ])
 
 /**
- * Internal Effect-tagged version of SyncError used inside @spool/core for
+ * Internal Effect-tagged version of SyncError used inside @spool-lab/core for
  * Effect's typed error channel. External callers (connectors) use the plain
  * class exported from @spool-lab/connector-sdk. Translation between the two
  * happens in SyncError.from().

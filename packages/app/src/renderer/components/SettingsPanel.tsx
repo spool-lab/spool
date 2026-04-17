@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
-import type { ConnectorStatus, RegistryConnector } from '@spool/core'
+import type { ConnectorStatus, RegistryConnector } from '@spool-lab/core'
 import type { AgentInfo, AgentsConfig, SdkAgentConfig } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'

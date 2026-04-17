@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads'
-import { getDB, Syncer } from '@spool/core'
-import type { SyncProgressEvent } from '@spool/core'
-import type { SyncResult } from '@spool/core'
+import { getDB, Syncer } from '@spool-lab/core'
+import type { SyncProgressEvent } from '@spool-lab/core'
+import type { SyncResult } from '@spool-lab/core'
 
 export type SyncWorkerMessage =
   | { type: 'progress'; data: SyncProgressEvent }

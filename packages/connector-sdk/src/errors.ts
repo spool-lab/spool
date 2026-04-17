@@ -89,7 +89,7 @@ const RETRYABLE_CODES = new Set<SyncErrorCode>([
  * SyncErrorCode so the framework and UI can classify and respond.
  *
  * This is a plain class, not `Data.TaggedError` — the SDK cannot depend on
- * `effect`. `@spool/core` wraps this in an `Effect.Cause` boundary internally.
+ * `effect`. `@spool-lab/core` wraps this in an `Effect.Cause` boundary internally.
  */
 export class SyncError extends Error {
   readonly _tag = 'SyncError' as const
