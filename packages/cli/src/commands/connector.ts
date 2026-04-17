@@ -22,7 +22,11 @@ const listSubcommand = new Command('list')
     const connectors = registry.list()
 
     if (connectors.length === 0) {
-      console.log('No connectors installed.')
+      if (opts.json) {
+        console.log('[]')
+      } else {
+        console.log('No connectors installed.')
+      }
       return
     }
 
