@@ -9,6 +9,7 @@ import {
   SyncEngine,
   TrustStore,
 } from '@spool/core'
+import type { SetupStep } from '@spool/core'
 import * as readline from 'node:readline'
 import { bootstrap } from './connector-shared.js'
 
@@ -109,8 +110,9 @@ const statusSubcommand = new Command('status')
     const auth = await connector.checkAuth()
     process.stdout.write(`\rAuth:         ${auth.ok ? 'ok' : 'FAILED'}        \n`)
     if (!auth.ok) {
-      console.log(`  Message: ${auth.message}`)
+      if (auth.message) console.log(`  Message: ${auth.message}`)
       if (auth.hint) console.log(`  Hint: ${auth.hint}`)
+      printSetupSteps(auth.setup)
     }
   })
 
@@ -258,8 +260,10 @@ const syncSubcommand = new Command('sync')
 
     const auth = await connector.checkAuth()
     if (!auth.ok) {
-      console.error(`Auth failed: ${auth.message}`)
-      if (auth.hint) console.error(`Hint: ${auth.hint}`)
+      console.error('Auth failed.')
+      if (auth.message) console.error(`  ${auth.message}`)
+      if (auth.hint) console.error(`  Hint: ${auth.hint}`)
+      printSetupSteps(auth.setup)
       process.exit(1)
     }
 
@@ -410,6 +414,38 @@ function timeSince(iso: string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   return `${days}d ago`
+}
+
+const STATUS_ICON: Record<string, string> = {
+  ok: '[ok]',
+  missing: '[MISSING]',
+  outdated: '[OUTDATED]',
+  error: '[ERROR]',
+  pending: '[pending]',
+}
+
+function printSetupSteps(steps?: SetupStep[]): void {
+  if (!steps || steps.length === 0) return
+  console.log('  Prerequisites:')
+  for (const s of steps) {
+    const icon = STATUS_ICON[s.status] ?? `[${s.status}]`
+    console.log(`    ${icon} ${s.label}`)
+    if (s.hint) console.log(`         ${s.hint}`)
+    if (s.status === 'missing' && s.install) {
+      const inst = s.install
+      if (inst.kind === 'cli') {
+        const cmd = inst.command[process.platform as 'darwin' | 'linux' | 'win32']
+        if (cmd) console.log(`         → ${cmd}`)
+      } else if (inst.kind === 'site-session') {
+        console.log(`         → Open ${inst.openUrl} and log in`)
+      } else if (inst.kind === 'browser-extension' && inst.manual) {
+        for (const step of inst.manual.steps) {
+          console.log(`         → ${step}`)
+        }
+      }
+    }
+    if (s.docsUrl) console.log(`         docs: ${s.docsUrl}`)
+  }
 }
 
 function tryRun(fn: () => void): void {

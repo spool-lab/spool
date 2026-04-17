@@ -5,10 +5,11 @@ import {
   getDB,
   ConnectorRegistry,
   TrustStore,
+  PrerequisiteChecker,
   loadConnectors,
   loadSyncState,
 } from '@spool/core'
-import type { LoadReport, LoadResult } from '@spool/core'
+import type { PrerequisitesCapability } from '@spool/core'
 import type Database from 'better-sqlite3'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -32,6 +33,9 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
   const { makeFetchCapability, makeChromeCookiesCapability, makeSqliteCapability, makeExecCapability, makeLogCapabilityFor } =
     await import('@spool/core')
 
+  const execImpl = makeExecCapability()
+  const prereqChecker = new PrerequisiteChecker(execImpl)
+
   const report = await loadConnectors({
     bundledConnectorsDir: join(__dirname, '../../resources/bundled-connectors'),
     connectorsDir,
@@ -39,8 +43,15 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
       fetch: makeFetchCapability(),
       cookies: makeChromeCookiesCapability(),
       sqlite: makeSqliteCapability(),
-      exec: makeExecCapability(),
+      exec: execImpl,
       logFor: (id: string) => makeLogCapabilityFor(id),
+      prerequisitesFor: (packageId: string): PrerequisitesCapability => ({
+        check: () => {
+          const pkg = registry.getPackage(packageId)
+          if (!pkg) return Promise.resolve([])
+          return prereqChecker.check(pkg)
+        },
+      }),
     },
     registry,
     log: { info: () => {}, warn: console.warn, error: console.error },
