@@ -62,7 +62,7 @@ function printResult(r: FragmentResult, n: number, total: number): void {
 function buildResumeCommand(r: FragmentResult): string | null {
   switch (r.source) {
     case 'claude':
-      return `claude -r ${r.sessionUuid}` + (r.cwd ? ` -p ${r.cwd}` : '')
+      return `claude -r ${r.sessionUuid}`
     case 'codex':
       return `codex resume ${r.sessionUuid}`
     default:
