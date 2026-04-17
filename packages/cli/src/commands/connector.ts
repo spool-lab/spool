@@ -38,7 +38,6 @@ const listSubcommand = new Command('list')
           version: versions.get(pkg?.packageName ?? '') ?? 'unknown',
           totalSynced: state.totalSynced,
           lastSync: state.lastForwardSyncAt,
-          enabled: state.enabled,
           hasError: state.consecutiveErrors > 0,
         }
       })
@@ -86,7 +85,6 @@ const statusSubcommand = new Command('status')
     console.log(`Platform:     ${connector.platform}`)
     console.log(`Package:      ${pkg?.packageName ?? 'unknown'}`)
     console.log(`Version:      ${version}`)
-    console.log(`Enabled:      ${state.enabled ? 'yes' : 'no'}`)
     console.log(`Items in DB:  ${itemCount}`)
     console.log(`Total synced: ${state.totalSynced}`)
     console.log(``)
