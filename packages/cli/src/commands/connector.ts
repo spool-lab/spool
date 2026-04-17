@@ -172,7 +172,7 @@ const uninstallSubcommand = new Command('uninstall')
       process.exit(1)
     }
 
-    const { db, registry, connectorsDir, trustStore } = await bootstrap()
+    const { db, registry, connectorsDir, trustStore, bundledPackages } = await bootstrap()
 
     const pkg = registry.getPackage(connectorId)
       ?? registry.listPackages().find(p => p.connectors.some(c => c.id === connectorId))
@@ -180,6 +180,11 @@ const uninstallSubcommand = new Command('uninstall')
     if (!pkg) {
       console.error(`Unknown connector: ${connectorId}`)
       console.error(`Available: ${registry.list().map(c => c.id).join(', ')}`)
+      process.exit(1)
+    }
+
+    if (bundledPackages.has(pkg.packageName)) {
+      console.error(`Cannot uninstall "${connectorId}" — it is a built-in connector.`)
       process.exit(1)
     }
 
@@ -254,6 +259,10 @@ const syncSubcommand = new Command('sync')
       console.error(`Unknown connector: ${connectorId}`)
       console.error(`Available: ${available.join(', ')}`)
       process.exit(1)
+    }
+
+    if (isSpoolAppRunning()) {
+      console.warn('Warning: The Spool app is running. Concurrent syncs may cause conflicts.')
     }
 
     const connector = registry.get(connectorId)
@@ -371,6 +380,11 @@ const updateSubcommand = new Command('update')
     if (!opts.apply) {
       console.log(`\nRun with --apply to install updates.`)
       return
+    }
+
+    if (isSpoolAppRunning()) {
+      console.error('The Spool app is currently running. Please quit the app first before applying updates.')
+      process.exit(1)
     }
 
     for (const [name, info] of updates) {

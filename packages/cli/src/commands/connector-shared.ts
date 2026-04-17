@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   getDB,
@@ -21,6 +22,7 @@ export interface BootstrapResult {
   connectorsDir: string
   trustStore: TrustStore
   versions: Map<string, string>
+  bundledPackages: Set<string>
 }
 
 export async function bootstrap(opts?: { readonly?: boolean }): Promise<BootstrapResult> {
@@ -37,7 +39,7 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
   const prereqChecker = new PrerequisiteChecker(execImpl)
 
   const report = await loadConnectors({
-    bundledConnectorsDir: join(__dirname, '../../resources/bundled-connectors'),
+    bundledConnectorsDir: resolveBundledConnectorsDir(),
     connectorsDir,
     capabilityImpls: {
       fetch: makeFetchCapability(),
@@ -65,5 +67,29 @@ export async function bootstrap(opts?: { readonly?: boolean }): Promise<Bootstra
     }
   }
 
-  return { db, registry, spoolDir, connectorsDir, trustStore, versions }
+  const bundledPackages = new Set([
+    ...report.bundleReport.extracted,
+    ...report.bundleReport.skipped,
+  ])
+
+  return { db, registry, spoolDir, connectorsDir, trustStore, versions, bundledPackages }
+}
+
+function resolveBundledConnectorsDir(): string {
+  // Try the installed Spool app's bundled connectors
+  const candidates = process.platform === 'darwin'
+    ? ['/Applications/Spool.app/Contents/Resources/bundled-connectors']
+    : process.platform === 'linux'
+      ? [join(homedir(), '.local/share/Spool/bundled-connectors'), '/opt/Spool/bundled-connectors']
+      : []
+
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir
+  }
+
+  // Fallback: dev environment or no app installed
+  const devDir = join(__dirname, '../../resources/bundled-connectors')
+  if (existsSync(devDir)) return devDir
+
+  return devDir // non-existent dir is fine — loadConnectors handles it gracefully
 }
