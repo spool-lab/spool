@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@spool-lab/core": "workspace:^",
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "undici": "^6.23.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

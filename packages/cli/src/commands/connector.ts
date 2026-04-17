@@ -12,7 +12,7 @@ import {
 } from '@spool-lab/core'
 import type { SetupStep } from '@spool-lab/core'
 import * as readline from 'node:readline'
-import { bootstrap } from './connector-shared.js'
+import { bootstrap, proxyFetch } from './connector-shared.js'
 
 // ── list ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +143,7 @@ const installSubcommand = new Command('install')
 
     console.log(`Installing ${packageName}...`)
     try {
-      const result = await downloadAndInstall(packageName, connectorsDir, fetch)
+      const result = await downloadAndInstall(packageName, connectorsDir, proxyFetch)
 
       if (!isFirstParty) {
         const trustStore = new TrustStore(spoolDir)
@@ -367,7 +367,7 @@ const updateSubcommand = new Command('update')
     }
 
     console.log('Checking for updates...')
-    const updates = await checkForUpdates(toCheck, fetch)
+    const updates = await checkForUpdates(toCheck, proxyFetch)
 
     if (updates.size === 0) {
       console.log('All connectors are up to date.')
@@ -391,7 +391,7 @@ const updateSubcommand = new Command('update')
     for (const [name, info] of updates) {
       process.stdout.write(`Updating ${name}...`)
       try {
-        await downloadAndInstall(name, connectorsDir, fetch)
+        await downloadAndInstall(name, connectorsDir, proxyFetch)
         console.log(` ${info.current} → ${info.latest}`)
       } catch (err) {
         console.log(` FAILED: ${err instanceof Error ? err.message : String(err)}`)
