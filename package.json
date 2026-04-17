@@ -14,7 +14,8 @@
     "lint": "turbo lint",
     "clean": "turbo clean",
     "check:phantom-independence": "scripts/phantom-independence-check.sh",
-    "dev:install:mac": "scripts/dev-install-mac.sh"
+    "dev:install:mac": "scripts/dev-install-mac.sh",
+    "spool": "node packages/cli/bin/spool.js"
   },
   "devDependencies": {
     "turbo": "^2.9.6",
