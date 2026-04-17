@@ -12,9 +12,30 @@ import type { PrerequisitesCapability } from '@spool-lab/core'
 import type Database from 'better-sqlite3'
 
 function getProxyUrl(): string | undefined {
-  return process.env['https_proxy'] || process.env['HTTPS_PROXY']
+  const fromEnv = process.env['https_proxy'] || process.env['HTTPS_PROXY']
     || process.env['http_proxy'] || process.env['HTTP_PROXY']
-    || undefined
+  if (fromEnv) return fromEnv
+
+  if (process.platform === 'darwin') {
+    try {
+      const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+      const out = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 3000 })
+      const httpsEnabled = /HTTPSEnable\s*:\s*1/.test(out)
+      if (httpsEnabled) {
+        const host = out.match(/HTTPSProxy\s*:\s*(\S+)/)?.[1]
+        const port = out.match(/HTTPSPort\s*:\s*(\d+)/)?.[1]
+        if (host && port) return `http://${host}:${port}`
+      }
+      const httpEnabled = /HTTPEnable\s*:\s*1/.test(out)
+      if (httpEnabled) {
+        const host = out.match(/HTTPProxy\s*:\s*(\S+)/)?.[1]
+        const port = out.match(/HTTPPort\s*:\s*(\d+)/)?.[1]
+        if (host && port) return `http://${host}:${port}`
+      }
+    } catch {}
+  }
+
+  return undefined
 }
 
 let _proxyDispatcher: Dispatcher | undefined
