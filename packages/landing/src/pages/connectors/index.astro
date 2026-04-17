@@ -8,7 +8,7 @@ interface GroupedPackage {
   label: string
   color: string
   category: string
-  bundled: boolean
+  author: string
   firstParty: boolean
   description: string
   packageDescription?: string
@@ -26,7 +26,7 @@ for (const c of connectors as Array<typeof connectors[number] & { packageDescrip
       label: c.label,
       color: c.color,
       category: c.category,
-      bundled: !!c.bundled,
+      author: c.author,
       firstParty: c.firstParty,
       description: c.description,
       packageDescription: c.packageDescription,
@@ -320,19 +320,6 @@ const subNamesOf = (pkg: GroupedPackage): string[] => {
     .copy-btn.copied .label-default { display: none; }
     .copy-btn.copied .label-done { display: inline; }
 
-    .built-in {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: var(--surface2);
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 500;
-      white-space: nowrap;
-    }
-    .built-in .check { color: #4ADE80; font-size: 12px; line-height: 1; }
   </style>
 </head>
 <body>
@@ -359,7 +346,7 @@ const subNamesOf = (pkg: GroupedPackage): string[] => {
               <span class="icon" style={`background: ${pkg.color}`}>{initial}</span>
               <div class="head-text">
                 <div class="title">{pkg.label}</div>
-                <div class="author">Spool Lab</div>
+                <div class="author">{pkg.author === 'spool-lab' ? 'Spool Lab' : pkg.author}</div>
               </div>
             </div>
             <p class="desc">{desc}</p>
@@ -372,24 +359,18 @@ const subNamesOf = (pkg: GroupedPackage): string[] => {
                 </span>
               </span>
               <span class="actions">
-                {pkg.bundled ? (
-                  <span class="built-in"><span class="check">&#10003;</span> Built-in</span>
-                ) : (
-                  <>
-                    <button class="copy-btn" type="button" data-cmd={cliCmd} aria-label="Copy install command">
-                      <svg class="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="5" y="5" width="8" height="8" rx="1.5"/>
-                        <path d="M3 11V4a1 1 0 0 1 1-1h7"/>
-                      </svg>
-                      <svg class="icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3.5 8.5l3 3 6-6.5"/>
-                      </svg>
-                      <span class="label-default">Copy CLI</span>
-                      <span class="label-done">Copied</span>
-                    </button>
-                    <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
-                  </>
-                )}
+                <button class="copy-btn" type="button" data-cmd={cliCmd} aria-label="Copy install command">
+                  <svg class="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="5" y="5" width="8" height="8" rx="1.5"/>
+                    <path d="M3 11V4a1 1 0 0 1 1-1h7"/>
+                  </svg>
+                  <svg class="icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3.5 8.5l3 3 6-6.5"/>
+                  </svg>
+                  <span class="label-default">Copy CLI</span>
+                  <span class="label-done">Copied</span>
+                </button>
+                <a href={`spool://connector/install/${pkg.name}`} class="install-btn">Install</a>
               </span>
             </div>
           </div>
