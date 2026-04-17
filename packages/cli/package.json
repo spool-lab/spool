@@ -27,7 +27,7 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@spool-lab/core": "workspace:*",
+    "@spool-lab/core": "workspace:^",
     "commander": "^13.1.0"
   },
   "devDependencies": {
