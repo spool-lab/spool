@@ -166,7 +166,7 @@ const uninstallSubcommand = new Command('uninstall')
       process.exit(1)
     }
 
-    const { registry, connectorsDir, trustStore } = await bootstrap({ readonly: true })
+    const { db, registry, connectorsDir, trustStore } = await bootstrap()
 
     const pkg = registry.getPackage(connectorId)
       ?? registry.listPackages().find(p => p.connectors.some(c => c.id === connectorId))
@@ -177,13 +177,15 @@ const uninstallSubcommand = new Command('uninstall')
       process.exit(1)
     }
 
-    const siblingIds = pkg.connectors.map(c => c.id).filter(id => id !== connectorId)
+    const allConnectorIds = pkg.connectors.map(c => c.id)
+    const siblingIds = allConnectorIds.filter(id => id !== connectorId)
 
     if (!opts.yes) {
       let prompt = `Uninstall "${pkg.packageName}"?`
       if (siblingIds.length > 0) {
         prompt += ` This will also remove: ${siblingIds.join(', ')}`
       }
+      prompt += ' This will delete all synced data for this connector.'
       const confirmed = await confirm(`${prompt} [y/N] `)
       if (!confirmed) {
         console.log('Cancelled.')
@@ -192,8 +194,23 @@ const uninstallSubcommand = new Command('uninstall')
     }
 
     try {
+      // Delete files + write .do-not-restore
       uninstallConnector(pkg.packageName, connectorsDir)
       trustStore.remove(pkg.packageName)
+
+      // Clean DB data for all connectors in the package (matches app behavior)
+      for (const cid of allConnectorIds) {
+        tryRun(() => db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(cid))
+        tryRun(() => {
+          db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(cid)
+          db.prepare(`
+            DELETE FROM captures
+            WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
+              AND NOT EXISTS (SELECT 1 FROM capture_connectors WHERE capture_id = captures.id)
+          `).run()
+        })
+      }
+
       console.log(`Uninstalled ${pkg.packageName}`)
       if (opts.force) {
         console.log('Restart the Spool app to apply.')
@@ -389,6 +406,10 @@ function timeSince(iso: string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   return `${days}d ago`
+}
+
+function tryRun(fn: () => void): void {
+  try { fn() } catch { /* best-effort — FTS triggers may fail on corrupted rows */ }
 }
 
 function isSpoolAppRunning(): boolean {
