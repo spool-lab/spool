@@ -29,7 +29,6 @@
   "dependencies": {
     "@spool-lab/connector-sdk": "workspace:^",
     "better-sqlite3": "^11.10.0",
-    "chokidar": "^4.0.3",
     "effect": "^3.21.0",
     "semver": "^7.7.4",
     "tar": "^7.5.13"
