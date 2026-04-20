@@ -387,6 +387,9 @@ app.whenReady().then(async () => {
     searchCache.clear()
     mainWindow?.webContents.send('spool:new-sessions', data)
   })
+  watcher.on('error', (_event, data) => {
+    console.error('[watcher]', data.error, data.root ? `(root=${data.root})` : '')
+  })
 
   // ── Connector framework ──────────────────────────────────────────────
   connectorRegistry = new ConnectorRegistry()

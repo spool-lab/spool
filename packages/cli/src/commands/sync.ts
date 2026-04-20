@@ -26,6 +26,9 @@ export const syncCommand = new Command('sync')
       watcher.on('new-sessions', (_event, data) => {
         console.log(`[${new Date().toLocaleTimeString()}] +${data.count} new session(s) indexed`)
       })
+      watcher.on('error', (_event, data) => {
+        console.error(`[${new Date().toLocaleTimeString()}] watcher error:`, data.error, data.root ? `(root=${data.root})` : '')
+      })
       watcher.start()
 
       process.on('SIGINT', () => {
