@@ -55,10 +55,11 @@ async function startWatcher(syncer: Syncer, extra: Partial<ConstructorParameters
   const w = new SpoolWatcher(syncer, { ...FAST, ...extra })
   runningWatchers.push(w)
   w.start()
-  // macOS FSEvents (which backs fs.watch recursive) has a small priming window
-  // after the stream is scheduled on the runloop. Events that happen before it
-  // is hot can be dropped. Give it a moment before tests start writing.
-  await new Promise(r => setTimeout(r, 250))
+  // macOS FSEvents (which backs fs.watch recursive) has a priming window
+  // after the stream is scheduled on the runloop. Events that happen before
+  // it is hot can be dropped. CI runners are slower than local machines, so
+  // give it a generous margin here.
+  await new Promise(r => setTimeout(r, process.platform === 'darwin' ? 500 : 150))
   return w
 }
 
