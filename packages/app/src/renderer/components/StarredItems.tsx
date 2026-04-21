@@ -150,7 +150,7 @@ function StarredSessionRow({
   onOpen: (uuid: string) => void
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
-  const date = formatDate(session.startedAt)
+  const date = formatRelativeDate(session.startedAt)
 
   return (
     <div
@@ -198,7 +198,7 @@ function StarredCaptureRow({
   platformColors: Record<string, string>
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
-  const date = formatDate(capture.capturedAt)
+  const date = formatRelativeDate(capture.capturedAt)
 
   return (
     <a
@@ -237,4 +237,3 @@ function StarredCaptureRow({
   )
 }
 
-const formatDate = formatRelativeDate

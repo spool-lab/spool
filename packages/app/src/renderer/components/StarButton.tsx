@@ -8,11 +8,9 @@ type Props = {
   uuid: string
   isStarred: boolean
   onToggle: (kind: StarKind, uuid: string, next: boolean) => void
-  /** sm = 12px icon (inline in rows), md = 15px (detail header / unstar shortcut). */
   size?: Size
   /** Set when the button is rendered inside an `<a>` — prevents the anchor from navigating. */
   insideAnchor?: boolean
-  /** Testid to attach. */
   testId?: string
 }
 

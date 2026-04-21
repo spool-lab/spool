@@ -8,6 +8,7 @@ type Props = {
 
 export default function StarredEntryButton({ count, active, onClick }: Props) {
   const hasCount = count > 0
+  const highlighted = active || hasCount
   return (
     <button
       onClick={onClick}
@@ -26,7 +27,8 @@ export default function StarredEntryButton({ count, active, onClick }: Props) {
       <Star
         size={13}
         strokeWidth={1.8}
-        {...(active || hasCount ? { fill: 'currentColor', className: 'text-accent dark:text-accent-dark flex-none' } : { className: 'flex-none' })}
+        fill={highlighted ? 'currentColor' : 'none'}
+        className={highlighted ? 'flex-none text-accent dark:text-accent-dark' : 'flex-none'}
       />
       {hasCount && <span className="text-[11px] font-medium tabular-nums leading-none">{count}</span>}
     </button>

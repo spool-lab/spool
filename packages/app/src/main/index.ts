@@ -16,7 +16,7 @@ import {
   PrerequisiteChecker,
 } from '@spool-lab/core'
 import type { UpdateInfo } from '@spool-lab/core'
-import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource } from '@spool-lab/core'
+import type { AuthStatus, ConnectorStatus, FragmentResult, SchedulerEvent, SearchResult, SessionSource, StarKind } from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -696,13 +696,13 @@ ipcMain.handle('spool:get-status', () => {
   return getStatus(db)
 })
 
-ipcMain.handle('spool:star-item', (_e, { kind, uuid }: { kind: 'session' | 'capture'; uuid: string }) => {
+ipcMain.handle('spool:star-item', (_e, { kind, uuid }: { kind: StarKind; uuid: string }) => {
   starItem(db, kind, uuid)
   searchCache.clear()
   return { ok: true }
 })
 
-ipcMain.handle('spool:unstar-item', (_e, { kind, uuid }: { kind: 'session' | 'capture'; uuid: string }) => {
+ipcMain.handle('spool:unstar-item', (_e, { kind, uuid }: { kind: StarKind; uuid: string }) => {
   unstarItem(db, kind, uuid)
   searchCache.clear()
   return { ok: true }

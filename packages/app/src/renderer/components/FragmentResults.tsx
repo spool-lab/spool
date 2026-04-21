@@ -159,7 +159,7 @@ function FragmentRow({
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
-  const date = formatDate(result.startedAt)
+  const date = formatRelativeDate(result.startedAt)
   const project = result.project.split('/').pop() ?? result.project
 
   return (
@@ -212,7 +212,7 @@ function CaptureRow({ result, platformColors, isStarred, onToggleStar }: {
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
-  const date = formatDate(result.capturedAt)
+  const date = formatRelativeDate(result.capturedAt)
 
   return (
     <a
@@ -251,7 +251,6 @@ function CaptureRow({ result, platformColors, isStarred, onToggleStar }: {
   )
 }
 
-const formatDate = formatRelativeDate
 
 function sortResults(results: SearchResult[], sortOrder: SearchSortOrder): SearchResult[] {
   if (sortOrder === 'relevance') return results

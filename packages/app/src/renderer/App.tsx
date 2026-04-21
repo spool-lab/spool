@@ -85,21 +85,21 @@ export default function App() {
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
-  const refreshStarredUuids = useCallback(async () => {
+  const refreshStarredUuids = useCallback(() => {
     if (!window.spool?.getStarredUuids) return
-    try {
-      const uuids = await window.spool.getStarredUuids()
-      setStarredSessions(prev => setsEqual(prev, uuids.session) ? prev : new Set(uuids.session))
-      setStarredCaptures(prev => setsEqual(prev, uuids.capture) ? prev : new Set(uuids.capture))
-    } catch (err) { console.error(err) }
+    window.spool.getStarredUuids()
+      .then(uuids => {
+        setStarredSessions(prev => setsEqual(prev, uuids.session) ? prev : new Set(uuids.session))
+        setStarredCaptures(prev => setsEqual(prev, uuids.capture) ? prev : new Set(uuids.capture))
+      })
+      .catch(console.error)
   }, [])
 
-  const refreshStarredItems = useCallback(async () => {
+  const refreshStarredItems = useCallback(() => {
     if (!window.spool?.listStarredItems) return
-    try {
-      const items = await window.spool.listStarredItems()
-      setStarredItems(items)
-    } catch (err) { console.error(err) }
+    window.spool.listStarredItems()
+      .then(setStarredItems)
+      .catch(console.error)
   }, [])
 
   useEffect(() => { refreshStarredUuids() }, [refreshStarredUuids])
@@ -109,16 +109,16 @@ export default function App() {
 
   const handleToggleStar = useCallback((kind: StarKind, uuid: string, next: boolean) => {
     const setState = kind === 'session' ? setStarredSessions : setStarredCaptures
-    setState(prev => {
-      const updated = new Set(prev)
-      if (next) updated.add(uuid)
-      else updated.delete(uuid)
-      return updated
-    })
+    const withUuid = (uuids: Set<string>) => {
+      const out = new Set(uuids)
+      if (next) out.add(uuid)
+      else out.delete(uuid)
+      return out
+    }
+
+    setState(withUuid)
     if (!next) {
-      setStarredItems(prev => prev.filter(it =>
-        !(it.kind === kind && (it.kind === 'session' ? it.session.sessionUuid : it.capture.captureUuid) === uuid),
-      ))
+      setStarredItems(prev => prev.filter(it => !isSameStarredItem(it, kind, uuid)))
     }
 
     const request = next
@@ -446,11 +446,17 @@ export default function App() {
   }, [])
 
   const handleBack = useCallback(() => {
-    setView('search'); setSelectedSession(null); setTargetMessageId(null)
+    setView('search')
+    setSelectedSession(null)
+    setTargetMessageId(null)
   }, [])
 
   const handleBackToHome = useCallback(() => {
-    setView('search'); setSelectedSession(null); setTargetMessageId(null); setHomeMode(true); setQuery('')
+    setView('search')
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setHomeMode(true)
+    setQuery('')
   }, [])
 
   const handleConnectClick = useCallback(() => {
@@ -474,10 +480,10 @@ export default function App() {
 
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
           <>
-            <div className="flex justify-end items-center h-10 px-3 flex-none">
+            <div className="absolute top-3 right-3 z-20">
               <StarredEntryButton
                 count={totalStarred}
                 active={false}
@@ -705,4 +711,10 @@ function setsEqual(a: Set<string>, b: string[]): boolean {
   if (a.size !== b.length) return false
   for (const v of b) if (!a.has(v)) return false
   return true
+}
+
+function isSameStarredItem(item: StarredItem, kind: StarKind, uuid: string): boolean {
+  if (item.kind !== kind) return false
+  const itemUuid = item.kind === 'session' ? item.session.sessionUuid : item.capture.captureUuid
+  return itemUuid === uuid
 }
