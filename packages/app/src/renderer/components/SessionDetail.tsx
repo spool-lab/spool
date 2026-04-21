@@ -213,7 +213,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           </p>
         </div>
 
-        <div className="flex items-end gap-1.5 flex-none self-end">
+        <div className="flex items-center gap-1.5 flex-none self-end">
           <StarButton
             kind="session"
             uuid={sessionUuid}

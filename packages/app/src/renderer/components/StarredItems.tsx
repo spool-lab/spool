@@ -127,13 +127,13 @@ function StarredHeader({
   const scoped = filterQuery && matched !== undefined
   return (
     <div className="flex items-center gap-2 border-b border-warm-border dark:border-dark-border px-4 min-h-11 flex-none">
-      <Star size={14} strokeWidth={1.8} fill="currentColor" className="text-accent dark:text-accent-dark flex-none" />
-      <span className="text-xs font-medium text-warm-text dark:text-dark-text">Starred</span>
-      <span className="text-xs text-warm-faint dark:text-dark-muted tabular-nums">
+      <Star size={13} strokeWidth={1.8} fill="currentColor" className="text-accent dark:text-accent-dark flex-none" />
+      <span className="text-xs font-medium text-warm-text dark:text-dark-text leading-none">Starred</span>
+      <span className="text-xs text-warm-faint dark:text-dark-muted tabular-nums leading-none">
         {scoped ? `${matched} of ${total}` : total}
       </span>
       {scoped && (
-        <span className="text-[11px] text-warm-faint dark:text-dark-muted italic ml-2 truncate">
+        <span className="text-[11px] text-warm-faint dark:text-dark-muted italic ml-2 truncate leading-none">
           matching &ldquo;{filterQuery}&rdquo;
         </span>
       )}
@@ -151,40 +151,39 @@ function StarredSessionRow({
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const date = formatRelativeDate(session.startedAt)
+  const handleOpen = () => onOpen(session.sessionUuid)
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={handleOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpen() } }}
       data-testid="starred-row"
       data-kind="session"
-      className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors flex items-start gap-3"
+      className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
     >
-      <button
-        onClick={() => onOpen(session.sessionUuid)}
-        className="flex-1 min-w-0 text-left cursor-pointer"
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <SourceBadge source={session.source} />
-          <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-            You starred this · {session.projectDisplayName}
-          </span>
-          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        </div>
-        <p className="text-sm text-warm-text dark:text-dark-text truncate">
-          {session.title ?? '(no title)'}
-        </p>
-        <p className="text-xs text-warm-faint dark:text-dark-muted mt-0.5">
-          {session.messageCount} messages
-          {session.model && ` · ${session.model}`}
-        </p>
-      </button>
-
-      <StarButton
-        kind="session"
-        uuid={session.sessionUuid}
-        isStarred={true}
-        onToggle={onToggleStar}
-        size="md"
-      />
+      <div className="flex items-center gap-2 mb-1">
+        <SourceBadge source={session.source} />
+        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
+          You starred this · {session.projectDisplayName}
+        </span>
+        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+        <StarButton
+          kind="session"
+          uuid={session.sessionUuid}
+          isStarred={true}
+          onToggle={onToggleStar}
+          size="sm"
+        />
+      </div>
+      <p className="text-sm text-warm-text dark:text-dark-text truncate">
+        {session.title ?? '(no title)'}
+      </p>
+      <p className="text-xs text-warm-faint dark:text-dark-muted mt-0.5">
+        {session.messageCount} messages
+        {session.model && ` · ${session.model}`}
+      </p>
     </div>
   )
 }
@@ -207,32 +206,29 @@ function StarredCaptureRow({
       rel="noopener noreferrer"
       data-testid="starred-row"
       data-kind="capture"
-      className="flex items-start gap-3 px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className="block px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <PlatformBadge platform={capture.platform} color={platformColors[capture.platform] ?? '#C85A00'} />
-          <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-            You starred this{capture.author ? ` · ${capture.author}` : ''}
-          </span>
-          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        </div>
-        <p className="text-sm text-warm-text dark:text-dark-text truncate">
-          {capture.title || capture.url}
-        </p>
-        <p className="text-xs text-warm-faint dark:text-dark-muted mt-0.5 truncate">
-          {capture.url}
-        </p>
+      <div className="flex items-center gap-2 mb-1">
+        <PlatformBadge platform={capture.platform} color={platformColors[capture.platform] ?? '#C85A00'} />
+        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
+          You starred this{capture.author ? ` · ${capture.author}` : ''}
+        </span>
+        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+        <StarButton
+          kind="capture"
+          uuid={capture.captureUuid}
+          isStarred={true}
+          onToggle={onToggleStar}
+          size="sm"
+          insideAnchor
+        />
       </div>
-
-      <StarButton
-        kind="capture"
-        uuid={capture.captureUuid}
-        isStarred={true}
-        onToggle={onToggleStar}
-        size="md"
-        insideAnchor
-      />
+      <p className="text-sm text-warm-text dark:text-dark-text truncate">
+        {capture.title || capture.url}
+      </p>
+      <p className="text-xs text-warm-faint dark:text-dark-muted mt-0.5 truncate">
+        {capture.url}
+      </p>
     </a>
   )
 }

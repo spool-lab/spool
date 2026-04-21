@@ -23,8 +23,8 @@ export default function StarButton({
   insideAnchor = false,
   testId,
 }: Props) {
-  const iconSize = size === 'md' ? 15 : 12
-  const box = size === 'md' ? 'h-[26px] w-[26px]' : 'w-5 h-5'
+  const iconSize = size === 'md' ? 15 : 13
+  const box = size === 'md' ? 'h-6 w-6' : 'w-5 h-5'
   const label = kind === 'capture' ? 'capture' : 'session'
 
   return (
@@ -41,6 +41,7 @@ export default function StarButton({
       data-starred={isStarred ? '1' : '0'}
       className={[
         'flex-none flex items-center justify-center rounded transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
         box,
         isStarred
           ? 'text-accent dark:text-accent-dark hover:opacity-70'
