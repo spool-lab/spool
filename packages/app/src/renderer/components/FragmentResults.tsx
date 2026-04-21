@@ -179,6 +179,7 @@ function FragmentRow({
             {result.profileLabel && <span> · {result.profileLabel}</span>}
             {result.matchCount > 1 && <span data-testid="match-count"> · {result.matchCount} matches</span>}
           </span>
+          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
           <StarButton
             kind="session"
             uuid={result.sessionUuid}
@@ -186,7 +187,6 @@ function FragmentRow({
             onToggle={onToggleStar}
             testId="fragment-star"
           />
-          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
         </div>
 
         <p
@@ -228,6 +228,7 @@ function CaptureRow({ result, platformColors, isStarred, onToggleStar }: {
         <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
           {result.author ? `You saved this · ${result.author}` : 'You saved this'}
         </span>
+        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
         <StarButton
           kind="capture"
           uuid={result.captureUuid}
@@ -236,7 +237,6 @@ function CaptureRow({ result, platformColors, isStarred, onToggleStar }: {
           insideAnchor
           testId="capture-star"
         />
-        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
       </div>
 
       <p

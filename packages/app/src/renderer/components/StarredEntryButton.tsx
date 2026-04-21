@@ -30,7 +30,7 @@ export default function StarredEntryButton({ count, active, onClick }: Props) {
         fill={highlighted ? 'currentColor' : 'none'}
         className={highlighted ? 'flex-none text-accent dark:text-accent-dark' : 'flex-none'}
       />
-      {hasCount && <span className="text-[11px] font-medium tabular-nums leading-none">{count}</span>}
+      {hasCount && <span className="text-[11px] font-medium tabular-nums leading-none translate-y-[0.5px]">{count}</span>}
     </button>
   )
 }
