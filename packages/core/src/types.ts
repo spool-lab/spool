@@ -116,3 +116,24 @@ export type { CapturedItem } from './connectors/types.js'
 export type SearchResult =
   | (FragmentResult & { kind: 'fragment' })
   | (CaptureResult & { kind: 'capture' })
+
+// ── Stars ──────────────────────────────────────────────────────────────────
+
+export type StarKind = 'session' | 'capture'
+
+/** Display-shape of a capture row outside of search results. */
+export interface Capture {
+  captureId: number
+  captureUuid: string
+  url: string
+  title: string
+  author: string | null
+  platform: string
+  contentType: string
+  thumbnailUrl: string | null
+  capturedAt: string
+}
+
+export type StarredItem =
+  | { kind: 'session'; starredAt: string; session: Session }
+  | { kind: 'capture'; starredAt: string; capture: Capture }

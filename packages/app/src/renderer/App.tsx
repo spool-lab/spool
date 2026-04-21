@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
-import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
+import type { FragmentResult, StarKind, StarredItem, SearchResult, StatusInfo } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
+import StarredItems from './components/StarredItems.js'
+import StarredEntryButton from './components/StarredEntryButton.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
@@ -13,7 +15,7 @@ import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editor
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
-type View = 'search' | 'session'
+type View = 'search' | 'session' | 'starred'
 type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
 
 interface AgentInfo {
@@ -72,7 +74,104 @@ export default function App() {
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
 
+  const [starredSessions, setStarredSessions] = useState<Set<string>>(new Set())
+  const [starredCaptures, setStarredCaptures] = useState<Set<string>>(new Set())
+  const [starredItems, setStarredItems] = useState<StarredItem[]>([])
+  const [starredScopedResults, setStarredScopedResults] = useState<SearchResult[]>([])
+  const [isStarredSearching, setIsStarredSearching] = useState(false)
+  const starredSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const starredSearchSeq = useRef(0)
+  const totalStarred = starredSessions.size + starredCaptures.size
+
   const isHomeMode = homeMode && view === 'search' && !selectedSession
+
+  const refreshStarredUuids = useCallback(async () => {
+    if (!window.spool?.getStarredUuids) return
+    try {
+      const uuids = await window.spool.getStarredUuids()
+      setStarredSessions(prev => setsEqual(prev, uuids.session) ? prev : new Set(uuids.session))
+      setStarredCaptures(prev => setsEqual(prev, uuids.capture) ? prev : new Set(uuids.capture))
+    } catch (err) { console.error(err) }
+  }, [])
+
+  const refreshStarredItems = useCallback(async () => {
+    if (!window.spool?.listStarredItems) return
+    try {
+      const items = await window.spool.listStarredItems()
+      setStarredItems(items)
+    } catch (err) { console.error(err) }
+  }, [])
+
+  useEffect(() => { refreshStarredUuids() }, [refreshStarredUuids])
+  useEffect(() => {
+    if (view === 'starred') refreshStarredItems()
+  }, [view, refreshStarredItems])
+
+  const handleToggleStar = useCallback((kind: StarKind, uuid: string, next: boolean) => {
+    const setState = kind === 'session' ? setStarredSessions : setStarredCaptures
+    setState(prev => {
+      const updated = new Set(prev)
+      if (next) updated.add(uuid)
+      else updated.delete(uuid)
+      return updated
+    })
+    if (!next) {
+      setStarredItems(prev => prev.filter(it =>
+        !(it.kind === kind && (it.kind === 'session' ? it.session.sessionUuid : it.capture.captureUuid) === uuid),
+      ))
+    }
+
+    const request = next
+      ? window.spool.starItem(kind, uuid)
+      : window.spool.unstarItem(kind, uuid)
+
+    request.catch(err => {
+      console.error(err)
+      setState(prev => {
+        const reverted = new Set(prev)
+        if (next) reverted.delete(uuid)
+        else reverted.add(uuid)
+        return reverted
+      })
+      refreshStarredUuids()
+      if (view === 'starred') refreshStarredItems()
+    })
+  }, [refreshStarredUuids, refreshStarredItems, view])
+
+  const handleToggleStarredView = useCallback(() => {
+    if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
+    starredSearchSeq.current++
+    setQuery('')
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setStarredScopedResults([])
+    setIsStarredSearching(false)
+    if (view === 'starred') {
+      setView('search')
+      setHomeMode(true)
+    } else {
+      setView('starred')
+      setHomeMode(false)
+    }
+  }, [view])
+
+  const runStarredScopedSearch = useCallback(async (q: string) => {
+    const needle = q.trim()
+    if (!needle || !window.spool) {
+      setStarredScopedResults([])
+      setIsStarredSearching(false)
+      return
+    }
+    const requestId = ++starredSearchSeq.current
+    setIsStarredSearching(true)
+    try {
+      const res = await window.spool.search(needle, 50, undefined, true)
+      if (requestId !== starredSearchSeq.current) return
+      startTransition(() => { setStarredScopedResults(res) })
+    } finally {
+      if (requestId === starredSearchSeq.current) setIsStarredSearching(false)
+    }
+  }, [])
 
   useEffect(() => {
     loadThemeEditorState()
@@ -129,6 +228,7 @@ export default function App() {
       if (searchTimer.current) clearTimeout(searchTimer.current)
       if (toastTimer.current) clearTimeout(toastTimer.current)
       if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
+      if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
     }
   }, [])
 
@@ -278,7 +378,15 @@ export default function App() {
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
     if (!q.trim()) setHomeMode(true)
-    if (searchMode === 'fast') {
+    if (view === 'starred') {
+      if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
+      if (!q.trim()) {
+        setStarredScopedResults([])
+        setIsStarredSearching(false)
+      } else {
+        starredSearchTimer.current = setTimeout(() => runStarredScopedSearch(q), 120)
+      }
+    } else if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
       searchTimer.current = setTimeout(() => doSearch(q), 120)
       void doPreviewSearch(q)
@@ -288,7 +396,7 @@ export default function App() {
       setAiError(null)
       aiAnswerRef.current = ''
     }
-  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError])
+  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError, view, runStarredScopedSearch])
 
   const handleSubmit = useCallback(() => {
     if (!query.trim()) return
@@ -341,6 +449,10 @@ export default function App() {
     setView('search'); setSelectedSession(null); setTargetMessageId(null)
   }, [])
 
+  const handleBackToHome = useCallback(() => {
+    setView('search'); setSelectedSession(null); setTargetMessageId(null); setHomeMode(true); setQuery('')
+  }, [])
+
   const handleConnectClick = useCallback(() => {
     setSettingsTab('connectors')
     setShowSettings(true)
@@ -364,24 +476,33 @@ export default function App() {
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
       <div className="flex flex-col flex-1 min-h-0">
         {isHomeMode ? (
-          <HomeView
-            query={query}
-            onChange={handleQueryChange}
-            onSubmit={handleSubmit}
-            onSelectSuggestion={handleSelectSuggestion}
-            suggestions={previewSuggestions}
-            isSearching={isSearching}
-            hasSettledQuery={lastCompletedPreviewQuery === query}
-            isDev={Boolean(runtimeInfo?.isDev)}
-            claudeCount={status?.claudeSessions ?? null}
-            codexCount={status?.codexSessions ?? null}
-            geminiCount={status?.geminiSessions ?? null}
-            captureSources={captureSources}
-            platformColors={platformColors}
-            mode={searchMode}
-            {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-            onConnectClick={handleConnectClick}
-          />
+          <>
+            <div className="flex justify-end items-center h-10 px-3 flex-none">
+              <StarredEntryButton
+                count={totalStarred}
+                active={false}
+                onClick={handleToggleStarredView}
+              />
+            </div>
+            <HomeView
+              query={query}
+              onChange={handleQueryChange}
+              onSubmit={handleSubmit}
+              onSelectSuggestion={handleSelectSuggestion}
+              suggestions={previewSuggestions}
+              isSearching={isSearching}
+              hasSettledQuery={lastCompletedPreviewQuery === query}
+              isDev={Boolean(runtimeInfo?.isDev)}
+              claudeCount={status?.claudeSessions ?? null}
+              codexCount={status?.codexSessions ?? null}
+              geminiCount={status?.geminiSessions ?? null}
+              captureSources={captureSources}
+              platformColors={platformColors}
+              mode={searchMode}
+              {...(hasAgents ? { onModeChange: handleModeChange } : {})}
+              onConnectClick={handleConnectClick}
+            />
+          </>
         ) : (
           <>
             <div className="flex items-center gap-3 px-4 h-10 flex-none mt-2">
@@ -392,11 +513,12 @@ export default function App() {
                 query={query}
                 onChange={handleQueryChange}
                 onSubmit={handleSubmit}
-                {...(view === 'session' ? { onBack: handleBack } : {})}
+                {...(view === 'session' ? { onBack: handleBack } : view === 'starred' ? { onBack: handleBackToHome } : {})}
                 isSearching={isSearching}
                 variant="compact"
                 mode={searchMode}
                 {...(hasAgents ? { onModeChange: handleModeChange } : {})}
+                {...(view === 'starred' ? { placeholder: 'Filter starred…', scoped: true } : {})}
               />
               {searchMode === 'ai' && availableAgents.length > 0 && (
                 <AgentSelector
@@ -405,11 +527,36 @@ export default function App() {
                   onSelect={setAiAgent}
                 />
               )}
+              <StarredEntryButton
+                count={totalStarred}
+                active={view === 'starred'}
+                onClick={handleToggleStarredView}
+              />
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === 'session' && selectedSession ? (
-                <SessionDetail sessionUuid={selectedSession} targetMessageId={targetMessageId} onCopySessionId={handleCopySessionId} />
+                <SessionDetail
+                  sessionUuid={selectedSession}
+                  targetMessageId={targetMessageId}
+                  onCopySessionId={handleCopySessionId}
+                  isStarred={starredSessions.has(selectedSession)}
+                  onToggleStar={handleToggleStar}
+                />
+              ) : view === 'starred' ? (
+                <StarredItems
+                  items={starredItems}
+                  filterQuery={query}
+                  scopedResults={starredScopedResults}
+                  isScopedSearching={isStarredSearching}
+                  starredSessions={starredSessions}
+                  starredCaptures={starredCaptures}
+                  platformColors={platformColors}
+                  defaultSortOrder={defaultSearchSort}
+                  onOpenSession={handleOpenSession}
+                  onToggleStar={handleToggleStar}
+                  onCopySessionId={handleCopySessionId}
+                />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
                   {searchMode === 'ai' && (aiAnswer || aiStreaming || aiError) && (
@@ -444,6 +591,9 @@ export default function App() {
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
                         platformColors={platformColors}
+                        starredSessions={starredSessions}
+                        starredCaptures={starredCaptures}
+                        onToggleStar={handleToggleStar}
                       />
                     </div>
                   )}
@@ -549,4 +699,10 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
       )}
     </div>
   )
+}
+
+function setsEqual(a: Set<string>, b: string[]): boolean {
+  if (a.size !== b.length) return false
+  for (const v of b) if (!a.has(v)) return false
+  return true
 }

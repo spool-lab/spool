@@ -7,6 +7,7 @@ import { Worker } from 'node:worker_threads'
 import {
   getDB, Syncer, SpoolWatcher,
   searchFragments, searchAll, searchSessionPreview, searchCaptures, listRecentSessions, getSessionWithMessages, getStatus,
+  starItem, unstarItem, listStarredItems, getStarredUuidsByType,
   ConnectorRegistry, SyncScheduler,
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability, makeExecCapability,
@@ -637,16 +638,16 @@ function resolveCliPrereq(packageId: string, prereqId: string): ResolvedCli {
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('spool:search', (_e, { query, limit = 10, source }: { query: string; limit?: number; source?: string }) => {
-  const cacheKey = `${source ?? 'all'}|${limit}|${query}`
+ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyStarred }: { query: string; limit?: number; source?: string; onlyStarred?: boolean }) => {
+  const cacheKey = `${source ?? 'all'}|${limit}|${onlyStarred ? 'starred' : 'full'}|${query}`
   if (!isSyncActive) {
     const cached = searchCache.get(cacheKey)
     if (cached) return cached
   }
 
   const results = source === 'claude' || source === 'codex' || source === 'gemini'
-    ? searchFragments(db, query, { limit, source })
-    : searchAll(db, query, { limit })
+    ? searchFragments(db, query, { limit, source, ...(onlyStarred ? { onlyStarred: true } : {}) })
+    : searchAll(db, query, { limit, ...(onlyStarred ? { onlyStarred: true } : {}) })
 
   if (!isSyncActive) {
     searchCache.set(cacheKey, results)
@@ -693,6 +694,26 @@ ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string 
 
 ipcMain.handle('spool:get-status', () => {
   return getStatus(db)
+})
+
+ipcMain.handle('spool:star-item', (_e, { kind, uuid }: { kind: 'session' | 'capture'; uuid: string }) => {
+  starItem(db, kind, uuid)
+  searchCache.clear()
+  return { ok: true }
+})
+
+ipcMain.handle('spool:unstar-item', (_e, { kind, uuid }: { kind: 'session' | 'capture'; uuid: string }) => {
+  unstarItem(db, kind, uuid)
+  searchCache.clear()
+  return { ok: true }
+})
+
+ipcMain.handle('spool:list-starred-items', (_e, { limit = 200 }: { limit?: number } = {}) => {
+  return listStarredItems(db, limit)
+})
+
+ipcMain.handle('spool:get-starred-uuids', () => {
+  return getStarredUuidsByType(db)
 })
 
 ipcMain.handle('spool:get-runtime-info', () => {

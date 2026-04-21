@@ -191,6 +191,22 @@ function runMigrations(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_capture_connectors_connector
       ON capture_connectors(connector_id);
 
+    -- ── Stars ─────────────────────────────────────────────────────────────
+    -- Unified star table for both sessions and captures. Referent is keyed by
+    -- its natural UUID (session_uuid / capture_uuid), which stays stable
+    -- across re-index. No FK — queries filter orphans at read time via JOIN,
+    -- so transient referent absence (e.g. transcript file removed then
+    -- restored) doesn't destroy the star. CHECK constraint guards against
+    -- typos in item_type.
+    CREATE TABLE IF NOT EXISTS stars (
+      item_type  TEXT NOT NULL CHECK (item_type IN ('session', 'capture')),
+      item_uuid  TEXT NOT NULL,
+      starred_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (item_type, item_uuid)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stars_starred_at ON stars(starred_at DESC);
+
     CREATE TABLE IF NOT EXISTS connector_sync_state (
       connector_id        TEXT PRIMARY KEY,
       head_cursor         TEXT,
@@ -335,6 +351,25 @@ function runMigrations(db: Database.Database): void {
       db.exec(`DROP INDEX IF EXISTS idx_captures_source`)
     })()
     db.pragma('user_version = 3')
+  }
+
+  if (version < 4) {
+    // v4: unified stars table covering both sessions and captures. An earlier
+    // in-development iteration used a session-only `session_stars` table —
+    // drop it if present before creating the unified table. Since this
+    // version was never released, users skipping past the intermediate state
+    // simply get the final schema.
+    db.exec(`
+      DROP TABLE IF EXISTS session_stars;
+      CREATE TABLE IF NOT EXISTS stars (
+        item_type  TEXT NOT NULL CHECK (item_type IN ('session', 'capture')),
+        item_uuid  TEXT NOT NULL,
+        starred_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (item_type, item_uuid)
+      );
+      CREATE INDEX IF NOT EXISTS idx_stars_starred_at ON stars(starred_at DESC);
+    `)
+    db.pragma('user_version = 4')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')

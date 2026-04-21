@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { FragmentResult, CaptureResult, SearchResult } from '@spool-lab/core'
+import { Star } from 'lucide-react'
+import type { FragmentResult, CaptureResult, SearchResult, StarKind } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
+import StarButton from './StarButton.js'
+import { SourceBadge, PlatformBadge } from './Badges.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
-import { getSessionSourceColor, getSessionSourceLabel, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
+import { getSessionSourceLabel } from '../../shared/sessionSources.js'
+import { formatRelativeDate } from '../../shared/formatDate.js'
 
 type Props = {
   results: SearchResult[]
@@ -11,15 +15,26 @@ type Props = {
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
   platformColors: Record<string, string>
+  starredSessions: Set<string>
+  starredCaptures: Set<string>
+  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }
 
-export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, platformColors }: Props) {
+export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, platformColors, starredSessions, starredCaptures, onToggleStar }: Props) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
+
+  const isResultStarred = (r: SearchResult): boolean =>
+    r.kind === 'fragment' ? starredSessions.has(r.sessionUuid) : starredCaptures.has(r.captureUuid)
 
   useEffect(() => {
     setSortOrder(defaultSortOrder)
   }, [defaultSortOrder])
+
+  useEffect(() => {
+    if (activeFilter === 'starred' && !results.some(isResultStarred)) setActiveFilter('all')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter, results, starredSessions, starredCaptures])
 
   if (results.length === 0) {
     return (
@@ -41,28 +56,34 @@ export default function FragmentResults({ results, query, onOpenSession, default
   const sourceKeys = [...new Set(results.map(r =>
     r.kind === 'fragment' ? r.source : r.platform
   ))]
+  const starredInResults = results.some(isResultStarred)
   const filtered = activeFilter === 'all'
     ? results
-    : results.filter(r =>
-        r.kind === 'fragment' ? r.source === activeFilter : r.platform === activeFilter
-      )
+    : activeFilter === 'starred'
+      ? results.filter(isResultStarred)
+      : results.filter(r =>
+          r.kind === 'fragment' ? r.source === activeFilter : r.platform === activeFilter
+        )
   const sortedResults = sortResults(filtered, sortOrder)
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-warm-border dark:border-dark-border px-4 min-h-11 flex-none">
         <div className="flex gap-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none">
-          {(['all', ...sourceKeys] as string[]).map(src => (
+          {(['all', ...(starredInResults ? ['starred'] : []), ...sourceKeys] as string[]).map(src => (
             <button
               key={src}
               onClick={() => setActiveFilter(src)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+              className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1 ${
                 activeFilter === src
                   ? 'border-accent text-warm-text dark:text-dark-text'
                   : 'border-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
               }`}
             >
-              {src === 'all' ? 'All' : formatSourceFilterLabel(src)}
+              {src === 'starred' && (
+                <Star size={11} strokeWidth={2} fill="currentColor" className="text-accent dark:text-accent-dark flex-none" />
+              )}
+              {src === 'all' ? 'All' : src === 'starred' ? 'Starred' : formatSourceFilterLabel(src)}
             </button>
           ))}
         </div>
@@ -95,8 +116,21 @@ export default function FragmentResults({ results, query, onOpenSession, default
         <div className="divide-y divide-warm-border dark:divide-dark-border">
           {sortedResults.map((result, i) =>
             result.kind === 'capture'
-              ? <CaptureRow key={`cap-${result.captureId}`} result={result} platformColors={platformColors} />
-              : <FragmentRow key={`frag-${result.sessionUuid}-${i}`} result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
+              ? <CaptureRow
+                  key={`cap-${result.captureId}`}
+                  result={result}
+                  platformColors={platformColors}
+                  isStarred={starredCaptures.has(result.captureUuid)}
+                  onToggleStar={onToggleStar}
+                />
+              : <FragmentRow
+                  key={`frag-${result.sessionUuid}-${i}`}
+                  result={result}
+                  onOpenSession={onOpenSession}
+                  onCopySessionId={onCopySessionId}
+                  isStarred={starredSessions.has(result.sessionUuid)}
+                  onToggleStar={onToggleStar}
+                />
           )}
         </div>
       </div>
@@ -115,17 +149,25 @@ function FragmentRow({
   result,
   onOpenSession,
   onCopySessionId,
+  isStarred,
+  onToggleStar,
 }: {
   result: FragmentResult & { kind: 'fragment' }
   onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
+  isStarred: boolean
+  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatDate(result.startedAt)
   const project = result.project.split('/').pop() ?? result.project
 
   return (
-    <div data-testid="fragment-row" className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors">
+    <div
+      data-testid="fragment-row"
+      data-starred={isStarred ? '1' : '0'}
+      className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+    >
       <div
         className="cursor-pointer"
         onClick={() => onOpenSession(result.sessionUuid, result.messageId)}
@@ -137,6 +179,13 @@ function FragmentRow({
             {result.profileLabel && <span> · {result.profileLabel}</span>}
             {result.matchCount > 1 && <span data-testid="match-count"> · {result.matchCount} matches</span>}
           </span>
+          <StarButton
+            kind="session"
+            uuid={result.sessionUuid}
+            isStarred={isStarred}
+            onToggle={onToggleStar}
+            testId="fragment-star"
+          />
           <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
         </div>
 
@@ -156,9 +205,11 @@ function FragmentRow({
   )
 }
 
-function CaptureRow({ result, platformColors }: {
+function CaptureRow({ result, platformColors, isStarred, onToggleStar }: {
   result: CaptureResult & { kind: 'capture' }
   platformColors: Record<string, string>
+  isStarred: boolean
+  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatDate(result.capturedAt)
@@ -168,6 +219,8 @@ function CaptureRow({ result, platformColors }: {
       href={result.url}
       target="_blank"
       rel="noopener noreferrer"
+      data-testid="capture-row"
+      data-starred={isStarred ? '1' : '0'}
       className="block px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
     >
       <div className="flex items-center gap-2 mb-1.5">
@@ -175,6 +228,14 @@ function CaptureRow({ result, platformColors }: {
         <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
           {result.author ? `You saved this · ${result.author}` : 'You saved this'}
         </span>
+        <StarButton
+          kind="capture"
+          uuid={result.captureUuid}
+          isStarred={isStarred}
+          onToggle={onToggleStar}
+          insideAnchor
+          testId="capture-star"
+        />
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
       </div>
 
@@ -190,43 +251,7 @@ function CaptureRow({ result, platformColors }: {
   )
 }
 
-function PlatformBadge({ platform, color }: { platform: string; color: string }) {
-  return (
-    <span
-      className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
-      style={{ background: color }}
-    >
-      {platform}
-    </span>
-  )
-}
-
-function SourceBadge({ source }: { source: string }) {
-  return (
-    <span
-      data-testid="source-badge"
-      data-source={source}
-      className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
-      style={{ background: getSessionSourceColor(source) }}
-    >
-      {getSessionSourceShortLabel(source)}
-    </span>
-  )
-}
-
-function formatDate(iso: string): string {
-  try {
-    const d = new Date(iso)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-    if (diffDays === 0) return 'today'
-    if (diffDays === 1) return 'yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-    return d.toLocaleDateString()
-  } catch {
-    return iso.slice(0, 10)
-  }
-}
+const formatDate = formatRelativeDate
 
 function sortResults(results: SearchResult[], sortOrder: SearchSortOrder): SearchResult[] {
   if (sortOrder === 'relevance') return results
