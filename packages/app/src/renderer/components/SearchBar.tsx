@@ -12,9 +12,11 @@ interface Props {
   variant?: ('home' | 'compact') | undefined
   mode?: SearchMode | undefined
   onModeChange?: ((mode: SearchMode) => void) | undefined
+  placeholder?: string | undefined
+  scoped?: boolean | undefined
 }
 
-export default function SearchBar({ query, onChange, onBack, onSubmit, isSearching, variant = 'compact', mode = 'fast', onModeChange }: Props) {
+export default function SearchBar({ query, onChange, onBack, onSubmit, isSearching, variant = 'compact', mode = 'fast', onModeChange, placeholder, scoped = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [showBusyIndicator, setShowBusyIndicator] = useState(false)
 
@@ -76,11 +78,15 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) onSubmit?.()
           }}
-          placeholder="Search my thinking…"
+          placeholder={placeholder ?? 'Search my thinking…'}
           className={[
             'w-full rounded-full outline-none',
-            'bg-warm-surface dark:bg-dark-surface',
-            'border border-warm-border dark:border-dark-border',
+            scoped
+              ? 'bg-accent/5 dark:bg-accent-dark/5'
+              : 'bg-warm-surface dark:bg-dark-surface',
+            scoped
+              ? 'border border-accent/30 dark:border-accent-dark/30'
+              : 'border border-warm-border dark:border-dark-border',
             'placeholder:text-warm-faint dark:placeholder:text-dark-muted',
             'text-warm-text dark:text-dark-text',
             'focus:ring-0',

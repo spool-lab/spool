@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, SearchResult, Source, SearchMatchType, SessionSource } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, SearchResult, Source, SearchMatchType, SessionSource, StarKind, StarredItem, Capture } from '../types.js'
 import type { CapturedItem } from '../connectors/types.js'
 import { DB_PATH, getDBSize } from './db.js'
 import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
@@ -160,23 +160,26 @@ export function insertMessages(
   }
 }
 
+const SESSION_SELECT = `
+  SELECT
+    s.id, s.project_id AS projectId, s.source_id AS sourceId,
+    s.session_uuid AS sessionUuid, s.file_path AS filePath,
+    s.title, s.started_at AS startedAt, s.ended_at AS endedAt,
+    s.message_count AS messageCount, s.has_tool_use AS hasToolUse,
+    s.cwd, s.model,
+    src.name AS source,
+    p.display_path AS projectDisplayPath,
+    p.display_name AS projectDisplayName
+  FROM sessions s
+  JOIN sources src ON src.id = s.source_id
+  JOIN projects p ON p.id = s.project_id`
+
 export function listRecentSessions(
   db: Database.Database,
   limit = 50,
 ): Session[] {
   return (db.prepare(`
-    SELECT
-      s.id, s.project_id AS projectId, s.source_id AS sourceId,
-      s.session_uuid AS sessionUuid, s.file_path AS filePath,
-      s.title, s.started_at AS startedAt, s.ended_at AS endedAt,
-      s.message_count AS messageCount, s.has_tool_use AS hasToolUse,
-      s.cwd, s.model,
-      src.name AS source,
-      p.display_path AS projectDisplayPath,
-      p.display_name AS projectDisplayName
-    FROM sessions s
-    JOIN sources src ON src.id = s.source_id
-    JOIN projects p ON p.id = s.project_id
+    ${SESSION_SELECT}
     ORDER BY s.started_at DESC
     LIMIT ?
   `).all(limit) as Array<Record<string, unknown>>).map(rowToSession)
@@ -187,18 +190,7 @@ export function getSessionWithMessages(
   sessionUuid: string,
 ): { session: Session; messages: Message[] } | null {
   const sessionRow = db.prepare(`
-    SELECT
-      s.id, s.project_id AS projectId, s.source_id AS sourceId,
-      s.session_uuid AS sessionUuid, s.file_path AS filePath,
-      s.title, s.started_at AS startedAt, s.ended_at AS endedAt,
-      s.message_count AS messageCount, s.has_tool_use AS hasToolUse,
-      s.cwd, s.model,
-      src.name AS source,
-      p.display_path AS projectDisplayPath,
-      p.display_name AS projectDisplayName
-    FROM sessions s
-    JOIN sources src ON src.id = s.source_id
-    JOIN projects p ON p.id = s.project_id
+    ${SESSION_SELECT}
     WHERE s.session_uuid = ?
   `).get(sessionUuid) as Record<string, unknown> | undefined
 
@@ -233,9 +225,9 @@ export function getSessionWithMessages(
 export function searchFragments(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: SessionSource; since?: string } = {},
+  opts: { limit?: number; source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): FragmentResult[] {
-  const { limit = 10, source, since } = opts
+  const { limit = 10, source, since, onlyStarred } = opts
 
   const rowLimit = Math.max(limit * 10, 50)
   const naturalTerms = getNaturalSearchTerms(query)
@@ -246,6 +238,7 @@ export function searchFragments(
     return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', {
       ...(source ? { source } : {}),
       ...(since ? { since } : {}),
+      ...(onlyStarred ? { onlyStarred } : {}),
     }).slice(0, limit)
   }
 
@@ -254,6 +247,7 @@ export function searchFragments(
       return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, {
         ...(source ? { source } : {}),
         ...(since ? { since } : {}),
+        ...(onlyStarred ? { onlyStarred } : {}),
       })
     }
 
@@ -261,6 +255,7 @@ export function searchFragments(
     const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, {
       ...(source ? { source } : {}),
       ...(since ? { since } : {}),
+      ...(onlyStarred ? { onlyStarred } : {}),
     })
     return collapseFragmentRows(rows, step.matchType)
   })
@@ -320,9 +315,9 @@ function searchFragmentRows(
   ftsTable: 'messages_fts' | 'messages_fts_trigram',
   ftsQuery: string,
   limit: number,
-  opts: { source?: SessionSource; since?: string } = {},
+  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since } = opts
+  const { source, since, onlyStarred } = opts
   const conditions: string[] = [`${ftsTable} MATCH ?`, 'm.is_sidechain = 0']
   const params: (string | number)[] = [ftsQuery]
 
@@ -333,6 +328,9 @@ function searchFragmentRows(
   if (since) {
     conditions.push('m.timestamp >= ?')
     params.push(since)
+  }
+  if (onlyStarred) {
+    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -503,7 +501,7 @@ function searchFragmentSessionFallback(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string } = {},
+  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): FragmentResult[] {
   if (terms.length < 1) return []
 
@@ -587,7 +585,7 @@ function searchSessionRowsByTerms(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string } = {},
+  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): Array<Record<string, unknown>> {
   if (canUseSessionSearchFts(phrase)) {
     return searchSessionRowsByFts(db, terms, phrase, limit, matchType, opts)
@@ -600,9 +598,9 @@ function searchSessionRowsByLike(
   db: Database.Database,
   terms: string[],
   limit: number,
-  opts: { source?: SessionSource; since?: string } = {},
+  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since } = opts
+  const { source, since, onlyStarred } = opts
   const titleScoreParts: string[] = []
   const whereClauses: string[] = []
   const scoreParams: string[] = []
@@ -634,6 +632,9 @@ function searchSessionRowsByLike(
   if (since) {
     conditions.push('sess.started_at >= ?')
     params.push(since)
+  }
+  if (onlyStarred) {
+    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -671,9 +672,9 @@ function searchSessionRowsByFts(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string } = {},
+  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since } = opts
+  const { source, since, onlyStarred } = opts
   const ftsTable = selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
   const ftsQuery = matchType === 'phrase'
     ? `"${phrase.replace(/"/g, '""')}"`
@@ -703,6 +704,9 @@ function searchSessionRowsByFts(
   if (since) {
     conditions.push('sess.started_at >= ?')
     params.push(since)
+  }
+  if (onlyStarred) {
+    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -849,6 +853,105 @@ function escapeLike(value: string): string {
     .replace(/_/g, '\\_')
 }
 
+// ── Stars (sessions + captures) ─────────────────────────────────────────────
+
+export function starItem(db: Database.Database, kind: StarKind, uuid: string): void {
+  db.prepare(
+    'INSERT OR IGNORE INTO stars (item_type, item_uuid) VALUES (?, ?)',
+  ).run(kind, uuid)
+}
+
+export function unstarItem(db: Database.Database, kind: StarKind, uuid: string): void {
+  db.prepare('DELETE FROM stars WHERE item_type = ? AND item_uuid = ?').run(kind, uuid)
+}
+
+export function isStarred(db: Database.Database, kind: StarKind, uuid: string): boolean {
+  const row = db
+    .prepare('SELECT 1 AS hit FROM stars WHERE item_type = ? AND item_uuid = ?')
+    .get(kind, uuid) as { hit: number } | undefined
+  return row !== undefined
+}
+
+export function getStarredUuidsByType(
+  db: Database.Database,
+): { session: string[]; capture: string[] } {
+  const rows = db
+    .prepare('SELECT item_type AS kind, item_uuid AS uuid FROM stars')
+    .all() as Array<{ kind: StarKind; uuid: string }>
+  const session: string[] = []
+  const capture: string[] = []
+  for (const r of rows) {
+    if (r.kind === 'session') session.push(r.uuid)
+    else if (r.kind === 'capture') capture.push(r.uuid)
+  }
+  return { session, capture }
+}
+
+export function listStarredItems(db: Database.Database, limit = 200): StarredItem[] {
+  // Orphan-filter at the SQL level so LIMIT counts only live rows; otherwise
+  // a user with 200+ orphaned stars could see an empty page.
+  const rows = db.prepare(`
+    SELECT item_type AS kind, item_uuid AS uuid, starred_at AS starredAt
+    FROM stars
+    WHERE (item_type = 'session' AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid))
+       OR (item_type = 'capture' AND EXISTS (SELECT 1 FROM captures WHERE capture_uuid = stars.item_uuid))
+    ORDER BY starred_at DESC
+    LIMIT ?
+  `).all(limit) as Array<{ kind: StarKind; uuid: string; starredAt: string }>
+
+  if (rows.length === 0) return []
+
+  const sessionUuids = rows.filter(r => r.kind === 'session').map(r => r.uuid)
+  const captureUuids = rows.filter(r => r.kind === 'capture').map(r => r.uuid)
+
+  const sessionMap = new Map<string, Session>()
+  if (sessionUuids.length > 0) {
+    const placeholders = sessionUuids.map(() => '?').join(', ')
+    const sessRows = db.prepare(`
+      ${SESSION_SELECT}
+      WHERE s.session_uuid IN (${placeholders})
+    `).all(...sessionUuids) as Array<Record<string, unknown>>
+    for (const row of sessRows) {
+      const session = rowToSession(row)
+      sessionMap.set(session.sessionUuid, session)
+    }
+  }
+
+  const captureMap = new Map<string, Capture>()
+  if (captureUuids.length > 0) {
+    const placeholders = captureUuids.map(() => '?').join(', ')
+    const capRows = db.prepare(`
+      SELECT
+        id             AS captureId,
+        capture_uuid   AS captureUuid,
+        url,
+        title,
+        author,
+        platform,
+        content_type   AS contentType,
+        thumbnail_url  AS thumbnailUrl,
+        captured_at    AS capturedAt
+      FROM captures
+      WHERE capture_uuid IN (${placeholders})
+    `).all(...captureUuids) as Array<Capture>
+    for (const row of capRows) {
+      captureMap.set(row.captureUuid, row)
+    }
+  }
+
+  const items: StarredItem[] = []
+  for (const r of rows) {
+    if (r.kind === 'session') {
+      const session = sessionMap.get(r.uuid)
+      if (session) items.push({ kind: 'session', starredAt: r.starredAt, session })
+    } else if (r.kind === 'capture') {
+      const capture = captureMap.get(r.uuid)
+      if (capture) items.push({ kind: 'capture', starredAt: r.starredAt, capture })
+    }
+  }
+  return items
+}
+
 export function getStatus(db: Database.Database): StatusInfo {
   const counts = db.prepare(`
     SELECT src.name, COUNT(*) AS cnt
@@ -949,9 +1052,9 @@ export function insertCapture(
 export function searchCaptures(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; platform?: string; since?: string } = {},
+  opts: { limit?: number; platform?: string; since?: string; onlyStarred?: boolean } = {},
 ): CaptureResult[] {
-  const { limit = 10, platform, since } = opts
+  const { limit = 10, platform, since, onlyStarred } = opts
 
   const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'captures_fts_trigram' : 'captures_fts'
   const rowLimit = Math.max(limit * 10, 50)
@@ -959,6 +1062,7 @@ export function searchCaptures(
     const rows = searchCaptureRows(db, ftsTable, step.query, rowLimit, {
       ...(platform ? { platform } : {}),
       ...(since ? { since } : {}),
+      ...(onlyStarred ? { onlyStarred } : {}),
     })
     return mapCaptureRows(rows, step.matchType)
   })
@@ -971,9 +1075,9 @@ function searchCaptureRows(
   ftsTable: 'captures_fts' | 'captures_fts_trigram',
   ftsQuery: string,
   limit: number,
-  opts: { platform?: string; since?: string } = {},
+  opts: { platform?: string; since?: string; onlyStarred?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { platform, since } = opts
+  const { platform, since, onlyStarred } = opts
   const conditions: string[] = [`${ftsTable} MATCH ?`]
   const params: (string | number)[] = [ftsQuery]
 
@@ -984,6 +1088,9 @@ function searchCaptureRows(
   if (since) {
     conditions.push('c.captured_at >= ?')
     params.push(since)
+  }
+  if (onlyStarred) {
+    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'capture' AND stars.item_uuid = c.capture_uuid)")
   }
   params.push(limit)
 
@@ -1049,19 +1156,21 @@ function mergeCaptureGroups(groups: CaptureResult[][], limit: number): CaptureRe
 export function searchAll(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: Source; since?: string } = {},
+  opts: { limit?: number; source?: Source; since?: string; onlyStarred?: boolean } = {},
 ): SearchResult[] {
-  const { limit = 20, source, since } = opts
+  const { limit = 20, source, since, onlyStarred } = opts
 
-  const fragOpts: { limit: number; source?: SessionSource; since?: string } = { limit }
+  const fragOpts: { limit: number; source?: SessionSource; since?: string; onlyStarred?: boolean } = { limit }
   if (source === 'claude' || source === 'codex' || source === 'gemini') fragOpts.source = source
   if (since) fragOpts.since = since
+  if (onlyStarred) fragOpts.onlyStarred = true
 
   const fragments = searchFragments(db, query, fragOpts)
     .map(f => ({ ...f, kind: 'fragment' as const }))
 
-  const capOpts: { limit: number; since?: string } = { limit }
+  const capOpts: { limit: number; since?: string; onlyStarred?: boolean } = { limit }
   if (since) capOpts.since = since
+  if (onlyStarred) capOpts.onlyStarred = true
 
   const captures = searchCaptures(db, query, capOpts)
     .map(c => ({ ...c, kind: 'capture' as const }))

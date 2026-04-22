@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Session, Message } from '@spool-lab/core'
+import type { Session, Message, StarKind } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 import SessionFindBar from './SessionFindBar.js'
+import StarButton from './StarButton.js'
 
 type Props = {
   sessionUuid: string
   targetMessageId?: number | null
   onCopySessionId: (source: Session['source']) => void
+  isStarred: boolean
+  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }
 
-export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId }: Props) {
+export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, isStarred, onToggleStar }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -210,17 +213,27 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           </p>
         </div>
 
-        <button
-          onClick={handleCopySessionId}
-          title="Copy session ID for CLI resume"
-          className="flex items-center gap-1.5 self-end text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded px-2.5 py-1 transition-colors flex-none"
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <rect x="4.5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-            <path d="M8.5 4.5V3C8.5 2.17 7.83 1.5 7 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7C1.5 7.83 2.17 8.5 3 8.5H4.5" stroke="currentColor" strokeWidth="1.2"/>
-          </svg>
-          Copy Session ID
-        </button>
+        <div className="flex items-center gap-1.5 flex-none self-end">
+          <StarButton
+            kind="session"
+            uuid={sessionUuid}
+            isStarred={isStarred}
+            onToggle={onToggleStar}
+            size="md"
+            testId="session-star"
+          />
+          <button
+            onClick={handleCopySessionId}
+            title="Copy session ID for CLI resume"
+            className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded px-2.5 py-1 transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <rect x="4.5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M8.5 4.5V3C8.5 2.17 7.83 1.5 7 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7C1.5 7.83 2.17 8.5 3 8.5H4.5" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            Copy Session ID
+          </button>
+        </div>
       </div>
 
       <SessionFindBar
