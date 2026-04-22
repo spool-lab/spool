@@ -3,7 +3,7 @@ title: CLI Commands
 description: Reference for the spool command-line interface.
 ---
 
-:::note[Coming Soon]
+::: info Coming Soon
 The standalone `spool` CLI is under development. Currently, you can search your data through the Spool app or the `/spool` skill in Claude Code.
 :::
 

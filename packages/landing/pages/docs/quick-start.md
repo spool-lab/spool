@@ -3,7 +3,7 @@ title: Quick Start
 description: Get up and running with Spool in under 5 minutes.
 ---
 
-After [installing Spool](/docs/installation/), you can start searching your data right away.
+After [installing Spool](/docs/installation), you can start searching your data right away.
 
 ## 1. Launch Spool
 

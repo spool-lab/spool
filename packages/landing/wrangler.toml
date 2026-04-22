@@ -1,5 +1,0 @@
-name = "spool-landing"
-compatibility_date = "2025-01-01"
-
-[site]
-bucket = "./dist"

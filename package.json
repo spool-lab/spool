@@ -26,7 +26,11 @@
       "better-sqlite3",
       "electron",
       "esbuild",
+      "workerd",
       "acp-extension-codex-linux-x64"
-    ]
+    ],
+    "peerDependencyRules": {
+      "allowAny": ["vite", "vitest"]
+    }
   }
 }
