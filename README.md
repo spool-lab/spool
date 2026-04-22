@@ -75,3 +75,7 @@ pnpm run rebuild:native:electron  # before launching the Electron app or e2e tes
 ## License
 
 MIT
+
+## Trademark
+
+"Spool" and the Spool logo are trademarks of TypeSafe Limited. The MIT License above covers the source code only and does not grant permission to use the Spool name or logo. See the trademark notice in [LICENSE](LICENSE) for details.

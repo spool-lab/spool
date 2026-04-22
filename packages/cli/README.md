@@ -72,3 +72,7 @@ All data is stored locally in `~/.spool/`:
 ## License
 
 MIT
+
+## Trademark
+
+Spool™ is a trademark of TypeSafe Limited. The MIT License covers the source code only and does not grant permission to use the Spool name or logo.

@@ -52,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             &nbsp; A local search engine for your thinking.
           </div>
           <div className="legal">MIT · MADE IN THE OPEN · 2026</div>
+          <div className="legal">SPOOL™ IS A TRADEMARK OF TYPESAFE LIMITED</div>
         </div>
         <div className="foot-right">
           <div>

@@ -279,6 +279,9 @@ function GeneralTab() {
         <p className="text-xs text-warm-muted dark:text-dark-muted">
           Spool — a local search engine for your thinking.
         </p>
+        <p className="text-[11px] text-warm-faint dark:text-dark-faint mt-1">
+          Spool™ is a trademark of TypeSafe Limited.
+        </p>
       </Section>
     </div>
   )
