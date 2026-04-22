@@ -3,7 +3,7 @@ title: Agent Integration
 description: Use Spool as a search backend for your AI coding agents.
 ---
 
-:::note[Coming Soon]
+::: info Coming Soon
 Agent integration is under active development. The `/spool` skill and standalone CLI are not yet functional — stay tuned.
 :::
 

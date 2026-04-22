@@ -4,20 +4,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev --port 3001",
-    "build": "astro build",
-    "preview": "astro preview --port 3001",
-    "deploy": "wrangler pages deploy dist --project-name spool-landing",
-    "clean": "rm -rf dist .astro"
+    "dev": "vp dev --port 3001",
+    "build": "vp build",
+    "preview": "vp preview --port 3001",
+    "deploy": "void deploy",
+    "clean": "rm -rf dist .void node_modules/.vite"
   },
   "dependencies": {
-    "@astrojs/rss": "^4.0.0",
-    "@astrojs/sitemap": "^3.3.0",
-    "@astrojs/starlight": "^0.37.7",
-    "astro": "^5.18.0",
-    "sharp": "^0.33.5"
+    "hono": "^4.12.14",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
-    "wrangler": "^4.81.1"
+    "@cloudflare/workers-types": "^4.20260415.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@void/md": "npm:@void-sdk/md@0.3.1",
+    "@void/react": "npm:@void-sdk/react@0.3.1",
+    "typescript": "^5.7.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
+    "vite-plus": "^0.1.18",
+    "void": "npm:@void-sdk/void@0.3.1"
   }
 }
