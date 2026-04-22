@@ -23,6 +23,8 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Build app (arm64 DMG + ZIP)
@@ -73,6 +75,8 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Build app (AppImage + tar.gz)
