@@ -1,11 +1,9 @@
 name: Deploy Landing Page
 
+# Manual-only while @void-sdk/* is in private beta. The landing package is
+# excluded from the root pnpm workspace so contributors without a GitHub
+# Packages token can still `pnpm install` at the repo root without 403.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packages/landing/**'
-      - '.github/workflows/deploy-landing.yml'
   workflow_dispatch:
 
 jobs:
@@ -28,10 +26,12 @@ jobs:
       - name: Install dependencies
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-        run: pnpm install --filter @spool/landing...
+        working-directory: packages/landing
+        run: pnpm install
 
       - name: Deploy to Void
         env:
           VOID_TOKEN: ${{ secrets.VOID_TOKEN }}
           VOID_PROJECT: spool-landing
-        run: pnpm --filter @spool/landing run deploy
+        working-directory: packages/landing
+        run: pnpm run deploy
