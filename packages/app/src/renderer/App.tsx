@@ -243,9 +243,20 @@ export default function App() {
         refreshCaptureSourcesRef.current()
       } else if (event.type === 'uninstalled') {
         refreshCaptureSourcesRef.current()
+        // Uninstall wipes the connector's captures in DB; any stars on those
+        // captures were cleared too, so refetch the UUID sets + list so the
+        // badge/detail view drop the now-dead references.
+        refreshStarredUuids()
+        refreshStarredItems()
+      } else if (event.type === 'sync-complete') {
+        // Ephemeral connectors wipe + replace their captures each sync, and
+        // stars on those captures are cleared in the same transaction.
+        // Refresh so the badge/list reflect reality immediately.
+        refreshStarredUuids()
+        if (view === 'starred') refreshStarredItems()
       }
     })
-  }, [])
+  }, [refreshStarredUuids, refreshStarredItems, view])
 
   // Listen for AI streaming chunks and tool calls
   useEffect(() => {
