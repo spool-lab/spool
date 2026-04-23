@@ -8,7 +8,7 @@ import type {
   CapturedItem,
   SyncState,
 } from '@spool-lab/connector-sdk'
-import { SyncError as SdkSyncError, SyncErrorCode, SYNC_ERROR_HINTS } from '@spool-lab/connector-sdk'
+import { SyncErrorCode, SYNC_ERROR_HINTS, isSyncError } from '@spool-lab/connector-sdk'
 
 // ── Re-exports from SDK ────────────────────────────────────────────────────
 export {
@@ -52,7 +52,7 @@ export class SyncError extends Data.TaggedError('SyncError')<{
 
   static from(e: unknown): SyncError {
     if (e instanceof SyncError) return e
-    if (e instanceof SdkSyncError) {
+    if (isSyncError(e)) {
       return new SyncError(e.code, e.message, e.cause)
     }
     return new SyncError(

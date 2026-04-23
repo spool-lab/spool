@@ -78,6 +78,9 @@ export async function downloadAndInstall(
   // Extract to node_modules
   const nameSegments = info.name.startsWith('@') ? info.name.split('/') : [info.name]
   const installPath = join(connectorsDir, 'node_modules', ...nameSegments)
+  // Clear any stale entry first: a broken dev symlink (from a removed
+  // worktree) would cause mkdirSync to ENOENT by following the dangling link.
+  rmSync(installPath, { recursive: true, force: true })
   mkdirSync(installPath, { recursive: true })
   await tar.extract({ file: tmpPath, cwd: installPath, strip: 1 })
 

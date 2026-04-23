@@ -1,26 +1,28 @@
 {
   "name": "@spool-lab/connector-twitter-bookmarks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Your saved tweets on X (Twitter Bookmarks) for Spool",
+  "keywords": [
+    "spool-connector"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "keywords": [
-    "spool-connector"
-  ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@spool-lab/connector-sdk": "workspace:^"
   },
+  "bundledDependencies": [
+    "@spool-lab/connector-sdk"
+  ],
   "devDependencies": {
-    "@spool-lab/connector-sdk": "workspace:^",
     "@types/node": "^22.15.3",
     "typescript": "^5.7.3"
   },
@@ -32,6 +34,10 @@
     "description": "Your saved tweets on X",
     "color": "#1DA1F2",
     "ephemeral": false,
-    "capabilities": ["fetch", "cookies:chrome", "log"]
+    "capabilities": [
+      "fetch",
+      "cookies:chrome",
+      "log"
+    ]
   }
 }

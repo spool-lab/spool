@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/connector-hackernews-hot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Top stories on Hacker News right now for Spool",
   "keywords": [
     "spool-connector",
@@ -17,11 +17,13 @@
     "build": "tsc",
     "clean": "rm -rf dist"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@spool-lab/connector-sdk": "workspace:^"
   },
+  "bundledDependencies": [
+    "@spool-lab/connector-sdk"
+  ],
   "devDependencies": {
-    "@spool-lab/connector-sdk": "workspace:^",
     "@types/node": "^22.15.3",
     "typescript": "^5.7.3"
   },

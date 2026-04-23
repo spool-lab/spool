@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/connector-xiaohongshu",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Xiaohongshu (小红书) creator notes via opencli",
   "type": "module",
   "main": "dist/index.js",
@@ -13,11 +13,13 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@spool-lab/connector-sdk": "workspace:*"
   },
+  "bundledDependencies": [
+    "@spool-lab/connector-sdk"
+  ],
   "devDependencies": {
-    "@spool-lab/connector-sdk": "workspace:*",
     "@types/node": "^22.15.3",
     "typescript": "^5.4.0",
     "vitest": "^3.2.4"

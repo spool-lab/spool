@@ -1,27 +1,29 @@
 {
   "name": "@spool-lab/connector-reddit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Reddit Saved and Upvoted posts for Spool",
+  "keywords": [
+    "spool-connector",
+    "reddit"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
-  "keywords": [
-    "spool-connector",
-    "reddit"
-  ],
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@spool-lab/connector-sdk": "workspace:^"
   },
+  "bundledDependencies": [
+    "@spool-lab/connector-sdk"
+  ],
   "devDependencies": {
-    "@spool-lab/connector-sdk": "workspace:^",
     "@types/node": "^22.15.3",
     "typescript": "^5.7.3"
   },

@@ -85,6 +85,28 @@ const RETRYABLE_CODES = new Set<SyncErrorCode>([
 ])
 
 /**
+ * Structural shape of a SyncError, independent of class identity. Used by
+ * {@link isSyncError} so a SyncError thrown from a differently-loaded copy of
+ * this SDK (e.g. one bundled inside a connector tarball) still gets recognized.
+ */
+export interface SyncErrorShape {
+  readonly _tag: 'SyncError'
+  readonly code: SyncErrorCode
+  readonly message: string
+  readonly cause?: unknown
+}
+
+/**
+ * Structural check for SyncError that survives module duplication. Matches on
+ * the `_tag` field rather than class identity, so it works across copies of
+ * this SDK loaded from different paths (host vs. bundled-in-connector).
+ */
+export function isSyncError(e: unknown): e is SyncErrorShape {
+  return typeof e === 'object' && e !== null
+    && (e as { _tag?: unknown })._tag === 'SyncError'
+}
+
+/**
  * Error thrown by connectors and the sync engine. Tagged with a machine-readable
  * SyncErrorCode so the framework and UI can classify and respond.
  *
@@ -105,6 +127,7 @@ export class SyncError extends Error {
 
   static from(e: unknown): SyncError {
     if (e instanceof SyncError) return e
+    if (isSyncError(e)) return new SyncError(e.code, e.message, e.cause)
     return new SyncError(
       SyncErrorCode.CONNECTOR_ERROR,
       e instanceof Error ? e.message : String(e),

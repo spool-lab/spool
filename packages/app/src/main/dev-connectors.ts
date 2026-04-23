@@ -12,6 +12,42 @@ export function ensureSymlink(target: string, linkPath: string): void {
   symlinkSync(target, linkPath)
 }
 
+function removeIfBrokenSymlink(p: string): boolean {
+  let stat
+  try { stat = lstatSync(p) } catch { return false }
+  if (!stat.isSymbolicLink()) return false
+  if (existsSync(p)) return false
+  rmSync(p, { force: true })
+  return true
+}
+
+/**
+ * Remove broken symlinks under ~/.spool/connectors/node_modules.
+ *
+ * Dev symlinks (from linkDevConnectors) point into a workspace checkout;
+ * deleting the worktree or switching to a branch that no longer carries a
+ * connector leaves the symlink dangling. A dangling link later breaks npm
+ * installs (mkdirSync follows the link and ENOENTs on the missing target).
+ */
+export function pruneBrokenConnectorLinks(spoolDir: string): void {
+  const nodeModules = join(spoolDir, 'connectors', 'node_modules')
+  if (!existsSync(nodeModules)) return
+
+  for (const entry of readdirSync(nodeModules)) {
+    const entryPath = join(nodeModules, entry)
+    if (entry.startsWith('@')) {
+      let children: string[]
+      try { children = readdirSync(entryPath) } catch { continue }
+      for (const child of children) {
+        const p = join(entryPath, child)
+        if (removeIfBrokenSymlink(p)) console.log(`[connectors] pruned broken symlink ${p}`)
+      }
+    } else {
+      if (removeIfBrokenSymlink(entryPath)) console.log(`[connectors] pruned broken symlink ${entryPath}`)
+    }
+  }
+}
+
 /**
  * Try to install a connector package from the workspace by symlinking.
  * Returns the resolved name+version on success, or null if the package
