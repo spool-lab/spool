@@ -110,7 +110,10 @@ describe('stars (unified)', () => {
 
   it('getStarredUuidsByType splits session + capture uuids', async () => {
     const mod = await load()
-    const { db } = mod
+    const { db, seedSession, seedCapture } = mod
+    seedSession('s1', 'P', 'T')
+    seedSession('s2', 'P', 'T')
+    seedCapture('c1', 'https://u/1', 'T', 'twitter')
     mod.starItem(db, 'session', 's1')
     mod.starItem(db, 'session', 's2')
     mod.starItem(db, 'capture', 'c1')
@@ -120,11 +123,43 @@ describe('stars (unified)', () => {
     expect(new Set(capture)).toEqual(new Set(['c1']))
   })
 
+  it('getStarredUuidsByType filters orphans (matches listStarredItems semantics)', async () => {
+    const mod = await load()
+    const { db, seedSession } = mod
+    seedSession('alive', 'P', 'T')
+    mod.starItem(db, 'session', 'alive')
+    mod.starItem(db, 'session', 'ghost-session')
+    mod.starItem(db, 'capture', 'ghost-capture')
+
+    const { session, capture } = mod.getStarredUuidsByType(db)
+    expect(session).toEqual(['alive'])
+    expect(capture).toEqual([])
+  })
+
   it('unstarItem on non-starred uuid is a no-op', async () => {
     const mod = await load()
     const { db } = mod
     expect(() => mod.unstarItem(db, 'session', 'nobody')).not.toThrow()
     expect(() => mod.unstarItem(db, 'capture', 'nobody')).not.toThrow()
+  })
+
+  it('startup sweep prunes orphan capture stars but preserves session orphans', async () => {
+    const spoolDir = makeTempDir('spool-stars-sweep-')
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
+
+    const first = await loadInto(spoolDir)
+    // Inject two orphan stars directly (no referent rows).
+    first.db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'ghost-cap')").run()
+    first.db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('session', 'ghost-sess')").run()
+    first.db.close()
+    openDbs.length = 0
+
+    // Reopen → migrations + startup sweep run
+    vi.resetModules()
+    const second = await loadInto(spoolDir)
+    const rows = second.db.prepare('SELECT item_type, item_uuid FROM stars ORDER BY item_type').all()
+    // capture orphan gone; session orphan preserved (transient-absence design)
+    expect(rows).toEqual([{ item_type: 'session', item_uuid: 'ghost-sess' }])
   })
 
   it('persists across a fresh getDB()', async () => {

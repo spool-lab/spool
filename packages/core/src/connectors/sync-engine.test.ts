@@ -147,6 +147,26 @@ describe('SyncEngine contract', () => {
       expect(r2.added).toBe(3)
       expect(r2.total).toBe(3)
     })
+
+    it('ephemeral re-sync drops stars on captures that are being wiped', async () => {
+      const connector1 = createScriptedConnector([
+        { items: [makeItem('#A')], nextCursor: null },
+      ], { ephemeral: true })
+      await engine.sync(connector1, { direction: 'forward', delayMs: 0 })
+
+      // Star the capture that was just synced
+      const capUuid = (db.prepare('SELECT capture_uuid FROM captures').get() as { capture_uuid: string }).capture_uuid
+      db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', ?)").run(capUuid)
+      expect(db.prepare("SELECT COUNT(*) AS n FROM stars WHERE item_type='capture'").get()).toEqual({ n: 1 })
+
+      // Re-sync replaces captures with new UUIDs → star on old UUID must go
+      const connector2 = createScriptedConnector([
+        { items: [makeItem('#B')], nextCursor: null },
+      ], { ephemeral: true })
+      await engine.sync(connector2, { direction: 'forward', delayMs: 0 })
+
+      expect(db.prepare("SELECT COUNT(*) AS n FROM stars WHERE item_type='capture'").get()).toEqual({ n: 0 })
+    })
   })
 
   // ── Head-side ───────────────────────────────────────────────────────────

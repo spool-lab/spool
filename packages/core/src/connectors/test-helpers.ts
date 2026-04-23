@@ -60,6 +60,13 @@ export function createTestDB(): InstanceType<typeof Database> {
       last_error_code     TEXT,
       last_error_message  TEXT
     );
+
+    CREATE TABLE stars (
+      item_type  TEXT NOT NULL CHECK (item_type IN ('session', 'capture')),
+      item_uuid  TEXT NOT NULL,
+      starred_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (item_type, item_uuid)
+    );
   `)
   return db
 }

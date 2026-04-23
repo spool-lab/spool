@@ -376,6 +376,16 @@ function runMigrations(db: Database.Database): void {
   rebuildFtsTableIfEmpty(db, 'captures', 'captures_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
+
+  // Prune stars on captures that no longer exist. Connector-sourced captures
+  // are bulk-replaced with fresh UUIDs on re-sync, so orphans here are
+  // permanent (no "transient absence" semantics like session files have).
+  // Cheap, idempotent, bounded by orphan count.
+  db.exec(`
+    DELETE FROM stars
+    WHERE item_type = 'capture'
+      AND NOT EXISTS (SELECT 1 FROM captures WHERE capture_uuid = stars.item_uuid)
+  `)
 }
 
 function rebuildFtsTableIfEmpty(

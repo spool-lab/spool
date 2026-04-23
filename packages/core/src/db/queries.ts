@@ -875,9 +875,15 @@ export function isStarred(db: Database.Database, kind: StarKind, uuid: string): 
 export function getStarredUuidsByType(
   db: Database.Database,
 ): { session: string[]; capture: string[] } {
-  const rows = db
-    .prepare('SELECT item_type AS kind, item_uuid AS uuid FROM stars')
-    .all() as Array<{ kind: StarKind; uuid: string }>
+  // Orphan-filter to stay consistent with listStarredItems — otherwise the
+  // badge count shows stars the list can't render (e.g. capture deleted by
+  // an ephemeral connector re-sync).
+  const rows = db.prepare(`
+    SELECT item_type AS kind, item_uuid AS uuid
+    FROM stars
+    WHERE (item_type = 'session' AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid))
+       OR (item_type = 'capture' AND EXISTS (SELECT 1 FROM captures WHERE capture_uuid = stars.item_uuid))
+  `).all() as Array<{ kind: StarKind; uuid: string }>
   const session: string[] = []
   const capture: string[] = []
   for (const r of rows) {

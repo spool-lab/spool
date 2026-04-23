@@ -229,7 +229,22 @@ function upsertItems(
 function deleteConnectorItems(db: Database.Database, connectorId: string): void {
   // 1. Drop this connector's M:N claims.
   db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(connectorId)
-  // 2. Delete captures that belonged to this connector and have no other
+  // 2. Drop stars on captures that are about to disappear. Bulk-replace
+  //    connectors (ephemeral or full-wipe) re-insert captures with new UUIDs
+  //    on the next sync, so without this the star becomes a permanent orphan.
+  //    Scoped with the same predicate as the capture delete below.
+  db.prepare(`
+    DELETE FROM stars
+    WHERE item_type = 'capture'
+      AND item_uuid IN (
+        SELECT capture_uuid FROM captures
+        WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
+          AND NOT EXISTS (
+            SELECT 1 FROM capture_connectors WHERE capture_id = captures.id
+          )
+      )
+  `).run()
+  // 3. Delete captures that belonged to this connector and have no other
   //    connector attribution left. Scoped to source='connector' so we never
   //    touch session-world captures.
   db.prepare(`
