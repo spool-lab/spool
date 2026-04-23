@@ -160,10 +160,11 @@ importers:
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
 
   packages/connectors/github:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:^
         version: link:../../connector-sdk
+    devDependencies:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.17
@@ -172,10 +173,11 @@ importers:
         version: 5.9.3
 
   packages/connectors/hackernews-hot:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:^
         version: link:../../connector-sdk
+    devDependencies:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.17
@@ -184,10 +186,11 @@ importers:
         version: 5.9.3
 
   packages/connectors/reddit:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:^
         version: link:../../connector-sdk
+    devDependencies:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.17
@@ -196,10 +199,11 @@ importers:
         version: 5.9.3
 
   packages/connectors/twitter-bookmarks:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:^
         version: link:../../connector-sdk
+    devDependencies:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.17
@@ -208,10 +212,11 @@ importers:
         version: 5.9.3
 
   packages/connectors/typeless:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:^
         version: link:../../connector-sdk
+    devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -229,10 +234,11 @@ importers:
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
 
   packages/connectors/xiaohongshu:
-    devDependencies:
+    dependencies:
       '@spool-lab/connector-sdk':
         specifier: workspace:*
         version: link:../../connector-sdk
+    devDependencies:
       '@types/node':
         specifier: ^22.15.3
         version: 22.19.17
@@ -1360,6 +1366,7 @@ packages:
   '@xmldom/xmldom@0.8.11':
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
