@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, readlinkSync, lstatSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { ensureSymlink, linkDevConnectors } from './dev-connectors.js'
+import { ensureSymlink, linkDevConnectors, pruneBrokenConnectorLinks } from './dev-connectors.js'
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'dev-connectors-test-'))
@@ -135,5 +135,73 @@ describe('linkDevConnectors', () => {
     linkDevConnectors(spoolDir, workspace)
 
     expect(() => lstatSync(join(spoolDir, 'connectors'))).toThrow()
+  })
+})
+
+// ── pruneBrokenConnectorLinks ────────────────────────────────────────────────
+
+describe('pruneBrokenConnectorLinks', () => {
+  function connectorsNm(spoolDir: string): string {
+    const p = join(spoolDir, 'connectors', 'node_modules')
+    mkdirSync(p, { recursive: true })
+    return p
+  }
+
+  it('removes broken symlinks in scoped dirs', () => {
+    const spoolDir = tmp()
+    const nm = connectorsNm(spoolDir)
+    mkdirSync(join(nm, '@spool-lab'))
+
+    const brokenLink = join(nm, '@spool-lab', 'connector-x')
+    symlinkSync('/nonexistent/path/does-not-exist', brokenLink)
+
+    pruneBrokenConnectorLinks(spoolDir)
+
+    expect(() => lstatSync(brokenLink)).toThrow()
+  })
+
+  it('preserves valid symlinks', () => {
+    const spoolDir = tmp()
+    const target = join(tmp(), 'real-target')
+    mkdirSync(target)
+    const nm = connectorsNm(spoolDir)
+    mkdirSync(join(nm, '@spool-lab'))
+
+    const goodLink = join(nm, '@spool-lab', 'connector-x')
+    symlinkSync(target, goodLink)
+
+    pruneBrokenConnectorLinks(spoolDir)
+
+    expect(lstatSync(goodLink).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(goodLink)).toBe(target)
+  })
+
+  it('preserves regular (npm-installed) directories', () => {
+    const spoolDir = tmp()
+    const nm = connectorsNm(spoolDir)
+    const installedDir = join(nm, '@graydawnc', 'connector-y')
+    mkdirSync(installedDir, { recursive: true })
+    writeFileSync(join(installedDir, 'package.json'), '{"name":"@graydawnc/connector-y"}')
+
+    pruneBrokenConnectorLinks(spoolDir)
+
+    expect(lstatSync(installedDir).isDirectory()).toBe(true)
+  })
+
+  it('handles broken unscoped symlinks at top level', () => {
+    const spoolDir = tmp()
+    const nm = connectorsNm(spoolDir)
+
+    const brokenLink = join(nm, 'connector-z')
+    symlinkSync('/nonexistent/target', brokenLink)
+
+    pruneBrokenConnectorLinks(spoolDir)
+
+    expect(() => lstatSync(brokenLink)).toThrow()
+  })
+
+  it('no-ops when node_modules does not exist', () => {
+    const spoolDir = tmp()
+    expect(() => pruneBrokenConnectorLinks(spoolDir)).not.toThrow()
   })
 })

@@ -21,7 +21,7 @@ import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
-import { linkDevConnectors, installFromWorkspace } from './dev-connectors.js'
+import { linkDevConnectors, installFromWorkspace, pruneBrokenConnectorLinks } from './dev-connectors.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource } from './uiPreferences.js'
@@ -430,6 +430,8 @@ app.whenReady().then(async () => {
 
   execCapabilityImpl = makeExecCapability()
   prerequisiteChecker = new PrerequisiteChecker(execCapabilityImpl)
+
+  pruneBrokenConnectorLinks(spoolDir)
 
   if (!app.isPackaged) {
     linkDevConnectors(spoolDir, resolve(process.cwd(), '../..'))

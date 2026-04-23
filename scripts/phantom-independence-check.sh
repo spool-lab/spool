@@ -19,7 +19,6 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLUGIN_DIR="$REPO_ROOT/packages/connectors/$PLUGIN"
-SDK_DIR="$REPO_ROOT/packages/connector-sdk"
 FULL_NAME="@spool-lab/connector-$PLUGIN"
 
 if [[ ! -d "$PLUGIN_DIR" ]]; then
@@ -27,20 +26,13 @@ if [[ ! -d "$PLUGIN_DIR" ]]; then
   exit 2
 fi
 
-# Build fresh
-echo "==> Building $FULL_NAME"
-(cd "$REPO_ROOT" && pnpm --filter "$FULL_NAME" build)
-
-echo "==> Building @spool-lab/connector-sdk"
-(cd "$REPO_ROOT" && pnpm --filter "@spool-lab/connector-sdk" build)
-
-# Create a staging temp dir — use a local name to avoid overriding $TMPDIR
 WORK_DIR="$(mktemp -d -t spool-phantom-check-XXXXXX)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-# Pack the plugin with pnpm — pnpm rewrites workspace: protocol refs to real semver
-echo "==> Packing $FULL_NAME to $WORK_DIR"
-(cd "$PLUGIN_DIR" && pnpm pack --pack-destination "$WORK_DIR")
+# Pack via the shared script — produces a tarball with SDK bundled inside
+# (bundledDependencies). SDK does NOT need to be separately installed.
+echo "==> Packing $FULL_NAME (SDK bundled inside)"
+bash "$REPO_ROOT/scripts/pack-connector.sh" "$PLUGIN" "$WORK_DIR"
 
 TARBALL="$(ls "$WORK_DIR"/spool-lab-connector-"$PLUGIN"-*.tgz 2>/dev/null | head -1)"
 if [[ -z "$TARBALL" ]]; then
@@ -49,29 +41,12 @@ if [[ -z "$TARBALL" ]]; then
   exit 1
 fi
 
-# Pack the SDK. The SDK has no workspace: deps so npm pack is fine here.
-echo "==> Packing @spool-lab/connector-sdk to $WORK_DIR"
-(cd "$SDK_DIR" && npm pack --pack-destination "$WORK_DIR" 2>/dev/null)
-
-SDK_TARBALL="$(ls "$WORK_DIR"/spool-lab-connector-sdk-*.tgz 2>/dev/null | head -1)"
-if [[ -z "$SDK_TARBALL" ]]; then
-  echo "SDK tarball not found after pack in $WORK_DIR:" >&2
-  ls "$WORK_DIR" >&2
-  exit 1
-fi
-
-# Copy tarballs into the install dir so file: references are relative basenames
-# (avoids npm path-handling quirks with absolute paths on some platforms)
 INSTALL_DIR="$WORK_DIR/install-test"
 mkdir -p "$INSTALL_DIR"
-cp "$TARBALL"     "$INSTALL_DIR/plugin.tgz"
-cp "$SDK_TARBALL" "$INSTALL_DIR/sdk.tgz"
+cp "$TARBALL" "$INSTALL_DIR/plugin.tgz"
 
 cd "$INSTALL_DIR"
 
-# Minimal package.json: explicit dep on both the plugin tarball and the SDK.
-# The SDK is a peerDependency of the plugin so npm won't auto-install it;
-# we list it here so it is present in the isolated node_modules.
 cat > package.json <<EOF
 {
   "name": "phantom-test",
@@ -79,8 +54,7 @@ cat > package.json <<EOF
   "private": true,
   "type": "module",
   "dependencies": {
-    "$FULL_NAME": "file:plugin.tgz",
-    "@spool-lab/connector-sdk": "file:sdk.tgz"
+    "$FULL_NAME": "file:plugin.tgz"
   }
 }
 EOF
