@@ -226,7 +226,7 @@ function upsertItems(
   return { newCount, updatedCount }
 }
 
-function deleteConnectorItems(db: Database.Database, connectorId: string): void {
+export function deleteConnectorItems(db: Database.Database, connectorId: string): void {
   // 1. Drop this connector's M:N claims.
   db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(connectorId)
   // 2. Drop stars on captures that are about to disappear. Bulk-replace

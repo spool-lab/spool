@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { SyncEngine, loadSyncState } from './sync-engine.js'
+import { SyncEngine, loadSyncState, deleteConnectorItems } from './sync-engine.js'
 import { SyncError, SyncErrorCode } from './types.js'
 import type { Connector, FetchContext, PageResult, AuthStatus } from './types.js'
 import { createTestDB, makeItem, setState, countCaptures } from './test-helpers.js'
@@ -166,6 +166,21 @@ describe('SyncEngine contract', () => {
       await engine.sync(connector2, { direction: 'forward', delayMs: 0 })
 
       expect(db.prepare("SELECT COUNT(*) AS n FROM stars WHERE item_type='capture'").get()).toEqual({ n: 0 })
+    })
+
+    it('deleteConnectorItems (uninstall path) drops stars on wiped captures', async () => {
+      const connector = createScriptedConnector([
+        { items: [makeItem('#X')], nextCursor: null },
+      ])
+      await engine.sync(connector, { direction: 'forward', delayMs: 0 })
+      const capUuid = (db.prepare('SELECT capture_uuid FROM captures').get() as { capture_uuid: string }).capture_uuid
+      db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', ?)").run(capUuid)
+
+      // Simulate uninstall: both app and CLI call deleteConnectorItems directly
+      deleteConnectorItems(db, 'test-connector')
+
+      expect(db.prepare("SELECT COUNT(*) AS n FROM captures").get()).toEqual({ n: 0 })
+      expect(db.prepare("SELECT COUNT(*) AS n FROM stars").get()).toEqual({ n: 0 })
     })
   })
 
