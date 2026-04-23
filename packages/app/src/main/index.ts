@@ -12,6 +12,7 @@ import {
   loadSyncState, saveSyncState,
   loadConnectors, makeFetchCapability, makeChromeCookiesCapability, makeLogCapabilityFor, makeSqliteCapability, makeExecCapability,
   TrustStore, downloadAndInstall, uninstallConnector, resolveNpmPackage, checkForUpdates,
+  deleteConnectorItems,
   fetchRegistry,
   PrerequisiteChecker,
 } from '@spool-lab/core'
@@ -932,20 +933,11 @@ ipcMain.handle('connector:uninstall', (_e, { id }: { id: string }) => {
 
   uninstallConnector(packageName, connectorsDir)
 
-  // Best-effort DB cleanup — captures_fts_delete trigger can fail on corrupted FTS rows
+  // Best-effort DB cleanup — captures_fts_delete trigger can fail on corrupted FTS rows.
+  // deleteConnectorItems handles capture_connectors + stars + captures in the right order.
   for (const sib of siblings) {
     tryRun(() => db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(sib.connectorId), `sync state for ${sib.connectorId}`)
-    tryRun(
-      () => {
-        db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(sib.connectorId)
-        db.prepare(`
-          DELETE FROM captures
-          WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
-            AND NOT EXISTS (SELECT 1 FROM capture_connectors WHERE capture_id = captures.id)
-        `).run()
-      },
-      `captures for ${sib.connectorId}`,
-    )
+    tryRun(() => deleteConnectorItems(db, sib.connectorId), `captures for ${sib.connectorId}`)
   }
 
   if (registryPkgId) prerequisiteChecker.invalidate(registryPkgId)

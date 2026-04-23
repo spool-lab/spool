@@ -11,7 +11,7 @@ export { resolveSystemBinary, cachedResolve, clearResolveCache } from './util/re
 
 // ── Connector framework ─────────────────────────────────────────────────────
 export { ConnectorRegistry } from './connectors/registry.js'
-export { SyncEngine, loadSyncState, saveSyncState } from './connectors/sync-engine.js'
+export { SyncEngine, loadSyncState, saveSyncState, deleteConnectorItems } from './connectors/sync-engine.js'
 export { SyncScheduler } from './connectors/sync-scheduler.js'
 export type { SchedulerEvent, SchedulerEventHandler } from './connectors/sync-scheduler.js'
 export {

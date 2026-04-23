@@ -9,6 +9,7 @@ import {
   loadSyncState,
   SyncEngine,
   TrustStore,
+  deleteConnectorItems,
 } from '@spool-lab/core'
 import type { SetupStep } from '@spool-lab/core'
 import * as readline from 'node:readline'
@@ -210,17 +211,11 @@ const uninstallSubcommand = new Command('uninstall')
       uninstallConnector(pkg.packageName, connectorsDir)
       trustStore.remove(pkg.packageName)
 
-      // Clean DB data for all connectors in the package (matches app behavior)
+      // Clean DB data for all connectors in the package (matches app behavior).
+      // deleteConnectorItems handles capture_connectors + stars + captures together.
       for (const cid of allConnectorIds) {
         tryRun(() => db.prepare('DELETE FROM connector_sync_state WHERE connector_id = ?').run(cid))
-        tryRun(() => {
-          db.prepare('DELETE FROM capture_connectors WHERE connector_id = ?').run(cid)
-          db.prepare(`
-            DELETE FROM captures
-            WHERE source_id = (SELECT id FROM sources WHERE name = 'connector')
-              AND NOT EXISTS (SELECT 1 FROM capture_connectors WHERE capture_id = captures.id)
-          `).run()
-        })
+        tryRun(() => deleteConnectorItems(db, cid))
       }
 
       console.log(`Uninstalled ${pkg.packageName}`)
