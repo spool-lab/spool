@@ -770,10 +770,15 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
         )}
         {!registryLoading && !registryError && discoverPackages.map(pkg => {
           const meta = pkg.subs.length > 1
-            ? pkg.subs.map(s => stripLabelPrefix(s.label, pkg.label)).join(', ')
-            : pkg.description
+              ? pkg.subs.map(s => stripLabelPrefix(s.label, pkg.label)).join(', ')
+              : pkg.description
+          const isInstalling = installingPackage === pkg.name
+          const hasError = !!installErrors[pkg.name] && !isInstalling
+          // Keep the button latched visible during install + error so feedback
+          // doesn't vanish when the pointer leaves the row.
+          const buttonAlwaysVisible = isInstalling || hasError
           return (
-            <div key={pkg.name} className="flex items-center gap-3 py-2.5">
+            <div key={pkg.name} className="group flex items-center gap-3 py-2.5">
               <span
                 className="w-2 h-2 rounded-full flex-none opacity-50"
                 style={{ background: pkg.color }}
@@ -785,16 +790,16 @@ function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: 
                     <span className="text-[11px] text-warm-faint dark:text-dark-muted truncate min-w-0" title={meta}>{meta}</span>
                   )}
                 </div>
-                {installErrors[pkg.name] && installingPackage !== pkg.name && (
+                {hasError && (
                   <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
                 )}
               </div>
               <button
                 onClick={() => handleInstall(pkg.name)}
-                disabled={installingPackage === pkg.name}
-                className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none"
+                disabled={isInstalling}
+                className={`text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none transition-opacity ${buttonAlwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`}
               >
-                {installingPackage === pkg.name ? 'Installing…' : 'Install'}
+                {isInstalling ? 'Installing…' : 'Install'}
               </button>
             </div>
           )
