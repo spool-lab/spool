@@ -1,3 +1,6 @@
 packages:
   - "packages/*"
   - "packages/connectors/*"
+  # Temporarily excluded: depends on private @void-sdk/* packages in GitHub Packages,
+  # which 403 for contributors without NODE_AUTH_TOKEN. Re-include once Void SDK is public.
+  - "!packages/landing"

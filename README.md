@@ -49,7 +49,7 @@ packages/
 ```bash
 pnpm install
 pnpm exec electron-rebuild -f -w better-sqlite3   # rebuild native modules for Electron
-pnpm dev          # starts app + landing in dev mode
+pnpm dev          # starts app in dev mode
 pnpm test         # runs all tests
 ```
 
