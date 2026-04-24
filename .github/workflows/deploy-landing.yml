@@ -27,7 +27,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         working-directory: packages/landing
-        run: pnpm install
+        # --ignore-workspace: landing is excluded from the root workspace, so
+        # without this flag pnpm installs the root and skips landing's deps.
+        run: pnpm install --ignore-workspace
 
       - name: Deploy to Void
         env:
