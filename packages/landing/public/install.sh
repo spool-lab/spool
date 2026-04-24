@@ -19,15 +19,16 @@ err()   { printf "\033[0;31merror:\033[0m %s\n" "$*" >&2; exit 1; }
 command -v curl >/dev/null || err "curl is required."
 
 # ── Find latest release DMG ──
+# Follow the /releases/latest redirect to resolve the tag — avoids the
+# unauthenticated GitHub API rate limit (60/hr/IP) which 403s shared IPs.
 info "Finding latest release..."
-DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep -oE '"browser_download_url":[[:space:]]*"[^"]*arm64\.dmg"' \
-  | head -1 \
-  | sed -E 's/"browser_download_url":[[:space:]]*"//;s/"//')
+LATEST_URL=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+  "https://github.com/${REPO}/releases/latest")
+TAG="${LATEST_URL##*/}"
+VERSION="${TAG#v}"
+[[ -n "$VERSION" && "$TAG" != "latest" ]] || err "Could not resolve latest release tag."
+DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/Spool-${VERSION}-arm64.dmg"
 
-[[ -n "$DOWNLOAD_URL" ]] || err "Could not find DMG in latest release."
-
-VERSION=$(echo "$DOWNLOAD_URL" | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1)
 info "Downloading Spool ${VERSION}..."
 
 # ── Download ──
