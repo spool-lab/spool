@@ -521,6 +521,15 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', showOrCreateWindow)
+}).catch((err) => {
+  // Without this catch, any rejection from the startup sequence becomes an
+  // unhandled promise rejection — Node 20+ terminates the process with SIGTRAP,
+  // producing an opaque EXC_BREAKPOINT crash with only `PromiseRejectCallback`
+  // in the stack. Logging the error here gives users something actionable.
+  console.error('[startup] fatal error during app initialization:', err)
+  if (err instanceof Error && err.stack) console.error(err.stack)
+  dialog.showErrorBox('Spool failed to start', err instanceof Error ? err.message : String(err))
+  app.exit(1)
 })
 
 app.on('window-all-closed', () => {

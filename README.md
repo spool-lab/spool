@@ -65,8 +65,14 @@ pnpm run rebuild:native:electron  # before launching the Electron app or e2e tes
 ## Release
 
 ```bash
-./scripts/release.sh        # bump version, build, create GitHub release
+./scripts/release.sh        # bump version, push tag, dispatch CI release workflow
 ```
+
+Build + signing happen in GitHub Actions (see `.github/workflows/release.yml`) so
+releases are never tied to a local developer certificate. The script blocks
+until CI finishes; artifacts appear on the release page when it returns.
+
+To test a local build without cutting a release, use `pnpm --filter @spool/app build:mac`.
 
 ## Acknowledgements
 
