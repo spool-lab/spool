@@ -1,11 +1,11 @@
 # Design System — Spool
 
 ## Product Context
-- **What this is:** A local search engine for your thinking — an Electron macOS app that indexes your AI sessions (Claude Code, Codex, ChatGPT), bookmarks (Twitter, GitHub, YouTube), and any URL you capture, then lets you search it all instantly.
+- **What this is:** A local search engine for your thinking — an Electron macOS app that indexes your AI sessions (Claude Code, Codex, Gemini) and lets you search them instantly.
 - **Who it's for:** Developers who think with AI daily and have accumulated hundreds of sessions across multiple tools. The persona has re-explained the same context to AI agents dozens of times.
 - **Space/industry:** Developer productivity / local-first tooling. Peers: Raycast, Spotlight, Obsidian, Perplexity — but none of them do this.
 - **Project type:** macOS Electron app — compact utility window, not a document editor or dashboard.
-- **Core positioning:** "A local Google for your thinking." Search is the entire product. Everything else (sources, capture, AI mode) is in service of the search box.
+- **Core positioning:** "A local Google for your thinking." Search is the entire product. Everything else (session sources, AI mode) is in service of the search box.
 
 ## Aesthetic Direction
 - **Direction:** Warm Index — library-warm, not terminal-cold. Function-first but with personality.
@@ -124,13 +124,12 @@ Each data source has a fixed color used consistently across badges, chips, and d
 
 ### Source Chips (home screen)
 - Pill shape, `--surface` background, source dot + name + count.
-- `+ Connect` uses dashed border.
-- Clicking a chip opens the Sources panel filtered to that source.
+- One chip per agent source (Claude / Codex / Gemini).
+- Clicking a chip opens Settings → Sources tab filtered to that source.
 
-### Sources Panel (accessible from status bar)
-- Slides up from status bar or opens as a separate window. Two tabs: **Sources** and **Import URL**.
-- Sources tab: list of configured connectors with toggle switch, last-sync time, item count.
-- Toggle switches: on = `--accent` background. Off = `--border2` background.
+### Sources Panel (Settings tab)
+- Lists the three built-in agent sources with their session counts.
+- Status: `auto` label + green dot when watcher is healthy.
 
 ### AI Answer Card
 - Left border: 3px solid `--accent`. Background: `--accent-bg`.
@@ -142,14 +141,13 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - Always visible, 30px height, `--surface` background.
 - Left: colored dot (green/yellow/red) + synced item count + last sync time.
 - Right: `Sources ⊕` button (replace `⊕` with vector icon).
-- Red dot only when a connector has auth error — not for normal background sync.
+- Dot is green when sync is healthy; yellow during active sync; red only on filesystem watcher errors.
 
 ## Icons
 - **Library:** Lucide React (`lucide-react`) — consistent stroke weight, MIT licensed.
 - **Search:** `Search` icon (Lucide)
 - **Source indicators:** Replace all emoji placeholder icons with purpose-drawn SVGs or Lucide equivalents. Emoji are placeholders only in mockups.
 - **Mode toggle:** Custom SVG — lightning bolt (⚡ Fast) and a minimal "brain" or sparkle (AI mode).
-- **Capture / add:** `PlusCircle` or `Plus` (Lucide)
 - **Settings:** `Settings2` (Lucide)
 - **Status dots:** No icon — pure colored circle via CSS.
 - **Stroke width:** 1.5px at 16px, 1.5px at 14px. Never bold/filled for UI chrome.

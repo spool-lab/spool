@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { homedir } from 'node:os'
+import { SPOOL_DIR } from '@spool-lab/core'
 import {
   normalizeThemeEditorState,
   type ThemeEditorStateV1,
@@ -10,13 +10,15 @@ import {
 interface UIConfigFile {
   themeSource?: unknown
   themeEditor?: unknown
+  spoolDaemonNoticeShown?: unknown
 }
 
-const UI_CONFIG_PATH = join(homedir(), '.spool', 'ui.json')
+const UI_CONFIG_PATH = join(SPOOL_DIR, 'ui.json')
 
 export interface UIPreferences {
   themeSource: ThemeSource
   themeEditor: ThemeEditorStateV1 | null
+  spoolDaemonNoticeShown: boolean
 }
 
 function normalizeThemeSource(raw: unknown): ThemeSource {
@@ -33,7 +35,7 @@ function readUIConfig(): UIConfigFile {
 }
 
 function writeUIConfig(config: UIConfigFile): void {
-  mkdirSync(join(homedir(), '.spool'), { recursive: true })
+  mkdirSync(SPOOL_DIR, { recursive: true })
   writeFileSync(UI_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8')
 }
 
@@ -42,7 +44,13 @@ export function loadUIPreferences(): UIPreferences {
   return {
     themeSource: normalizeThemeSource(config.themeSource),
     themeEditor: normalizeThemeEditorState(config.themeEditor),
+    spoolDaemonNoticeShown: config.spoolDaemonNoticeShown === true,
   }
+}
+
+export function saveSpoolDaemonNoticeShown(): void {
+  const config = readUIConfig()
+  writeUIConfig({ ...config, spoolDaemonNoticeShown: true })
 }
 
 export function saveThemeSource(themeSource: ThemeSource): void {

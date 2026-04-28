@@ -1,8 +1,8 @@
 # Spool
 
-> **The missing search engine for your own data.**
+> **The missing search engine for your own AI sessions.**
 
-Search your `[Claude Code sessions · Codex history · Gemini chats · ChatGPT history · GitHub stars · Twitter bookmarks · YouTube likes]` — locally.
+Search your `[Claude Code sessions · Codex history · Gemini chats]` — locally.
 
 ---
 
@@ -10,16 +10,16 @@ Search your `[Claude Code sessions · Codex history · Gemini chats · ChatGPT h
 
 ### Your coding agent is already the best search engine you have.
 
-Spool lets Claude Code, Codex, Gemini CLI, and any coding agent search your personal data — past sessions, bookmarks, stars, saves — from a single search box.
-
-### Your bookmarks and stars, synced locally.
-
-Installable connector plugins sync your bookmarks, stars, and saves from Twitter/X, GitHub, and more — no API keys, no tokens. Spool indexes them all locally.
+Spool lets Claude Code, Codex, Gemini CLI, and any coding agent search your past sessions from a single search box.
 
 ### Every agent session, indexed automatically.
 
-Spool watches `~/.claude/`, `~/.codex/`, and Gemini CLI’s `~/.gemini/tmp/*/chats` in real time. Every conversation you have with Claude Code, Codex, or Gemini CLI — searchable the moment it's written.
+Spool watches `~/.claude/`, `~/.codex/`, and Gemini CLI's `~/.gemini/tmp/*/chats` in real time. Every conversation you have with Claude Code, Codex, or Gemini CLI — searchable the moment it's written.
 
 ### Context that flows back in.
 
-A `/spool` skill inside Claude Code. A `spool` CLI in your terminal. Ask your agent to "build on last month's auth discussion" and it actually can — Spool feeds matching fragments from your past sessions and personal data directly into the conversation.
+A `/spool` skill inside Claude Code. A `spool` CLI in your terminal. Ask your agent to "build on last month's auth discussion" and it actually can — Spool feeds matching fragments from your past sessions directly into the conversation.
+
+---
+
+Looking for connectors that sync platform data (Twitter, GitHub, Reddit, etc.)? Those have moved to **[Spool Daemon](https://spool.pro/daemon)**, a sibling app focused on capture sync.

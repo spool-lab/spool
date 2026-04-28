@@ -1,24 +1,38 @@
 import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { mkdirSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
 
 let _db: Database.Database | null = null
+let _wasNewDb = false
+let _initialUserVersion: number | null = null
 
 export function getDB(_readonly = false): Database.Database {
   if (_db) return _db
   mkdirSync(SPOOL_DIR, { recursive: true })
+  // Capture pre-open state before better-sqlite3 creates the file. These two
+  // signals together let callers tell apart "fresh install" from "upgrade":
+  //   - wasNewDb=true  → DB file did not exist; this is a first-time install
+  //   - wasNewDb=false → upgrade path, and initialUserVersion tells you from where
+  _wasNewDb = !existsSync(DB_PATH)
   const db = new Database(DB_PATH)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   db.pragma('busy_timeout = 5000')
+  _initialUserVersion = (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version ?? 0
   runMigrations(db)
   _db = db
   return db
 }
+
+/** True if the DB file did not exist before this process opened it. */
+export function wasNewDb(): boolean { return _wasNewDb }
+
+/** user_version of the DB before any migrations ran this process. Null if getDB() hasn't been called. */
+export function getInitialUserVersion(): number | null { return _initialUserVersion }
 
 export function getDBSize(): number {
   try {
