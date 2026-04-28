@@ -255,7 +255,7 @@ ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyStarred }: 
     limit,
     ...(sessionSource ? { source: sessionSource } : {}),
     ...(onlyStarred ? { onlyStarred: true } : {}),
-  })
+  }).map(f => ({ ...f, kind: 'fragment' as const }))
 
   if (!isSyncActive) {
     searchCache.set(cacheKey, results)
