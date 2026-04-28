@@ -1,19 +1,20 @@
 import { Star } from 'lucide-react'
-import type { FragmentResult, Session, Capture, StarKind, StarredItem, SearchResult } from '@spool-lab/core'
+import type { FragmentResult, Session, StarKind, StarredItem } from '@spool-lab/core'
 import FragmentResults from './FragmentResults.js'
 import StarButton from './StarButton.js'
-import { SourceBadge, PlatformBadge } from './Badges.js'
+import { SourceBadge } from './Badges.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../../shared/searchSort.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 
+type SessionStarredItem = StarredItem & { kind: 'session' }
+type FragmentRowResult = FragmentResult & { kind: 'fragment' }
+
 type Props = {
-  items: StarredItem[]
+  items: SessionStarredItem[]
   filterQuery: string
-  scopedResults: SearchResult[]
+  scopedResults: FragmentRowResult[]
   isScopedSearching: boolean
   starredSessions: Set<string>
-  starredCaptures: Set<string>
-  platformColors: Record<string, string>
   defaultSortOrder: SearchSortOrder
   onOpenSession: (uuid: string, messageId?: number) => void
   onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
@@ -26,8 +27,6 @@ export default function StarredItems({
   scopedResults,
   isScopedSearching,
   starredSessions,
-  starredCaptures,
-  platformColors,
   defaultSortOrder = DEFAULT_SEARCH_SORT_ORDER,
   onOpenSession,
   onToggleStar,
@@ -40,7 +39,7 @@ export default function StarredItems({
       <div className="flex flex-col items-center justify-center h-full text-warm-faint dark:text-dark-muted gap-2 pb-12">
         <Star size={28} strokeWidth={1.4} className="opacity-40" />
         <p className="text-sm text-warm-muted dark:text-dark-muted">You haven&apos;t starred anything yet.</p>
-        <p className="text-xs opacity-80">Star sessions or captures to save them here.</p>
+        <p className="text-xs opacity-80">Star sessions to save them here.</p>
       </div>
     )
   }
@@ -76,9 +75,7 @@ export default function StarredItems({
             onOpenSession={onOpenSession}
             defaultSortOrder={defaultSortOrder}
             onCopySessionId={onCopySessionId}
-            platformColors={platformColors}
             starredSessions={starredSessions}
-            starredCaptures={starredCaptures}
             onToggleStar={onToggleStar}
           />
         </div>
@@ -86,28 +83,20 @@ export default function StarredItems({
     )
   }
 
-  // Empty query → mixed list of starred items ordered by starred_at DESC
-  // (already sorted server-side). Keep session and capture rows visually
-  // distinct but co-ordered chronologically.
+  // Empty query → list of starred sessions ordered by starred_at DESC
+  // (already sorted server-side).
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <StarredHeader total={items.length} />
       <div className="flex-1 overflow-y-auto">
         <div className="divide-y divide-warm-border dark:divide-dark-border">
           {items.map(item => (
-            item.kind === 'session'
-              ? <StarredSessionRow
-                  key={`s-${item.session.sessionUuid}`}
-                  session={item.session}
-                  onOpen={onOpenSession}
-                  onToggleStar={onToggleStar}
-                />
-              : <StarredCaptureRow
-                  key={`c-${item.capture.captureUuid}`}
-                  capture={item.capture}
-                  platformColors={platformColors}
-                  onToggleStar={onToggleStar}
-                />
+            <StarredSessionRow
+              key={`s-${item.session.sessionUuid}`}
+              session={item.session}
+              onOpen={onOpenSession}
+              onToggleStar={onToggleStar}
+            />
           ))}
         </div>
       </div>
@@ -170,7 +159,6 @@ function StarredSessionRow({
         </span>
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
         <StarButton
-          kind="session"
           uuid={session.sessionUuid}
           isStarred={true}
           onToggle={onToggleStar}
@@ -187,49 +175,3 @@ function StarredSessionRow({
     </div>
   )
 }
-
-function StarredCaptureRow({
-  capture,
-  platformColors,
-  onToggleStar,
-}: {
-  capture: Capture
-  platformColors: Record<string, string>
-  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
-}) {
-  const date = formatRelativeDate(capture.capturedAt)
-
-  return (
-    <a
-      href={capture.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      data-testid="starred-row"
-      data-kind="capture"
-      className="block px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <PlatformBadge platform={capture.platform} color={platformColors[capture.platform] ?? '#C85A00'} />
-        <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-          You starred this{capture.author ? ` · ${capture.author}` : ''}
-        </span>
-        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        <StarButton
-          kind="capture"
-          uuid={capture.captureUuid}
-          isStarred={true}
-          onToggle={onToggleStar}
-          size="sm"
-          insideAnchor
-        />
-      </div>
-      <p className="text-sm text-warm-text dark:text-dark-text truncate">
-        {capture.title || capture.url}
-      </p>
-      <p className="text-xs text-warm-faint dark:text-dark-muted mt-0.5 truncate">
-        {capture.url}
-      </p>
-    </a>
-  )
-}
-

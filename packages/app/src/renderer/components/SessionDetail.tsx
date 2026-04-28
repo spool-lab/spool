@@ -215,7 +215,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
         <div className="flex items-center gap-1.5 flex-none self-end">
           <StarButton
-            kind="session"
             uuid={sessionUuid}
             isStarred={isStarred}
             onToggle={onToggleStar}
