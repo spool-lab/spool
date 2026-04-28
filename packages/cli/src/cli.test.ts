@@ -101,7 +101,7 @@ const SCHEMA_SQL = `
   );
   INSERT INTO sources (name, base_path) VALUES
     ('claude','~/.claude/projects'),('codex','~/.codex/sessions'),
-    ('gemini','~/.gemini/tmp'),('connector','<plugin>');
+    ('gemini','~/.gemini/tmp');
 
   CREATE TABLE projects (
     id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL REFERENCES sources(id),
@@ -161,38 +161,6 @@ const SCHEMA_SQL = `
   CREATE VIRTUAL TABLE session_search_fts_trigram USING fts5(
     title, user_text, assistant_text,
     content='session_search', content_rowid='session_id', tokenize='trigram'
-  );
-
-  CREATE TABLE captures (
-    id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL REFERENCES sources(id),
-    capture_uuid TEXT NOT NULL UNIQUE, url TEXT NOT NULL,
-    title TEXT NOT NULL DEFAULT '', content_text TEXT NOT NULL DEFAULT '',
-    author TEXT, platform TEXT NOT NULL, platform_id TEXT,
-    content_type TEXT NOT NULL DEFAULT 'page', thumbnail_url TEXT,
-    metadata TEXT NOT NULL DEFAULT '{}', captured_at TEXT NOT NULL,
-    indexed_at TEXT NOT NULL DEFAULT (datetime('now')), raw_json TEXT
-  );
-  CREATE VIRTUAL TABLE captures_fts USING fts5(
-    title, content_text, content='captures', content_rowid='id',
-    tokenize='unicode61 remove_diacritics 1'
-  );
-  CREATE VIRTUAL TABLE captures_fts_trigram USING fts5(
-    title, content_text, content='captures', content_rowid='id', tokenize='trigram'
-  );
-
-  CREATE TABLE capture_connectors (
-    capture_id INTEGER NOT NULL REFERENCES captures(id) ON DELETE CASCADE,
-    connector_id TEXT NOT NULL, PRIMARY KEY (capture_id, connector_id)
-  );
-  CREATE INDEX idx_capture_connectors_connector ON capture_connectors(connector_id);
-
-  CREATE TABLE connector_sync_state (
-    connector_id TEXT PRIMARY KEY, head_cursor TEXT, head_item_id TEXT,
-    tail_cursor TEXT, tail_complete INTEGER NOT NULL DEFAULT 0,
-    last_forward_sync_at TEXT, last_backfill_sync_at TEXT,
-    total_synced INTEGER NOT NULL DEFAULT 0, consecutive_errors INTEGER NOT NULL DEFAULT 0,
-    enabled INTEGER NOT NULL DEFAULT 1, config_json TEXT NOT NULL DEFAULT '{}',
-    last_error_at TEXT, last_error_code TEXT, last_error_message TEXT
   );
 
   CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN
@@ -376,124 +344,6 @@ describe('sync', () => {
       const out = run(['sync'], { SPOOL_DATA_DIR: dir })
       expect(out).toContain('Syncing sessions')
       expect(out).toContain('Done')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('connector install', () => {
-  it('exits with error when package arg is missing', () => {
-    const out = runFail(['connector', 'install'])
-    expect(out).toContain("missing required argument")
-  })
-
-  it('fails gracefully on nonexistent package', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-install-'))
-    try {
-      const out = runFail(['connector', 'install', '@spool-lab/nonexistent-pkg-test', '-y'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Failed')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('connector sync', () => {
-  it('lists connectors or reports none when no arg given', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-csync-'))
-    try {
-      let out: string
-      try {
-        out = run(['connector', 'sync'], { SPOOL_DATA_DIR: dir })
-      } catch {
-        out = runFail(['connector', 'sync'], { SPOOL_DATA_DIR: dir })
-      }
-      expect(out).toMatch(/Available connectors|No connectors installed/)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('exits with error for unknown connector', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-csync-'))
-    try {
-      const out = runFail(['connector', 'sync', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Unknown connector')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('connector list', () => {
-  it('lists connectors or reports none', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-clist-'))
-    try {
-      const out = run(['connector', 'list'], { SPOOL_DATA_DIR: dir })
-      expect(out).toMatch(/items|No connectors installed/)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('outputs JSON with --json', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-clist-'))
-    try {
-      const out = run(['connector', 'list', '--json'], { SPOOL_DATA_DIR: dir })
-      const parsed = JSON.parse(out)
-      expect(Array.isArray(parsed)).toBe(true)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('connector status', () => {
-  it('exits with error for unknown connector', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cstatus-'))
-    try {
-      const out = runFail(['connector', 'status', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Unknown connector')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('exits with error when id is missing', () => {
-    const out = runFail(['connector', 'status'])
-    expect(out).toContain("missing required argument")
-  })
-})
-
-describe('connector uninstall', () => {
-  it('exits with error for unknown connector', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cuninstall-'))
-    try {
-      const out = runFail(['connector', 'uninstall', 'nonexistent-connector', '-y'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Unknown connector')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('connector update', () => {
-  it('checks for updates without error', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cupdate-'))
-    try {
-      const out = run(['connector', 'update'], { SPOOL_DATA_DIR: dir })
-      expect(out).toMatch(/up to date|No connectors to check|→/)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('exits with error for unknown connector', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-cupdate-'))
-    try {
-      const out = runFail(['connector', 'update', 'nonexistent-connector'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Unknown connector')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
