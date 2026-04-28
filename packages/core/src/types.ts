@@ -95,45 +95,12 @@ export interface SyncResult {
   errors: number
 }
 
-// ── Capture Types ────────────────────────────────────────────────────────────
+// ── Search ──────────────────────────────────────────────────────────────────
 
-export interface CaptureResult {
-  rank: number
-  captureId: number
-  captureUuid: string
-  matchType: SearchMatchType
-  url: string
-  title: string
-  snippet: string
-  platform: string
-  contentType: string
-  author: string | null
-  capturedAt: string
-}
-
-export type { CapturedItem } from './connectors/types.js'
-
-export type SearchResult =
-  | (FragmentResult & { kind: 'fragment' })
-  | (CaptureResult & { kind: 'capture' })
+export type SearchResult = FragmentResult & { kind: 'fragment' }
 
 // ── Stars ──────────────────────────────────────────────────────────────────
 
-export type StarKind = 'session' | 'capture'
+export type StarKind = 'session'
 
-/** Display-shape of a capture row outside of search results. */
-export interface Capture {
-  captureId: number
-  captureUuid: string
-  url: string
-  title: string
-  author: string | null
-  platform: string
-  contentType: string
-  thumbnailUrl: string | null
-  capturedAt: string
-}
-
-export type StarredItem =
-  | { kind: 'session'; starredAt: string; session: Session }
-  | { kind: 'capture'; starredAt: string; capture: Capture }
+export type StarredItem = { kind: 'session'; starredAt: string; session: Session }
