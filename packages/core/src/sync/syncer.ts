@@ -18,6 +18,8 @@ import {
   insertMessages,
 } from '../db/queries.js'
 import type { ParsedMessage, SyncResult } from '../types.js'
+import { computeIdentity } from '../projects/identity.js'
+import { realFs } from '../projects/fs.js'
 
 export interface SyncProgressEvent {
   phase: 'scanning' | 'syncing' | 'indexing' | 'done'
@@ -169,10 +171,12 @@ export class Syncer {
 
       const sourceId = getSourceId(this.db, source)
       const { slug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
-      const projectId = getOrCreateProject(this.db, sourceId, slug, displayPath, displayName, {
-        identityKind: 'path',
-        identityKey: displayPath,
-      })
+      const identity = computeIdentity(parsed.cwd || null, realFs)
+      const projectId = getOrCreateProject(
+        this.db, sourceId, slug, displayPath,
+        identity.displayName || displayName,
+        { identityKind: identity.kind, identityKey: identity.key },
+      )
 
       const isNew = existingMtime === null
       const hasToolUse = parsed.messages.some(m => m.toolNames.length > 0)
