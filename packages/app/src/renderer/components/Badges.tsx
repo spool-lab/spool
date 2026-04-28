@@ -13,13 +13,3 @@ export function SourceBadge({ source }: { source: string }) {
   )
 }
 
-export function PlatformBadge({ platform, color }: { platform: string; color: string }) {
-  return (
-    <span
-      className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded text-white"
-      style={{ background: color }}
-    >
-      {platform}
-    </span>
-  )
-}

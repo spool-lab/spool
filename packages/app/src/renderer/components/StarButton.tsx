@@ -4,7 +4,6 @@ import type { StarKind } from '@spool-lab/core'
 type Size = 'sm' | 'md'
 
 type Props = {
-  kind: StarKind
   uuid: string
   isStarred: boolean
   onToggle: (kind: StarKind, uuid: string, next: boolean) => void
@@ -15,7 +14,6 @@ type Props = {
 }
 
 export default function StarButton({
-  kind,
   uuid,
   isStarred,
   onToggle,
@@ -25,17 +23,16 @@ export default function StarButton({
 }: Props) {
   const iconSize = size === 'md' ? 15 : 13
   const box = size === 'md' ? 'h-6 w-6' : 'w-5 h-5'
-  const label = kind === 'capture' ? 'capture' : 'session'
 
   return (
     <button
       onClick={(e) => {
         if (insideAnchor) e.preventDefault()
         e.stopPropagation()
-        onToggle(kind, uuid, !isStarred)
+        onToggle('session', uuid, !isStarred)
       }}
       title={isStarred ? 'Unstar' : 'Star for quick access'}
-      aria-label={isStarred ? `Unstar ${label}` : `Star ${label}`}
+      aria-label={isStarred ? 'Unstar session' : 'Star session'}
       aria-pressed={isStarred}
       {...(testId ? { 'data-testid': testId } : {})}
       data-starred={isStarred ? '1' : '0'}

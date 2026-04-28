@@ -1,24 +1,13 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
-import type { ConnectorStatus, RegistryConnector } from '@spool-lab/core'
+import { useState, useEffect, type ReactNode } from 'react'
 import type { AgentInfo, AgentsConfig, SdkAgentConfig } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
-import { commonLabel } from '../lib/common-label.js'
-import { PackageSetupCard } from './PackageSetupCard.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
-
-// Strip the common package prefix from a sub-label when the parent context is already visible.
-// e.g. stripLabelPrefix("GitHub Stars", "GitHub") → "Stars"
-function stripLabelPrefix(label: string, prefix: string): string {
-  if (!prefix || label === prefix) return label
-  const withSpace = prefix + ' '
-  return label.startsWith(withSpace) ? label.slice(withSpace.length) : label
-}
+type SettingsTab = 'general' | 'appearance' | 'agent'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_OPTIONS = [
@@ -62,19 +51,6 @@ const SDK_MODEL_OPTIONS = [
   { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
 ] as const
 
-function formatSyncTime(iso: string | null): string {
-  if (!iso) return 'never synced'
-  const utcIso = iso.endsWith('Z') ? iso : iso + 'Z'
-  const diff = Date.now() - new Date(utcIso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 // ── Sidebar tabs ───────────────────────────────────────────────────────────
 
 const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
@@ -104,15 +80,6 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
       >
         <path d="M12 3v2.5M12 18.5V21M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M3 12h2.5M18.5 12H21M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
         <circle cx="12" cy="12" r="4.25" />
-      </svg>
-    ),
-  },
-  {
-    id: 'connectors',
-    label: 'Connectors',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2v6M12 18v4M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M18 12h4M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/>
       </svg>
     ),
   },
@@ -200,11 +167,10 @@ export default function SettingsPanel({
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {tab === 'general' && <GeneralTab />}
+            {tab === 'general' && <GeneralTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
             {tab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
-            {tab === 'connectors' && <ConnectorsTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
             {tab === 'agent' && <AgentTab />}
           </div>
         </div>
@@ -215,7 +181,7 @@ export default function SettingsPanel({
 
 // ── General Tab ────────────────────────────────────────────────────────────
 
-function GeneralTab() {
+function GeneralTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
   const [config, setConfig] = useState<AgentsConfig>({})
 
   useEffect(() => {
@@ -239,6 +205,12 @@ function GeneralTab() {
 
   return (
     <div className="space-y-6">
+      <Section title="Agent Sessions">
+        <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
+        <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
+        <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
+      </Section>
+
       {/* Search */}
       <Section title="Search">
         <div className="flex items-center justify-between gap-3">
@@ -318,499 +290,6 @@ function AppearanceTab({
         themeSource={themeSource}
         onThemeMode={setThemeMode}
       />
-    </div>
-  )
-}
-
-// ── Connectors Tab ─────────────────────────────────────────────────────────
-
-function ConnectorsTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
-  const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
-  const [connectorCounts, setConnectorCounts] = useState<Record<string, number>>({})
-  const [selectedPkg, setSelectedPkg] = useState<string | null>(null)
-  const [syncingConnector, setSyncingConnector] = useState<string | null>(null)
-  const [syncProgress, setSyncProgress] = useState<Record<string, { added: number; phase: string }>>({})
-  const [syncError, setSyncError] = useState<string | null>(null)
-  const [availableUpdates, setAvailableUpdates] = useState<Record<string, { current: string; latest: string }>>({})
-  const [updatingConnector, setUpdatingConnector] = useState<string | null>(null)
-  const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
-  const [registryConnectors, setRegistryConnectors] = useState<RegistryConnector[]>([])
-  const [registryLoading, setRegistryLoading] = useState(true)
-  const [registryError, setRegistryError] = useState(false)
-  const [installingPackage, setInstallingPackage] = useState<string | null>(null)
-  const [installErrors, setInstallErrors] = useState<Record<string, string>>({})
-  const [uninstalling, setUninstalling] = useState(false)
-
-  const loadConnectors = useCallback(async () => {
-    if (!window.spool?.connectors) return
-    const list = await window.spool.connectors.list()
-    setConnectors(list)
-    const counts: Record<string, number> = {}
-    for (const c of list) {
-      counts[c.id] = await window.spool.connectors.getCaptureCount(c.id)
-    }
-    setConnectorCounts(counts)
-  }, [])
-
-  useEffect(() => { loadConnectors() }, [loadConnectors])
-
-  useEffect(() => {
-    window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
-  }, [])
-
-  // Listen for connector sync events
-  useEffect(() => {
-    if (!window.spool?.connectors) return () => {}
-    const off = window.spool.connectors.onEvent((event) => {
-      if (event.type === 'sync-start') {
-        setSyncingConnector(event.connectorId ?? null)
-        if (event.connectorId) setSyncProgress(prev => ({ ...prev, [event.connectorId!]: { added: 0, phase: 'starting' } }))
-      } else if (event.type === 'sync-progress') {
-        const p = event.progress as { connectorId: string; phase: string; added: number } | undefined
-        if (p) setSyncProgress(prev => ({ ...prev, [p.connectorId]: { added: p.added, phase: p.phase } }))
-      } else if (event.type === 'sync-complete' || event.type === 'sync-error') {
-        setSyncingConnector(null)
-        if (event.connectorId) setSyncProgress(prev => { const next = { ...prev }; delete next[event.connectorId!]; return next })
-        loadConnectors()
-      } else if (event.type === 'updated') {
-        loadConnectors()
-        window.spool?.connectors.checkUpdates().then(setAvailableUpdates).catch(() => {})
-      } else if (event.type === 'installed') {
-        loadConnectors()
-      } else if (event.type === 'uninstalled') {
-        setSelectedPkg(null)
-        loadConnectors()
-      }
-    })
-    return off
-  }, [loadConnectors])
-
-  // Refresh when prerequisites status changes (e.g. background check completes)
-  useEffect(() => {
-    if (!window.spool?.connectors?.onStatusChanged) return
-    const unsub = window.spool.connectors.onStatusChanged(() => loadConnectors())
-    return () => { unsub() }
-  }, [loadConnectors])
-
-  useEffect(() => {
-    if (!window.spool?.connectors?.fetchRegistry) return
-    setRegistryLoading(true)
-    window.spool.connectors.fetchRegistry()
-      .then(setRegistryConnectors)
-      .catch(() => setRegistryError(true))
-      .finally(() => setRegistryLoading(false))
-  }, [])
-
-  const installedIds = new Set(connectors.map(c => c.id))
-  const uninstalledConnectors = registryConnectors.filter(rc => !installedIds.has(rc.id))
-
-  // Group available connectors by npm package so multi-connector packages show as one row
-  const discoverPackages = useMemo(() => {
-    const byName = new Map<string, { name: string; label: string; color: string; description: string; subs: Array<{ label: string; description: string }> }>()
-    for (const rc of uninstalledConnectors) {
-      const existing = byName.get(rc.name)
-      if (existing) { existing.subs.push({ label: rc.label, description: rc.description }); continue }
-      byName.set(rc.name, { name: rc.name, label: rc.label, color: rc.color, description: rc.description, subs: [{ label: rc.label, description: rc.description }] })
-    }
-    const pkgs = [...byName.values()]
-    for (const pkg of pkgs) {
-      if (pkg.subs.length > 1) pkg.label = commonLabel(pkg.subs.map(s => s.label))
-    }
-    return pkgs
-  }, [uninstalledConnectors])
-
-  const handleSync = async (connectorId: string) => {
-    if (!window.spool?.connectors) return
-    setSyncingConnector(connectorId)
-    setSyncError(null)
-    try { await window.spool.connectors.syncNow(connectorId) } catch (err) {
-      setSyncError(`${connectorId}: ${err instanceof Error ? err.message : String(err)}`)
-      setSyncingConnector(null)
-    }
-  }
-
-  const handleToggleEnabled = async (connectorId: string, enabled: boolean) => {
-    if (!window.spool?.connectors) return
-    await window.spool.connectors.setEnabled(connectorId, enabled)
-    await loadConnectors()
-  }
-
-  const handleUpdate = async (connectorId: string) => {
-    if (!window.spool?.connectors) return
-    setUpdatingConnector(connectorId)
-    setUpdateErrors(prev => { const next = { ...prev }; delete next[connectorId]; return next })
-    try {
-      const result = await window.spool.connectors.update(connectorId)
-      if (!result.ok) setUpdateErrors(prev => ({ ...prev, [connectorId]: result.error ?? 'Update failed' }))
-    } catch (err) {
-      setUpdateErrors(prev => ({ ...prev, [connectorId]: err instanceof Error ? err.message : String(err) }))
-    } finally {
-      setUpdatingConnector(null)
-    }
-  }
-
-  const handleInstall = async (packageName: string) => {
-    if (!window.spool?.connectors?.install) return
-    setInstallingPackage(packageName)
-    setInstallErrors(prev => { const next = { ...prev }; delete next[packageName]; return next })
-    try {
-      const result = await window.spool.connectors.install(packageName)
-      if (!result.ok) {
-        setInstallErrors(prev => ({ ...prev, [packageName]: result.error ?? 'Install failed' }))
-      }
-    } catch (err) {
-      setInstallErrors(prev => ({ ...prev, [packageName]: err instanceof Error ? err.message : String(err) }))
-    } finally {
-      setInstallingPackage(null)
-    }
-  }
-
-  // Package-level detail: find all connectors for selected package
-  const pkgConnectors = selectedPkg
-    ? connectors.filter(c => (c.packageId ?? (c.packageName || c.id)) === selectedPkg)
-    : []
-
-  // ── Detail view (drill-down) — package level ──
-  if (selectedPkg && pkgConnectors.length > 0) {
-    const first = pkgConnectors[0]!
-    const pkgLabel = commonLabel(pkgConnectors.map(c => c.label))
-
-    return (
-      <div className="space-y-5">
-        {/* Back button */}
-        <button
-          disabled={uninstalling}
-          onClick={() => setSelectedPkg(null)}
-          className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-50"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Back
-        </button>
-
-        {/* Package header */}
-        <div className="flex items-start gap-3">
-          <span className="w-3 h-3 rounded-full flex-none mt-0.5" style={{ background: first.color }} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h4 className="text-xs font-medium text-warm-text dark:text-dark-text">{pkgLabel}</h4>
-              <span className="text-[10px] font-mono text-warm-faint dark:text-dark-faint">v{first.version}</span>
-              {(
-                <div className="flex items-center gap-2 ml-auto text-[11px]">
-                  {availableUpdates[first.id] && (
-                    <button
-                      onClick={() => handleUpdate(first.id)}
-                      disabled={updatingConnector === first.id}
-                      className="font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50"
-                    >
-                      {updatingConnector === first.id ? 'Updating…' : 'Update'}
-                    </button>
-                  )}
-                  <button
-                    disabled={uninstalling}
-                    onClick={async () => {
-                      const totalCount = pkgConnectors.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
-                      const names = pkgConnectors.map(c => c.label).join(', ')
-                      const msg = totalCount > 0
-                        ? `Uninstall "${pkgLabel}"?\n\nThis will remove ${names} and permanently delete ${totalCount} synced item${totalCount === 1 ? '' : 's'}. You can reinstall from spool.pro/connectors.`
-                        : `Uninstall "${pkgLabel}"?\n\nThis will remove ${names}. You can reinstall from spool.pro/connectors.`
-                      if (!confirm(msg)) return
-                      setUninstalling(true)
-                      try {
-                        await window.spool?.connectors.uninstall(first.id)
-                      } finally {
-                        setUninstalling(false)
-                        setSelectedPkg(null)
-                      }
-                    }}
-                    className="font-medium text-warm-faint dark:text-dark-muted hover:text-red-400 hover:underline disabled:opacity-50"
-                  >
-                    {uninstalling ? 'Uninstalling…' : 'Uninstall'}
-                  </button>
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-warm-faint dark:text-dark-muted">
-              {pkgConnectors.length === 1 ? first.description : pkgConnectors.map(c => stripLabelPrefix(c.label, pkgLabel)).join(', ')}
-            </p>
-            {updateErrors[first.id] && updatingConnector !== first.id && (
-              <p className="text-[11px] text-red-400 mt-1">{updateErrors[first.id]}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Setup card (package-level prerequisites) — alwaysShow on the
-            detail page so users can inspect prereq state any time, not only
-            when something is wrong. Defaults to a collapsed summary row when
-            everything is OK. */}
-        {(() => {
-          const setup = pkgConnectors.find(c => c.setup && c.setup.length > 0)?.setup
-          if (!setup) return null
-          const packageId = first.packageId ?? selectedPkg
-          return (
-            <PackageSetupCard
-              packageId={packageId}
-              packageLabel={pkgLabel}
-              steps={setup}
-              onChanged={loadConnectors}
-              alwaysShow
-            />
-          )
-        })()}
-
-        {/* Per-connector cards */}
-        {pkgConnectors.map(c => {
-          const isSyncing = syncingConnector === c.id || c.syncing
-          const progress = syncProgress[c.id]
-          const hasError = c.enabled && !!c.state.lastErrorCode
-          const dotClass = !c.enabled
-            ? 'bg-warm-faint dark:bg-dark-faint'
-            : isSyncing
-              ? 'bg-accent dark:bg-accent-dark animate-pulse'
-              : hasError
-                ? 'bg-red-400'
-                : 'bg-green-500'
-          const statusText = !c.enabled
-            ? 'Disabled'
-            : isSyncing
-              ? 'Syncing…'
-              : c.state.lastErrorCode?.startsWith('AUTH_')
-                ? 'Needs login'
-                : hasError
-                  ? 'Error'
-                  : 'Connected'
-          return (
-            <div key={c.id} className="space-y-2">
-              {pkgConnectors.length > 1 && (
-                <div className="px-0.5">
-                  <h5 className="text-[11px] font-medium text-warm-text dark:text-dark-text">{stripLabelPrefix(c.label, pkgLabel)}</h5>
-                  <p className="text-[10px] text-warm-faint dark:text-dark-muted">{c.description}</p>
-                </div>
-              )}
-              <div className="bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[8px] overflow-hidden divide-y divide-warm-border dark:divide-dark-border">
-                {/* Status summary */}
-                <div className="px-3 py-2.5 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-warm-muted dark:text-dark-muted">Status</span>
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass}`} />
-                      <span className={`text-[11px] ${c.enabled && !hasError ? 'text-warm-text dark:text-dark-text' : 'text-warm-faint dark:text-dark-muted'}`}>
-                        {statusText}
-                      </span>
-                    </span>
-                  </div>
-                  {c.enabled && (connectorCounts[c.id] ?? 0) > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-warm-muted dark:text-dark-muted">Items</span>
-                      <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted tabular-nums">
-                        {connectorCounts[c.id]} · {formatSyncTime(c.state.lastForwardSyncAt)}
-                      </span>
-                    </div>
-                  )}
-                  {isSyncing && progress && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-warm-muted dark:text-dark-muted">Progress</span>
-                      <span className="text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-                        {progress.added} new · {progress.phase === 'forward' ? 'fetching' : 'backfilling'}…
-                      </span>
-                    </div>
-                  )}
-                  {c.enabled && !isSyncing && c.state.lastErrorCode && (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-warm-muted dark:text-dark-muted flex-none">Error</span>
-                      <span className="text-[11px] text-red-400 truncate text-right" title={c.state.lastErrorMessage ?? undefined}>
-                        {c.state.lastErrorMessage ?? c.state.lastErrorCode}
-                      </span>
-                    </div>
-                  )}
-                  {c.enabled && !c.state.tailComplete && !isSyncing && !c.state.lastErrorCode && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-warm-muted dark:text-dark-muted">History</span>
-                      <span className="text-[11px] text-warm-faint dark:text-dark-muted">syncing in background</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Controls: toggle + inline sync */}
-                <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs text-warm-muted dark:text-dark-muted">Enabled</span>
-                  <div className="flex items-center gap-4">
-                    {c.enabled && (
-                      <button
-                        onClick={() => handleSync(c.id)}
-                        disabled={isSyncing || uninstalling}
-                        className="text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 disabled:no-underline"
-                      >
-                        {isSyncing ? 'Syncing…' : 'Sync now'}
-                      </button>
-                    )}
-                    <button
-                      disabled={uninstalling}
-                      aria-pressed={c.enabled}
-                      aria-label={c.enabled ? 'Disable connector' : 'Enable connector'}
-                      onClick={() => handleToggleEnabled(c.id, !c.enabled)}
-                      className={`relative w-8 h-[18px] rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-warm-surface dark:focus-visible:ring-offset-dark-surface ${
-                        c.enabled ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border2 dark:bg-dark-border'
-                      }`}
-                    >
-                      <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
-                        c.enabled ? 'left-[16px]' : 'left-[2px]'
-                      }`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-
-        {syncError && (
-          <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
-            <p className="text-xs text-red-500">{syncError}</p>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── List view ──
-  return (
-    <div className="space-y-6">
-      <Section title="Agent Sessions">
-        <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
-        <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
-        <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
-      </Section>
-
-      <Section title="Data Sources">
-        {connectors.length === 0 && (
-          <p className="text-xs text-warm-faint dark:text-dark-muted">No connectors installed yet</p>
-        )}
-        {(() => {
-          // Group installed connectors by package
-          const groupMap = new Map<string, { key: string; label: string; color: string; items: typeof connectors }>()
-          for (const c of connectors) {
-            const key = c.packageId ?? (c.packageName || c.id)
-            const existing = groupMap.get(key)
-            if (existing) { existing.items.push(c); continue }
-            groupMap.set(key, { key, label: c.label, color: c.color, items: [c] })
-          }
-          const groups = [...groupMap.values()]
-          for (const g of groups) {
-            if (g.items.length > 1) g.label = commonLabel(g.items.map(c => c.label))
-          }
-          return groups.map(g => {
-            const totalItems = g.items.reduce((sum, c) => sum + (connectorCounts[c.id] ?? 0), 0)
-            const anyEnabled = g.items.some(c => c.state.enabled)
-            const anySyncing = g.items.some(c => syncingConnector === c.id || c.syncing)
-            const lastSync = g.items.map(c => c.state.lastForwardSyncAt).filter(Boolean).sort().pop() ?? null
-            const anyError = g.items.some(c => c.state.lastErrorCode)
-            return (
-              <button
-                key={g.key}
-                onClick={() => setSelectedPkg(g.key)}
-                className="w-full flex items-center gap-3 py-2.5 rounded-[6px] text-left relative before:absolute before:-inset-x-2 before:inset-y-0 before:rounded-[6px] before:transition-colors hover:before:bg-warm-surface/50 dark:hover:before:bg-dark-surface/50"
-              >
-                <span
-                  className={`w-2 h-2 rounded-full flex-none ${anySyncing ? 'animate-pulse' : ''}`}
-                  style={{ background: anyEnabled ? g.color : '#888' }}
-                />
-                <div className="flex-1 min-w-0 leading-4">
-                  <span className={`text-xs ${anyEnabled ? 'text-warm-text dark:text-dark-text' : 'text-warm-muted dark:text-dark-muted'}`}>
-                    {g.label}
-                  </span>
-                  {g.items.length > 1 ? (
-                    <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
-                      {!anyEnabled
-                        ? g.items.map(c => stripLabelPrefix(c.label, g.label)).join(', ')
-                        : anySyncing
-                          ? 'Syncing…'
-                          : totalItems > 0
-                            ? `${totalItems} items · ${formatSyncTime(lastSync)}`
-                            : anyError
-                              ? 'Error'
-                              : 'Not synced yet'}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-warm-faint dark:text-dark-muted ml-2">
-                      {!anyEnabled
-                        ? 'Not connected'
-                        : anySyncing
-                          ? 'Syncing…'
-                          : totalItems > 0
-                            ? `${totalItems} items · ${formatSyncTime(lastSync)}`
-                            : anyError
-                              ? 'Error'
-                              : 'Not synced yet'}
-                    </span>
-                  )}
-                </div>
-                {anyEnabled && !anySyncing && anyError && (
-                  <span className="text-[10px] text-amber-500 font-medium">needs login</span>
-                )}
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-warm-faint dark:text-dark-muted">
-                  <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )
-          })
-        })()}
-      </Section>
-
-      <Section title="Available Connectors">
-        {registryLoading && (
-          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Loading connector directory…</p>
-        )}
-        {registryError && !registryLoading && (
-          <p className="text-[11px] text-warm-faint dark:text-dark-muted">Couldn't load connector directory</p>
-        )}
-        {!registryLoading && !registryError && discoverPackages.length === 0 && (
-          <p className="text-[11px] text-warm-faint dark:text-dark-muted">All connectors installed</p>
-        )}
-        {!registryLoading && !registryError && discoverPackages.map(pkg => {
-          const meta = pkg.subs.length > 1
-              ? pkg.subs.map(s => stripLabelPrefix(s.label, pkg.label)).join(', ')
-              : pkg.description
-          const isInstalling = installingPackage === pkg.name
-          const hasError = !!installErrors[pkg.name] && !isInstalling
-          // Keep the button latched visible during install + error so feedback
-          // doesn't vanish when the pointer leaves the row.
-          const buttonAlwaysVisible = isInstalling || hasError
-          return (
-            <div key={pkg.name} className="group flex items-center gap-3 py-2.5">
-              <span
-                className="w-2 h-2 rounded-full flex-none opacity-50"
-                style={{ background: pkg.color }}
-              />
-              <div className="flex-1 min-w-0 leading-4">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-xs text-warm-muted dark:text-dark-muted flex-none">{pkg.label}</span>
-                  {meta && (
-                    <span className="text-[11px] text-warm-faint dark:text-dark-muted truncate min-w-0" title={meta}>{meta}</span>
-                  )}
-                </div>
-                {hasError && (
-                  <div className="text-[10px] text-red-400 mt-0.5">{installErrors[pkg.name]}</div>
-                )}
-              </div>
-              <button
-                onClick={() => handleInstall(pkg.name)}
-                disabled={isInstalling}
-                className={`text-[11px] font-medium text-accent dark:text-accent-dark hover:underline disabled:opacity-50 flex-none transition-opacity ${buttonAlwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`}
-              >
-                {isInstalling ? 'Installing…' : 'Install'}
-              </button>
-            </div>
-          )
-        })}
-      </Section>
-
-      {syncError && (
-        <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-[6px]">
-          <p className="text-xs text-red-500">{syncError}</p>
-        </div>
-      )}
     </div>
   )
 }

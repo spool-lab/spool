@@ -16,7 +16,10 @@ import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
 type View = 'search' | 'session' | 'starred'
-type SettingsTab = 'general' | 'appearance' | 'connectors' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'agent'
+
+type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
+type SessionStarredItem = StarredItem & { kind: 'session' }
 
 interface AgentInfo {
   id: string
@@ -63,25 +66,20 @@ export default function App() {
   // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
-  const [captureSources, setCaptureSources] = useState<Array<{ label: string; count: number }>>([])
-  const [platformColors, setPlatformColors] = useState<Record<string, string>>({})
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
-  const [connectorToast, setConnectorToast] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
-  const refreshCaptureSourcesRef = useRef<() => void>(() => {})
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
 
   const [starredSessions, setStarredSessions] = useState<Set<string>>(new Set())
-  const [starredCaptures, setStarredCaptures] = useState<Set<string>>(new Set())
-  const [starredItems, setStarredItems] = useState<StarredItem[]>([])
+  const [starredItems, setStarredItems] = useState<SessionStarredItem[]>([])
   const [starredScopedResults, setStarredScopedResults] = useState<SearchResult[]>([])
   const [isStarredSearching, setIsStarredSearching] = useState(false)
   const starredSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const starredSearchSeq = useRef(0)
-  const totalStarred = starredSessions.size + starredCaptures.size
+  const totalStarred = starredSessions.size
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
@@ -90,7 +88,6 @@ export default function App() {
     window.spool.getStarredUuids()
       .then(uuids => {
         setStarredSessions(prev => setsEqual(prev, uuids.session) ? prev : new Set(uuids.session))
-        setStarredCaptures(prev => setsEqual(prev, uuids.capture) ? prev : new Set(uuids.capture))
       })
       .catch(console.error)
   }, [])
@@ -98,7 +95,7 @@ export default function App() {
   const refreshStarredItems = useCallback(() => {
     if (!window.spool?.listStarredItems) return
     window.spool.listStarredItems()
-      .then(setStarredItems)
+      .then(items => setStarredItems(items.filter((it): it is SessionStarredItem => it.kind === 'session')))
       .catch(console.error)
   }, [])
 
@@ -107,8 +104,7 @@ export default function App() {
     if (view === 'starred') refreshStarredItems()
   }, [view, refreshStarredItems])
 
-  const handleToggleStar = useCallback((kind: StarKind, uuid: string, next: boolean) => {
-    const setState = kind === 'session' ? setStarredSessions : setStarredCaptures
+  const handleToggleStar = useCallback((_kind: StarKind, uuid: string, next: boolean) => {
     const withUuid = (uuids: Set<string>) => {
       const out = new Set(uuids)
       if (next) out.add(uuid)
@@ -116,18 +112,18 @@ export default function App() {
       return out
     }
 
-    setState(withUuid)
+    setStarredSessions(withUuid)
     if (!next) {
-      setStarredItems(prev => prev.filter(it => !isSameStarredItem(it, kind, uuid)))
+      setStarredItems(prev => prev.filter(it => it.session.sessionUuid !== uuid))
     }
 
     const request = next
-      ? window.spool.starItem(kind, uuid)
-      : window.spool.unstarItem(kind, uuid)
+      ? window.spool.starItem('session', uuid)
+      : window.spool.unstarItem('session', uuid)
 
     request.catch(err => {
       console.error(err)
-      setState(prev => {
+      setStarredSessions(prev => {
         const reverted = new Set(prev)
         if (next) reverted.delete(uuid)
         else reverted.add(uuid)
@@ -232,32 +228,6 @@ export default function App() {
     }
   }, [])
 
-  // Listen for connector install events
-  useEffect(() => {
-    if (!window.spool?.connectors?.onEvent) return () => {}
-    return window.spool.connectors.onEvent((event) => {
-      if (event.type === 'installed' && event.name) {
-        setConnectorToast(`${event.name} v${event.version} installed`)
-        if (toastTimer.current) clearTimeout(toastTimer.current)
-        toastTimer.current = setTimeout(() => setConnectorToast(null), 4000)
-        refreshCaptureSourcesRef.current()
-      } else if (event.type === 'uninstalled') {
-        refreshCaptureSourcesRef.current()
-        // Uninstall wipes the connector's captures in DB; any stars on those
-        // captures were cleared too, so refetch the UUID sets + list so the
-        // badge/detail view drop the now-dead references.
-        refreshStarredUuids()
-        refreshStarredItems()
-      } else if (event.type === 'sync-complete') {
-        // Ephemeral connectors wipe + replace their captures each sync, and
-        // stars on those captures are cleared in the same transaction.
-        // Refresh so the badge/list reflect reality immediately.
-        refreshStarredUuids()
-        if (view === 'starred') refreshStarredItems()
-      }
-    })
-  }, [refreshStarredUuids, refreshStarredItems, view])
-
   // Listen for AI streaming chunks and tool calls
   useEffect(() => {
     if (!window.spool?.onAiChunk) return () => {}
@@ -284,28 +254,11 @@ export default function App() {
     return () => { offChunk(); offDone(); offToolCall?.() }
   }, [])
 
-  const refreshCaptureSources = useCallback(() => {
-    if (!window.spool?.connectors) return
-    window.spool.connectors.list().then(async connectors => {
-      const results: Array<{ label: string; count: number }> = []
-      const colors: Record<string, string> = {}
-      for (const c of connectors) {
-        if (c.platform && c.color) colors[c.platform] = c.color
-        const count = await window.spool.connectors.getCaptureCount(c.id)
-        if (count > 0) results.push({ label: c.label, count })
-      }
-      setCaptureSources(results)
-      setPlatformColors(colors)
-    }).catch(console.error)
-  }, [])
-  refreshCaptureSourcesRef.current = refreshCaptureSources
-
   useEffect(() => {
     if (!window.spool) return
     window.spool.getStatus().then(setStatus).catch(console.error)
     window.spool.getRuntimeInfo?.().then(setRuntimeInfo).catch(console.error)
-    refreshCaptureSources()
-  }, [syncStatus, refreshCaptureSources])
+  }, [syncStatus])
 
   useEffect(() => {
     if (!window.spool) return () => {}
@@ -470,11 +423,6 @@ export default function App() {
     setQuery('')
   }, [])
 
-  const handleConnectClick = useCallback(() => {
-    setSettingsTab('connectors')
-    setShowSettings(true)
-  }, [])
-
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
@@ -487,7 +435,9 @@ export default function App() {
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
   const activeAgentMode = activeAgentInfo?.acpMode
   const hasAgents = availableAgents.length > 0
-  const fragmentSources = deferredResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
+  const fragmentSources = deferredResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
+  const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
+  const fragmentScopedResults = starredScopedResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
@@ -506,18 +456,15 @@ export default function App() {
               onChange={handleQueryChange}
               onSubmit={handleSubmit}
               onSelectSuggestion={handleSelectSuggestion}
-              suggestions={previewSuggestions}
+              suggestions={fragmentPreview}
               isSearching={isSearching}
               hasSettledQuery={lastCompletedPreviewQuery === query}
               isDev={Boolean(runtimeInfo?.isDev)}
               claudeCount={status?.claudeSessions ?? null}
               codexCount={status?.codexSessions ?? null}
               geminiCount={status?.geminiSessions ?? null}
-              captureSources={captureSources}
-              platformColors={platformColors}
               mode={searchMode}
               {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-              onConnectClick={handleConnectClick}
             />
           </>
         ) : (
@@ -564,11 +511,9 @@ export default function App() {
                 <StarredItems
                   items={starredItems}
                   filterQuery={query}
-                  scopedResults={starredScopedResults}
+                  scopedResults={fragmentScopedResults}
                   isScopedSearching={isStarredSearching}
                   starredSessions={starredSessions}
-                  starredCaptures={starredCaptures}
-                  platformColors={platformColors}
                   defaultSortOrder={defaultSearchSort}
                   onOpenSession={handleOpenSession}
                   onToggleStar={handleToggleStar}
@@ -602,14 +547,12 @@ export default function App() {
                   ) : (
                     <div className="flex-1 min-h-0">
                       <FragmentResults
-                        results={deferredResults}
+                        results={fragmentSources}
                         query={query}
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
-                        platformColors={platformColors}
                         starredSessions={starredSessions}
-                        starredCaptures={starredCaptures}
                         onToggleStar={handleToggleStar}
                       />
                     </div>
@@ -633,19 +576,9 @@ export default function App() {
         <ResumeToast command={resumeToastCommand} />
       )}
 
-      {connectorToast && (
-        <div className="pointer-events-none absolute bottom-10 left-1/2 z-40 -translate-x-1/2 animate-in fade-in duration-150 px-4">
-          <div className="rounded-full border border-warm-border dark:border-dark-border bg-warm-surface2/95 dark:bg-dark-surface2/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-            <p className="whitespace-nowrap text-xs text-warm-text dark:text-dark-text">
-              &#10003; {connectorToast}
-            </p>
-          </div>
-        </div>
-      )}
-
       {showSettings && (
         <SettingsPanel
-          onClose={() => { setShowSettings(false); refreshAgents(); refreshCaptureSources() }}
+          onClose={() => { setShowSettings(false); refreshAgents() }}
           initialTab={settingsTab}
           claudeCount={status?.claudeSessions ?? null}
           codexCount={status?.codexSessions ?? null}
@@ -724,8 +657,3 @@ function setsEqual(a: Set<string>, b: string[]): boolean {
   return true
 }
 
-function isSameStarredItem(item: StarredItem, kind: StarKind, uuid: string): boolean {
-  if (item.kind !== kind) return false
-  const itemUuid = item.kind === 'session' ? item.session.sessionUuid : item.capture.captureUuid
-  return itemUuid === uuid
-}
