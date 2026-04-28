@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, StarKind, StarredItem, ConnectorStatus, AuthStatus, SchedulerStatus, RegistryConnector } from '@spool-lab/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, StarKind, StarredItem } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 
@@ -65,7 +65,7 @@ const api = {
   listStarredItems: (limit?: number): Promise<StarredItem[]> =>
     ipcRenderer.invoke('spool:list-starred-items', { limit }),
 
-  getStarredUuids: (): Promise<{ session: string[]; capture: string[] }> =>
+  getStarredUuids: (): Promise<{ session: string[] }> =>
     ipcRenderer.invoke('spool:get-starred-uuids'),
 
   getRuntimeInfo: (): Promise<{ isDev: boolean; appPath: string; appName: string }> =>
@@ -140,70 +140,6 @@ const api = {
 
   setThemeEditorState: (state: ThemeEditorStateV1): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:set-theme-editor-state', { state }),
-
-  // ── Connectors ──
-
-  connectors: {
-    list: (): Promise<ConnectorStatus[]> =>
-      ipcRenderer.invoke('connector:list'),
-
-    checkAuth: (id: string): Promise<AuthStatus> =>
-      ipcRenderer.invoke('connector:check-auth', { id }),
-
-    syncNow: (id: string): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('connector:sync-now', { id }),
-
-    setEnabled: (id: string, enabled: boolean): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('connector:set-enabled', { id, enabled }),
-
-    getStatus: (): Promise<SchedulerStatus> =>
-      ipcRenderer.invoke('connector:get-status'),
-
-    getCaptureCount: (connectorId: string): Promise<number> =>
-      ipcRenderer.invoke('connector:get-capture-count', { connectorId }),
-
-    uninstall: (id: string): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('connector:uninstall', { id }),
-
-    checkUpdates: (): Promise<Record<string, { current: string; latest: string }>> =>
-      ipcRenderer.invoke('connector:check-updates'),
-
-    update: (id: string): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke('connector:update', { id }),
-
-    onEvent: (cb: (event: { type: string; connectorId?: string; progress?: unknown; result?: unknown; code?: string; message?: string; name?: string; version?: string }) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as any)
-      ipcRenderer.on('connector:event', handler)
-      return () => ipcRenderer.removeListener('connector:event', handler)
-    },
-
-    fetchRegistry: (): Promise<RegistryConnector[]> =>
-      ipcRenderer.invoke('connector:fetch-registry'),
-
-    install: (packageName: string): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke('connector:install', { packageName }),
-
-    recheckPrerequisites: (packageId: string) =>
-      ipcRenderer.invoke('connector:recheck-prerequisites', { packageId }),
-
-    installCli: (packageId: string, prereqId: string, installId?: string) =>
-      ipcRenderer.invoke('connector:install-cli', { packageId, prereqId, installId }),
-
-    cancelInstallCli: (installId: string) =>
-      ipcRenderer.invoke('connector:install-cli-cancel', { installId }),
-
-    copyInstallCommand: (packageId: string, prereqId: string) =>
-      ipcRenderer.invoke('connector:copy-install-command', { packageId, prereqId }),
-
-    openExternal: (url: string) =>
-      ipcRenderer.invoke('connector:open-external', { url }),
-
-    onStatusChanged: (cb: (e: { packageId: string }) => void) => {
-      const handler = (_e: unknown, payload: { packageId: string }) => cb(payload)
-      ipcRenderer.on('connector:status-changed', handler)
-      return () => ipcRenderer.removeListener('connector:status-changed', handler)
-    },
-  },
 
   // Auto-update
   onUpdateStatus: (cb: (data: { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number }) => void) => {
