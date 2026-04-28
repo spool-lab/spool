@@ -1,6 +1,6 @@
 # @spool-lab/cli
 
-Command-line interface for [Spool](https://spool.pro) — search your AI sessions and manage connector plugins from the terminal.
+Command-line interface for [Spool](https://spool.pro) — search your AI sessions from the terminal.
 
 ## Install
 
@@ -37,37 +37,10 @@ spool sync                     # Index new AI sessions (Claude, Codex, Gemini)
 spool sync --watch             # Keep watching for new sessions
 ```
 
-### Connector management
-
-```bash
-spool connector list                              # List installed connectors
-spool connector list --json                       # Output as JSON
-spool connector install <package>                 # Install from npm
-spool connector install @spool-lab/connector-github -y  # Skip confirmation
-spool connector uninstall <id>                    # Remove a connector + data
-spool connector status <id>                       # Detailed sync state + auth check
-spool connector sync <id>                         # Run sync manually
-spool connector sync <id> --reset                 # Clear data and resync
-spool connector update                            # Check all for npm updates
-spool connector update --apply                    # Apply available updates
-```
-
-## Available connectors
-
-Browse the full list at [spool.pro/connectors](https://spool.pro/connectors). Some examples:
-
-```bash
-spool connector install @spool-lab/connector-github
-spool connector install @spool-lab/connector-twitter-bookmarks
-spool connector install @spool-lab/connector-reddit
-spool connector install @graydawnc/connector-youtube
-```
-
 ## Data location
 
 All data is stored locally in `~/.spool/`:
-- `spool.db` — SQLite database with sessions, messages, and captures
-- `connectors/` — installed connector plugins
+- `spool.db` — SQLite database with sessions and messages
 
 ## License
 
