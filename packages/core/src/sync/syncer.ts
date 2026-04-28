@@ -169,7 +169,10 @@ export class Syncer {
 
       const sourceId = getSourceId(this.db, source)
       const { slug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
-      const projectId = getOrCreateProject(this.db, sourceId, slug, displayPath, displayName)
+      const projectId = getOrCreateProject(this.db, sourceId, slug, displayPath, displayName, {
+        identityKind: 'path',
+        identityKey: displayPath,
+      })
 
       const isNew = existingMtime === null
       const hasToolUse = parsed.messages.some(m => m.toolNames.length > 0)

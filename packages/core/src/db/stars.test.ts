@@ -167,6 +167,7 @@ async function loadInto(_spoolDir: string) {
       projectDisplay.toLowerCase().replace(/\s+/g, '-'),
       `/fake/${projectDisplay}`,
       projectDisplay,
+      { identityKind: 'path', identityKey: `/fake/${projectDisplay}` },
     )
     queryModule.upsertSession(db, {
       projectId,
