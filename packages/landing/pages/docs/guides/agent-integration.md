@@ -7,7 +7,7 @@ description: Use Spool as a search backend for your AI coding agents.
 Agent integration is under active development. The `/spool` skill and standalone CLI are not yet functional — stay tuned.
 :::
 
-Spool is designed to work with AI coding agents. Once the integration is ready, your agent will be able to search your personal data — past sessions, bookmarks, stars — without leaving your workflow. Session indexing already supports Claude Code, Codex CLI, and Gemini CLI.
+Spool is designed to work with AI coding agents. Once the integration is ready, your agent will be able to search your past sessions without leaving your workflow. Session indexing already supports Claude Code, Codex CLI, and Gemini CLI.
 
 ## Planned: Claude Code skill
 
@@ -28,6 +28,6 @@ A standalone `spool` CLI is also under development, which will allow any agent o
 ## How it will work
 
 1. Your agent sends a search query to Spool
-2. Spool searches the local SQLite index (Claude sessions, Codex sessions, Gemini sessions, connector data)
+2. Spool searches the local SQLite index (Claude sessions, Codex sessions, Gemini sessions)
 3. Matching fragments are returned with source metadata
 4. Your agent incorporates the context into its response

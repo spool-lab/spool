@@ -1,13 +1,11 @@
 ---
 title: Data Sources
-description: Platforms and data types that Spool can index.
+description: AI agent session sources that Spool indexes.
 ---
 
-Spool indexes data from two main sources: **agent sessions** (watched automatically) and **platform data** (pulled via connector plugins).
+Spool indexes your AI agent sessions automatically. Each source is watched in real time — new sessions become searchable the moment they're written, no manual export needed.
 
-## Agent sessions (automatic)
-
-Spool watches these directories in real time:
+## Agent sessions
 
 | Agent | Path |
 |-------|------|
@@ -17,29 +15,6 @@ Spool watches these directories in real time:
 | Codex CLI (profiles) | `~/.codex-profiles/*/sessions/` |
 | Gemini CLI | `~/.gemini/tmp/*/chats/` |
 
-New sessions become searchable the moment they're written. No manual export needed.
+## Platform data (Twitter, GitHub, Reddit, etc.)
 
-## Platform data (via connector plugins)
-
-Connector plugins pull your bookmarks, stars, and saves from various platforms to your machine. Spool indexes everything they capture.
-
-### Supported connectors
-
-- **Code**: GitHub Stars, GitLab Stars, Bitbucket
-- **Social**: Twitter/X Bookmarks, Reddit Saved, Hacker News Favorites
-- **Video**: YouTube Likes, Bilibili Favorites
-- **Reading**: Substack, Medium Bookmarks, Pocket, Instapaper
-- **Professional**: LinkedIn Saved, Slack Bookmarks
-- **Notes**: Notion, Obsidian, Apple Notes
-
-### Syncing data
-
-```bash
-# Install a connector
-spool connectors install twitter-bookmarks
-
-# Sync all installed connectors
-spool connectors sync
-```
-
-Spool indexes new data from connectors as it arrives.
+Connector-based platform sync (bookmarks, stars, saves) lives in **[Spool Daemon](/daemon/)**, a sibling app. Daemon's captures show up alongside Spool sessions in the same search box when both apps are installed.

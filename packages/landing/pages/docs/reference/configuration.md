@@ -11,7 +11,7 @@ Spool stores its data in `~/.spool/`.
 |------|---------|
 | `~/.spool/spool.db` | Local search index (SQLite) |
 | `~/.spool/agents.json` | Agent and SDK configuration |
-| `~/.spool/connectors/` | Connector plugin sync data |
+| `~/.spool/ui.json` | UI preferences (theme, etc.) |
 
 ## Watched directories
 

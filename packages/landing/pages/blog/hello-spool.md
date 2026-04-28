@@ -18,9 +18,9 @@ You can't grep through JSONL files and get useful results. You can't ask your ag
 
 ## How Spool works
 
-Spool watches your session directories in real time. Every conversation becomes searchable the moment it's written — no manual export, no copy-paste.
+Spool watches your session directories in real time. Every conversation becomes searchable the moment it's written — no manual export, no copy-paste. All local, all on your machine.
 
-It also indexes data from installable connector plugins: your GitHub stars, Twitter bookmarks, Reddit saves, and more. All local, all on your machine.
+For platform data — GitHub stars, Twitter bookmarks, Reddit saves — see [Spool Daemon](/daemon/), our sibling app focused on capture sync.
 
 ## What's next: agent-native search
 
