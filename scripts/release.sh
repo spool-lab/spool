@@ -5,6 +5,21 @@ set -euo pipefail
 # Build + artifact upload happen in GitHub Actions so the release is never
 # signed with a local Apple Development cert (which is tied to specific
 # device UDIDs and would crash for everyone else). See .github/workflows/release.yml.
+#
+# Usage:
+#   ./scripts/release.sh              # patch bump (0.3.8 → 0.3.9)
+#   ./scripts/release.sh --minor      # minor bump (0.3.8 → 0.4.0)
+
+BUMP="patch"
+case "${1:-}" in
+  ""|--patch) BUMP="patch" ;;
+  --minor)    BUMP="minor" ;;
+  *)
+    printf "\033[31mUnknown flag: %s\033[0m\n" "$1"
+    echo "Usage: $0 [--patch|--minor]"
+    exit 1
+    ;;
+esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -28,10 +43,13 @@ if [[ "$BRANCH" != "main" ]]; then
 fi
 
 OLD_VERSION=$(jq -r .version package.json)
-dim "Current version: $OLD_VERSION"
+dim "Current version: $OLD_VERSION ($BUMP bump)"
 
 IFS='.' read -r major minor patch <<< "$OLD_VERSION"
-patch=$((patch + 1))
+case "$BUMP" in
+  minor) minor=$((minor + 1)); patch=0 ;;
+  patch) patch=$((patch + 1)) ;;
+esac
 NEW_VERSION="$major.$minor.$patch"
 TAG="v$NEW_VERSION"
 green "Bumping to $NEW_VERSION"
