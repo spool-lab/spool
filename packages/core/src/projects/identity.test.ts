@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { homedir } from 'node:os'
 import { computeIdentity, normalizeGitRemote } from './identity.js'
 
 const noFs = {
@@ -30,9 +31,10 @@ describe('computeIdentity', () => {
   })
 
   it('returns loose for home dir', () => {
-    expect(computeIdentity('/Users/chen', noFs).kind).toBe('loose')
-    expect(computeIdentity('/Users/chen/Desktop', noFs).kind).toBe('loose')
-    expect(computeIdentity('/Users/chen/Downloads', noFs).kind).toBe('loose')
+    const home = homedir()
+    expect(computeIdentity(home, noFs).kind).toBe('loose')
+    expect(computeIdentity(`${home}/Desktop`, noFs).kind).toBe('loose')
+    expect(computeIdentity(`${home}/Downloads`, noFs).kind).toBe('loose')
     expect(computeIdentity('/tmp', noFs).kind).toBe('loose')
   })
 
