@@ -25,14 +25,6 @@ if (customUserDataDir) {
 // macOS menu bar shows the first menu's label as the app name
 app.setName(isDevMode ? 'Spool DEV' : 'Spool')
 
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('spool', process.execPath, [process.argv[1]!])
-  }
-} else {
-  app.setAsDefaultProtocolClient('spool')
-}
-
 const uiPreferences = loadUIPreferences()
 nativeTheme.themeSource = uiPreferences.themeSource
 let focusExistingWindow = () => {}
