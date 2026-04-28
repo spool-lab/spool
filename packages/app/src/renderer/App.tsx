@@ -16,7 +16,7 @@ import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
 type View = 'search' | 'session' | 'starred'
-type SettingsTab = 'general' | 'appearance' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 type SessionStarredItem = StarredItem & { kind: 'session' }
