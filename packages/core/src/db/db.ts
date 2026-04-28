@@ -42,7 +42,7 @@ export function getDBSize(): number {
   }
 }
 
-function runMigrations(db: Database.Database): void {
+export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sources (
       id        INTEGER PRIMARY KEY,
@@ -316,6 +316,39 @@ function runMigrations(db: Database.Database): void {
       db.exec(`DELETE FROM sources WHERE name = 'connector'`)
     })()
     db.pragma('user_version = 5')
+  }
+
+  if (version < 6) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE projects ADD COLUMN identity_kind TEXT;
+        ALTER TABLE projects ADD COLUMN identity_key  TEXT;
+        CREATE INDEX IF NOT EXISTS idx_projects_identity
+          ON projects (identity_kind, identity_key);
+
+        CREATE VIEW IF NOT EXISTS project_groups_v AS
+        SELECT
+          p.identity_kind,
+          p.identity_key,
+          MIN(p.display_name)              AS display_name,
+          GROUP_CONCAT(DISTINCT s.name)    AS sources_csv,
+          COALESCE(SUM(c.session_count),0) AS session_count,
+          MAX(c.last_session_at)           AS last_session_at
+        FROM projects p
+        JOIN sources s ON s.id = p.source_id
+        LEFT JOIN (
+          SELECT project_id,
+                 COUNT(*)         AS session_count,
+                 MAX(started_at)  AS last_session_at
+          FROM sessions
+          WHERE message_count > 0
+          GROUP BY project_id
+        ) c ON c.project_id = p.id
+        WHERE p.identity_kind IS NOT NULL
+        GROUP BY p.identity_kind, p.identity_key;
+      `)
+    })()
+    db.pragma('user_version = 6')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
