@@ -4,16 +4,22 @@ import globalCss from "./global.css?inline";
 import homeCss from "./home.css?inline";
 import docsCss from "./docs.css?inline";
 import blogCss from "./blog.css?inline";
-import connectorsCss from "./connectors.css?inline";
+import daemonCss from "./daemon.css?inline";
 
-const ALL_CSS = [globalCss, homeCss, docsCss, blogCss, connectorsCss].join("\n");
+const ALL_CSS = [globalCss, homeCss, docsCss, blogCss, daemonCss].join("\n");
 
-const THEME_INIT = `(function(){try{var s=localStorage.getItem('spool-theme');var d=s?s==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();`;
+const HEAD_INIT = `(function(){
+  try {
+    var s = localStorage.getItem('spool-theme');
+    var d = s ? s === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+  } catch(e) {}
+})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+    <div className="page-shell">
+      <script dangerouslySetInnerHTML={{ __html: HEAD_INIT }} />
       <style dangerouslySetInnerHTML={{ __html: ALL_CSS }} />
       <header className="top">
         <div className="wrap top-inner">
@@ -22,10 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Spool<span className="dot">.</span>
           </Link>
           <nav className="links">
-            <a href="/#gallery" className="nav-hideable">Queries</a>
-            <a href="/#agents" className="nav-hideable">Agents</a>
-            <a href="/#sources" className="nav-hideable">Sources</a>
-            <Link href="/connectors">Connectors</Link>
+            <Link href="/">Spool</Link>
+            <Link href="/daemon">Daemon</Link>
             <Link href="/docs/installation">Docs</Link>
             <Link href="/blog">Blog</Link>
             <span className="sep" />
@@ -41,15 +45,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      {children}
+      <div className="page-content">{children}</div>
 
       <footer className="wrap">
         <div className="foot-left">
+          <div className="foot-prods">
+            <Link href="/" className="foot-prod">
+              <strong>Spool</strong><span style={{ color: "var(--accent)" }}>.</span>
+            </Link>
+            <Link href="/daemon" className="foot-prod">
+              <strong>Daemon</strong><span style={{ color: "var(--accent)" }}>.</span>
+            </Link>
+          </div>
           <div>
-            <strong style={{ color: "var(--text)", fontWeight: 600 }}>
-              Spool<span style={{ color: "var(--accent)" }}>.</span>
+            Local-first tools for how you think and capture. Made by{" "}
+            <strong style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap" }}>
+              spool-lab
             </strong>
-            &nbsp; A local search engine for your thinking.
+            .
           </div>
           <div className="legal">MIT · MADE IN THE OPEN · 2026</div>
           <div className="legal">SPOOL™ IS A TRADEMARK OF TYPESAFE LIMITED</div>
@@ -61,10 +74,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="https://x.com/spoollabs">X</a> &nbsp;·&nbsp;{" "}
             <Link href="/blog">Blog</Link>
           </div>
-          <div className="legal">SPOOL-LAB / SPOOL @ MAIN</div>
+          <div className="legal">SPOOL-LAB · @ MAIN</div>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
 

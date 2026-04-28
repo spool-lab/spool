@@ -694,6 +694,16 @@ section:last-of-type { border-bottom: none; }
   font-size: 13px;
   color: var(--muted);
   line-height: 1.55;
+  text-wrap: pretty;
+}
+.principle p code {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
 /* ─── final cta ─── */
@@ -729,4 +739,11 @@ section:last-of-type { border-bottom: none; }
   font-size: 11px;
   color: var(--faint);
   letter-spacing: 0.04em;
+}
+
+/* via-daemon badge inside QueriesSection capture card meta */
+.qres .qmeta .via-daemon {
+  color: var(--accent);
+  border-bottom: 1px dotted color-mix(in srgb, var(--accent) 45%, transparent);
+  padding-bottom: 0;
 }
