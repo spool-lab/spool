@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, CaptureResult, SearchResult, Source, SearchMatchType, SessionSource, StarKind, StarredItem, Capture } from '../types.js'
-import type { CapturedItem } from '../connectors/types.js'
+import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, StarKind, StarredItem } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
 import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
@@ -874,86 +872,46 @@ export function isStarred(db: Database.Database, kind: StarKind, uuid: string): 
 
 export function getStarredUuidsByType(
   db: Database.Database,
-): { session: string[]; capture: string[] } {
-  // Orphan-filter to stay consistent with listStarredItems — otherwise the
-  // badge count shows stars the list can't render (e.g. capture deleted by
-  // an ephemeral connector re-sync).
+): { session: string[] } {
   const rows = db.prepare(`
-    SELECT item_type AS kind, item_uuid AS uuid
+    SELECT item_uuid AS uuid
     FROM stars
-    WHERE (item_type = 'session' AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid))
-       OR (item_type = 'capture' AND EXISTS (SELECT 1 FROM captures WHERE capture_uuid = stars.item_uuid))
-  `).all() as Array<{ kind: StarKind; uuid: string }>
-  const session: string[] = []
-  const capture: string[] = []
-  for (const r of rows) {
-    if (r.kind === 'session') session.push(r.uuid)
-    else if (r.kind === 'capture') capture.push(r.uuid)
-  }
-  return { session, capture }
+    WHERE item_type = 'session'
+      AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid)
+  `).all() as Array<{ uuid: string }>
+  return { session: rows.map(r => r.uuid) }
 }
 
 export function listStarredItems(db: Database.Database, limit = 200): StarredItem[] {
   // Orphan-filter at the SQL level so LIMIT counts only live rows; otherwise
   // a user with 200+ orphaned stars could see an empty page.
   const rows = db.prepare(`
-    SELECT item_type AS kind, item_uuid AS uuid, starred_at AS starredAt
+    SELECT item_uuid AS uuid, starred_at AS starredAt
     FROM stars
-    WHERE (item_type = 'session' AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid))
-       OR (item_type = 'capture' AND EXISTS (SELECT 1 FROM captures WHERE capture_uuid = stars.item_uuid))
+    WHERE item_type = 'session'
+      AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid)
     ORDER BY starred_at DESC
     LIMIT ?
-  `).all(limit) as Array<{ kind: StarKind; uuid: string; starredAt: string }>
+  `).all(limit) as Array<{ uuid: string; starredAt: string }>
 
   if (rows.length === 0) return []
 
-  const sessionUuids = rows.filter(r => r.kind === 'session').map(r => r.uuid)
-  const captureUuids = rows.filter(r => r.kind === 'capture').map(r => r.uuid)
-
+  const sessionUuids = rows.map(r => r.uuid)
   const sessionMap = new Map<string, Session>()
-  if (sessionUuids.length > 0) {
-    const placeholders = sessionUuids.map(() => '?').join(', ')
-    const sessRows = db.prepare(`
-      ${SESSION_SELECT}
-      WHERE s.session_uuid IN (${placeholders})
-    `).all(...sessionUuids) as Array<Record<string, unknown>>
-    for (const row of sessRows) {
-      const session = rowToSession(row)
-      sessionMap.set(session.sessionUuid, session)
-    }
-  }
-
-  const captureMap = new Map<string, Capture>()
-  if (captureUuids.length > 0) {
-    const placeholders = captureUuids.map(() => '?').join(', ')
-    const capRows = db.prepare(`
-      SELECT
-        id             AS captureId,
-        capture_uuid   AS captureUuid,
-        url,
-        title,
-        author,
-        platform,
-        content_type   AS contentType,
-        thumbnail_url  AS thumbnailUrl,
-        captured_at    AS capturedAt
-      FROM captures
-      WHERE capture_uuid IN (${placeholders})
-    `).all(...captureUuids) as Array<Capture>
-    for (const row of capRows) {
-      captureMap.set(row.captureUuid, row)
-    }
+  const placeholders = sessionUuids.map(() => '?').join(', ')
+  const sessRows = db.prepare(`
+    ${SESSION_SELECT}
+    WHERE s.session_uuid IN (${placeholders})
+  `).all(...sessionUuids) as Array<Record<string, unknown>>
+  for (const row of sessRows) {
+    const session = rowToSession(row)
+    sessionMap.set(session.sessionUuid, session)
   }
 
   const items: StarredItem[] = []
   for (const r of rows) {
-    if (r.kind === 'session') {
-      const session = sessionMap.get(r.uuid)
-      if (session) items.push({ kind: 'session', starredAt: r.starredAt, session })
-    } else if (r.kind === 'capture') {
-      const capture = captureMap.get(r.uuid)
-      if (capture) items.push({ kind: 'capture', starredAt: r.starredAt, capture })
-    }
+    const session = sessionMap.get(r.uuid)
+    if (session) items.push({ kind: 'session', starredAt: r.starredAt, session })
   }
   return items
 }
@@ -1010,205 +968,3 @@ function getProfileLabelFromFilePath(filePath: string): string | undefined {
   return match?.[1]
 }
 
-// ── Captures ────────────────────────────────────────────────────────────────
-
-export function insertCapture(
-  db: Database.Database,
-  sourceId: number,
-  item: CapturedItem,
-): number {
-  const captureUuid = randomUUID()
-
-  // Dedup by platform_id if provided
-  if (item.platformId) {
-    const existing = db
-      .prepare('SELECT id FROM captures WHERE platform = ? AND platform_id = ?')
-      .get(item.platform, item.platformId) as { id: number } | undefined
-    if (existing) {
-      db.prepare(`
-        UPDATE captures SET
-          title = ?, content_text = ?, author = ?, metadata = ?,
-          captured_at = ?, raw_json = ?, thumbnail_url = ?
-        WHERE id = ?
-      `).run(
-        item.title, item.contentText, item.author,
-        JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
-        item.thumbnailUrl,
-        existing.id,
-      )
-      return existing.id
-    }
-  }
-
-  const result = db.prepare(`
-    INSERT INTO captures
-      (source_id, capture_uuid, url, title, content_text,
-       author, platform, platform_id, content_type, thumbnail_url,
-       metadata, captured_at, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    sourceId, captureUuid, item.url, item.title, item.contentText,
-    item.author, item.platform, item.platformId, item.contentType, item.thumbnailUrl,
-    JSON.stringify(item.metadata), item.capturedAt, item.rawJson,
-  )
-
-  return Number(result.lastInsertRowid)
-}
-
-export function searchCaptures(
-  db: Database.Database,
-  query: string,
-  opts: { limit?: number; platform?: string; since?: string; onlyStarred?: boolean } = {},
-): CaptureResult[] {
-  const { limit = 10, platform, since, onlyStarred } = opts
-
-  const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'captures_fts_trigram' : 'captures_fts'
-  const rowLimit = Math.max(limit * 10, 50)
-  const groups = buildSearchPlan(query).map(step => {
-    const rows = searchCaptureRows(db, ftsTable, step.query, rowLimit, {
-      ...(platform ? { platform } : {}),
-      ...(since ? { since } : {}),
-      ...(onlyStarred ? { onlyStarred } : {}),
-    })
-    return mapCaptureRows(rows, step.matchType)
-  })
-
-  return mergeCaptureGroups(groups, limit)
-}
-
-function searchCaptureRows(
-  db: Database.Database,
-  ftsTable: 'captures_fts' | 'captures_fts_trigram',
-  ftsQuery: string,
-  limit: number,
-  opts: { platform?: string; since?: string; onlyStarred?: boolean } = {},
-): Array<Record<string, unknown>> {
-  const { platform, since, onlyStarred } = opts
-  const conditions: string[] = [`${ftsTable} MATCH ?`]
-  const params: (string | number)[] = [ftsQuery]
-
-  if (platform) {
-    conditions.push('c.platform = ?')
-    params.push(platform)
-  }
-  if (since) {
-    conditions.push('c.captured_at >= ?')
-    params.push(since)
-  }
-  if (onlyStarred) {
-    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'capture' AND stars.item_uuid = c.capture_uuid)")
-  }
-  params.push(limit)
-
-  const sql = `
-    SELECT
-      rank,
-      c.id            AS captureId,
-      c.capture_uuid  AS captureUuid,
-      c.url,
-      c.title,
-      c.author,
-      c.platform,
-      c.content_type  AS contentType,
-      c.captured_at   AS capturedAt,
-      snippet(${ftsTable}, -1, '<mark>', '</mark>', '…', 20) AS snippet
-    FROM ${ftsTable}
-    JOIN captures c ON c.id = ${ftsTable}.rowid
-    WHERE ${conditions.join(' AND ')}
-    ORDER BY rank
-    LIMIT ?
-  `
-
-  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
-}
-
-function mapCaptureRows(rows: Array<Record<string, unknown>>, matchType: SearchMatchType): CaptureResult[] {
-  return rows.map((row, i) => ({
-    rank: i + 1,
-    captureId: row['captureId'] as number,
-    captureUuid: row['captureUuid'] as string,
-    matchType,
-    url: row['url'] as string,
-    title: (row['title'] as string) || '(no title)',
-    snippet: row['snippet'] as string,
-    platform: row['platform'] as string,
-    contentType: row['contentType'] as string,
-    author: (row['author'] as string | null) ?? null,
-    capturedAt: row['capturedAt'] as string,
-  }))
-}
-
-function mergeCaptureGroups(groups: CaptureResult[][], limit: number): CaptureResult[] {
-  const merged: CaptureResult[] = []
-  const seen = new Set<string>()
-
-  for (const group of groups) {
-    for (const capture of group) {
-      if (seen.has(capture.captureUuid)) continue
-      if (merged.length >= limit) continue
-
-      const next = {
-        ...capture,
-        rank: merged.length + 1,
-      }
-      merged.push(next)
-      seen.add(next.captureUuid)
-    }
-  }
-
-  return merged
-}
-
-export function searchAll(
-  db: Database.Database,
-  query: string,
-  opts: { limit?: number; source?: Source; since?: string; onlyStarred?: boolean } = {},
-): SearchResult[] {
-  const { limit = 20, source, since, onlyStarred } = opts
-
-  const fragOpts: { limit: number; source?: SessionSource; since?: string; onlyStarred?: boolean } = { limit }
-  if (source === 'claude' || source === 'codex' || source === 'gemini') fragOpts.source = source
-  if (since) fragOpts.since = since
-  if (onlyStarred) fragOpts.onlyStarred = true
-
-  const fragments = searchFragments(db, query, fragOpts)
-    .map(f => ({ ...f, kind: 'fragment' as const }))
-
-  const capOpts: { limit: number; since?: string; onlyStarred?: boolean } = { limit }
-  if (since) capOpts.since = since
-  if (onlyStarred) capOpts.onlyStarred = true
-
-  const captures = searchCaptures(db, query, capOpts)
-    .map(c => ({ ...c, kind: 'capture' as const }))
-
-  return [...fragments, ...captures]
-    .sort(compareSearchResultRelevance)
-    .slice(0, limit)
-    .map((result, index) => ({ ...result, rank: index + 1 }))
-}
-
-function compareSearchResultRelevance(a: SearchResult, b: SearchResult): number {
-  const typeDiff = getMatchTypePriority(a.matchType) - getMatchTypePriority(b.matchType)
-  if (typeDiff !== 0) return typeDiff
-  return a.rank - b.rank
-}
-
-function getMatchTypePriority(matchType: SearchMatchType): number {
-  switch (matchType) {
-    case 'phrase':
-      return 0
-    case 'all_terms':
-      return 1
-    default:
-      return 2
-  }
-}
-
-export function getCaptureCount(db: Database.Database, platform?: string): number {
-  if (platform) {
-    const row = db.prepare('SELECT COUNT(*) AS cnt FROM captures WHERE platform = ?').get(platform) as { cnt: number }
-    return row.cnt
-  }
-  const row = db.prepare('SELECT COUNT(*) AS cnt FROM captures').get() as { cnt: number }
-  return row.cnt
-}

@@ -20,24 +20,18 @@
   "scripts": {
     "rebuild:native": "pnpm run rebuild:native:node",
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
-    "build": "pnpm --filter @spool-lab/connector-sdk build && tsc",
+    "build": "tsc",
     "dev": "tsc --watch",
     "test": "pnpm run rebuild:native && vitest run",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@spool-lab/connector-sdk": "workspace:^",
-    "better-sqlite3": "^11.10.0",
-    "effect": "^3.21.0",
-    "semver": "^7.7.4",
-    "tar": "^7.5.13"
+    "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {
-    "@effect/vitest": "^0.29.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.17",
-    "@types/semver": "^7.7.1",
     "vitest": "^3.2.4"
   }
 }

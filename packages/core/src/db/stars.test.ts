@@ -16,8 +16,8 @@ afterEach(() => {
   }
 })
 
-describe('stars (unified)', () => {
-  it('star + isStarred + unstar roundtrip for sessions', async () => {
+describe('stars', () => {
+  it('star + isStarred + unstar roundtrip', async () => {
     const mod = await load()
     const { db, seedSession } = mod
     const uuid = 'sess-1'
@@ -31,30 +31,6 @@ describe('stars (unified)', () => {
     expect(mod.isStarred(db, 'session', uuid)).toBe(false)
   })
 
-  it('star + isStarred + unstar roundtrip for captures', async () => {
-    const mod = await load()
-    const { db, seedCapture } = mod
-    const uuid = 'cap-1'
-    seedCapture(uuid, 'https://x.com/1', 'Tweet', 'twitter')
-
-    expect(mod.isStarred(db, 'capture', uuid)).toBe(false)
-    mod.starItem(db, 'capture', uuid)
-    expect(mod.isStarred(db, 'capture', uuid)).toBe(true)
-
-    mod.unstarItem(db, 'capture', uuid)
-    expect(mod.isStarred(db, 'capture', uuid)).toBe(false)
-  })
-
-  it('session and capture with same uuid string are independent', async () => {
-    const mod = await load()
-    const { db } = mod
-    mod.starItem(db, 'session', 'same-uuid')
-    expect(mod.isStarred(db, 'session', 'same-uuid')).toBe(true)
-    expect(mod.isStarred(db, 'capture', 'same-uuid')).toBe(false)
-    mod.starItem(db, 'capture', 'same-uuid')
-    expect(mod.isStarred(db, 'capture', 'same-uuid')).toBe(true)
-  })
-
   it('starItem is idempotent and preserves original starred_at', async () => {
     const mod = await load()
     const { db, seedSession } = mod
@@ -66,99 +42,85 @@ describe('stars (unified)', () => {
     expect(second.starred_at).toBe(first.starred_at)
   })
 
-  it('CHECK constraint rejects unknown item_type', async () => {
+  it('CHECK constraint rejects non-session item_type', async () => {
     const mod = await load()
     const { db } = mod
+    expect(() =>
+      db.prepare('INSERT INTO stars (item_type, item_uuid) VALUES (?, ?)').run('capture', 'x'),
+    ).toThrow()
     expect(() =>
       db.prepare('INSERT INTO stars (item_type, item_uuid) VALUES (?, ?)').run('bogus', 'x'),
     ).toThrow()
   })
 
-  it('listStarredItems returns mixed sessions + captures by starred_at DESC', async () => {
+  it('listStarredItems returns sessions ordered by starred_at DESC', async () => {
     const mod = await load()
-    const { db, seedSession, seedCapture } = mod
+    const { db, seedSession } = mod
     seedSession('s1', 'P', 'Session one')
-    seedCapture('c1', 'https://u/1', 'Cap one', 'twitter')
     seedSession('s2', 'P', 'Session two')
+    seedSession('s3', 'P', 'Session three')
 
-    // Explicit timestamps so order is deterministic.
     db.prepare("INSERT INTO stars (item_type, item_uuid, starred_at) VALUES ('session', 's1', '2026-01-01 00:00:00')").run()
-    db.prepare("INSERT INTO stars (item_type, item_uuid, starred_at) VALUES ('capture', 'c1', '2026-02-01 00:00:00')").run()
-    db.prepare("INSERT INTO stars (item_type, item_uuid, starred_at) VALUES ('session', 's2', '2026-03-01 00:00:00')").run()
+    db.prepare("INSERT INTO stars (item_type, item_uuid, starred_at) VALUES ('session', 's2', '2026-02-01 00:00:00')").run()
+    db.prepare("INSERT INTO stars (item_type, item_uuid, starred_at) VALUES ('session', 's3', '2026-03-01 00:00:00')").run()
 
     const items = mod.listStarredItems(db)
-    expect(items.map(i => i.kind === 'session' ? i.session.sessionUuid : i.capture.captureUuid))
-      .toEqual(['s2', 'c1', 's1'])
-    expect(items[1]!.kind).toBe('capture')
+    expect(items.map(i => i.session.sessionUuid)).toEqual(['s3', 's2', 's1'])
   })
 
-  it('listStarredItems filters orphans (starred referent missing)', async () => {
+  it('listStarredItems filters orphans (session referent missing)', async () => {
     const mod = await load()
     const { db, seedSession } = mod
     seedSession('alive', 'P', 'A')
     mod.starItem(db, 'session', 'alive')
     mod.starItem(db, 'session', 'ghost-session')
-    mod.starItem(db, 'capture', 'ghost-capture')
 
     const items = mod.listStarredItems(db)
     expect(items).toHaveLength(1)
-    expect(items[0]!.kind).toBe('session')
-    if (items[0]!.kind === 'session') {
-      expect(items[0]!.session.sessionUuid).toBe('alive')
-    }
+    expect(items[0]!.session.sessionUuid).toBe('alive')
   })
 
-  it('getStarredUuidsByType splits session + capture uuids', async () => {
+  it('getStarredUuidsByType returns session uuids', async () => {
     const mod = await load()
-    const { db, seedSession, seedCapture } = mod
+    const { db, seedSession } = mod
     seedSession('s1', 'P', 'T')
     seedSession('s2', 'P', 'T')
-    seedCapture('c1', 'https://u/1', 'T', 'twitter')
     mod.starItem(db, 'session', 's1')
     mod.starItem(db, 'session', 's2')
-    mod.starItem(db, 'capture', 'c1')
 
-    const { session, capture } = mod.getStarredUuidsByType(db)
+    const { session } = mod.getStarredUuidsByType(db)
     expect(new Set(session)).toEqual(new Set(['s1', 's2']))
-    expect(new Set(capture)).toEqual(new Set(['c1']))
   })
 
-  it('getStarredUuidsByType filters orphans (matches listStarredItems semantics)', async () => {
+  it('getStarredUuidsByType filters orphans', async () => {
     const mod = await load()
     const { db, seedSession } = mod
     seedSession('alive', 'P', 'T')
     mod.starItem(db, 'session', 'alive')
     mod.starItem(db, 'session', 'ghost-session')
-    mod.starItem(db, 'capture', 'ghost-capture')
 
-    const { session, capture } = mod.getStarredUuidsByType(db)
+    const { session } = mod.getStarredUuidsByType(db)
     expect(session).toEqual(['alive'])
-    expect(capture).toEqual([])
   })
 
   it('unstarItem on non-starred uuid is a no-op', async () => {
     const mod = await load()
     const { db } = mod
     expect(() => mod.unstarItem(db, 'session', 'nobody')).not.toThrow()
-    expect(() => mod.unstarItem(db, 'capture', 'nobody')).not.toThrow()
   })
 
-  it('startup sweep prunes orphan capture stars but preserves session orphans', async () => {
+  it('preserves session orphans across re-open (transient-absence design)', async () => {
     const spoolDir = makeTempDir('spool-stars-sweep-')
     vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
 
     const first = await loadInto(spoolDir)
-    // Inject two orphan stars directly (no referent rows).
-    first.db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'ghost-cap')").run()
     first.db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('session', 'ghost-sess')").run()
     first.db.close()
     openDbs.length = 0
 
-    // Reopen → migrations + startup sweep run
     vi.resetModules()
     const second = await loadInto(spoolDir)
-    const rows = second.db.prepare('SELECT item_type, item_uuid FROM stars ORDER BY item_type').all()
-    // capture orphan gone; session orphan preserved (transient-absence design)
+    const rows = second.db.prepare('SELECT item_type, item_uuid FROM stars').all()
     expect(rows).toEqual([{ item_type: 'session', item_uuid: 'ghost-sess' }])
   })
 
@@ -222,15 +184,6 @@ async function loadInto(_spoolDir: string) {
     })
   }
 
-  function seedCapture(captureUuid: string, url: string, title: string, platform: string): void {
-    const connectorSource = db.prepare("SELECT id FROM sources WHERE name='connector'").get() as { id: number }
-    db.prepare(`
-      INSERT INTO captures
-        (source_id, capture_uuid, url, title, content_text, author, platform, platform_id, content_type, thumbnail_url, metadata, captured_at, raw_json)
-      VALUES (?, ?, ?, ?, '', NULL, ?, NULL, 'page', NULL, '{}', '2026-01-01T00:00:00Z', NULL)
-    `).run(connectorSource.id, captureUuid, url, title, platform)
-  }
-
   return {
     db,
     starItem: queryModule.starItem,
@@ -239,6 +192,5 @@ async function loadInto(_spoolDir: string) {
     listStarredItems: queryModule.listStarredItems,
     getStarredUuidsByType: queryModule.getStarredUuidsByType,
     seedSession,
-    seedCapture,
   }
 }
