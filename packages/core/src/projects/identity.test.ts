@@ -43,8 +43,6 @@ describe('computeIdentity', () => {
       spawn: (cmd: string, args: string[]) => {
         if (args.includes('remote.origin.url'))
           return { stdout: 'git@github.com:spool-lab/spool.git\n', exitCode: 0 }
-        if (args.includes('--show-toplevel'))
-          return { stdout: '/Users/chen/Code/spool\n', exitCode: 0 }
         if (args.includes('--git-common-dir'))
           return { stdout: '/Users/chen/Code/spool/.git\n', exitCode: 0 }
         return { stdout: '', exitCode: 1 }
@@ -95,5 +93,22 @@ describe('computeIdentity', () => {
     expect(id.kind).toBe('path')
     expect(id.key).toBe('/Users/chen/scratch/notes')
     expect(id.displayName).toBe('notes')
+  })
+
+  it('absolutizes a relative git_common_dir against gitRoot', () => {
+    const fs = {
+      exists: (p: string) => p.endsWith('/.git'),
+      readText: () => null,
+      spawn: (cmd: string, args: string[]) => {
+        if (args.includes('remote.origin.url'))
+          return { stdout: '', exitCode: 1 }
+        if (args.includes('--git-common-dir'))
+          return { stdout: '../shared.git\n', exitCode: 0 }   // relative
+        return { stdout: '', exitCode: 1 }
+      },
+    }
+    const id = computeIdentity('/Users/chen/Code/spool-wt', fs)
+    expect(id.kind).toBe('git_common_dir')
+    expect(id.key).toBe('/Users/chen/Code/shared.git')   // resolved up one level
   })
 })

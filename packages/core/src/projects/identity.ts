@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { dirname, basename, join } from 'node:path'
+import { dirname, basename, join, isAbsolute, resolve } from 'node:path'
 import type { ProjectIdentity, ProjectIdentityKind } from '../types.js'
 
 export interface IdentityFs {
@@ -11,6 +11,10 @@ export interface IdentityFs {
 const MANIFESTS = [
   'package.json', 'Cargo.toml', 'pyproject.toml',
   'go.mod', 'Gemfile', 'pom.xml', 'build.gradle',
+] as const
+
+const PARSEABLE_MANIFESTS = [
+  'package.json', 'Cargo.toml', 'pyproject.toml',
 ] as const
 
 const LOOSE_DIRS = new Set([
@@ -53,11 +57,14 @@ export function computeIdentity(cwd: string | null, fs: IdentityFs): ProjectIden
     }
     const common = fs.spawn('git', ['rev-parse', '--git-common-dir'], { cwd: gitRoot })
     if (common.exitCode === 0) {
-      const key = common.stdout.trim()
-      return {
-        kind: 'git_common_dir',
-        key,
-        displayName: deriveDisplayName({ kind: 'git_common_dir', key, gitRoot, fs }),
+      const raw = common.stdout.trim()
+      if (raw) {
+        const key = isAbsolute(raw) ? raw : resolve(gitRoot, raw)
+        return {
+          kind: 'git_common_dir',
+          key,
+          displayName: deriveDisplayName({ kind: 'git_common_dir', key, gitRoot, fs }),
+        }
       }
     }
   }
@@ -119,7 +126,7 @@ function deriveDisplayName(input: DisplayNameInput): string {
   // Try manifest name first
   const dir = input.gitRoot ?? (input.kind === 'manifest_path' ? input.key : null)
   if (dir) {
-    for (const m of MANIFESTS) {
+    for (const m of PARSEABLE_MANIFESTS) {
       const p = join(dir, m)
       if (input.fs.exists(p)) {
         const name = parseManifestName(m, input.fs.readText(p) ?? '')
