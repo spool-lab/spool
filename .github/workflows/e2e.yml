@@ -23,10 +23,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      - run: pnpm --filter @spool-lab/connector-sdk build
       - run: pnpm --filter @spool-lab/core build
       - run: pnpm --filter @spool-lab/core test
-      - run: pnpm --filter @spool-lab/connector-sdk test
       - run: pnpm --filter @spool-lab/cli build
       - run: pnpm --filter @spool-lab/cli test
 
@@ -51,9 +49,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: pnpm install --frozen-lockfile
-
-      - name: Build SDK
-        run: pnpm --filter @spool-lab/connector-sdk build
 
       - name: Build core
         run: pnpm --filter @spool-lab/core build
