@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
-import { dirname, basename, join, isAbsolute, resolve } from 'node:path'
+import { dirname, join, isAbsolute, resolve } from 'node:path'
 import type { ProjectIdentity, ProjectIdentityKind } from '../types.js'
+import { fallbackDisplayName } from './display-name.js'
 
 export interface IdentityFs {
   exists(path: string): boolean
@@ -83,7 +84,7 @@ export function computeIdentity(cwd: string | null, fs: IdentityFs): ProjectIden
   return {
     kind: 'path',
     key: cwd,
-    displayName: basename(cwd) || cwd,
+    displayName: fallbackDisplayName(cwd),
   }
 }
 
@@ -140,8 +141,8 @@ function deriveDisplayName(input: DisplayNameInput): string {
     return parts[parts.length - 1] || input.key
   }
   // common-dir or path → containing dir name
-  if (input.gitRoot) return basename(input.gitRoot)
-  return basename(input.key) || input.key
+  if (input.gitRoot) return fallbackDisplayName(input.gitRoot)
+  return fallbackDisplayName(input.key)
 }
 
 function parseManifestName(file: string, text: string): string | null {
