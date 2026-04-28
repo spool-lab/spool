@@ -2,6 +2,8 @@ import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
+import { computeIdentity, type IdentityFs } from '../projects/identity.js'
+import { realFs } from '../projects/fs.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -349,11 +351,30 @@ export function runMigrations(db: Database.Database): void {
       `)
     })()
     db.pragma('user_version = 6')
+    backfillProjectIdentities(db, realFs)
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
+}
+
+export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs) {
+  const rows = db.prepare(
+    `SELECT id, display_path FROM projects WHERE identity_kind IS NULL`
+  ).all() as { id: number; display_path: string }[]
+  if (rows.length === 0) return
+  const update = db.prepare(
+    `UPDATE projects
+     SET identity_kind = ?, identity_key = ?, display_name = COALESCE(?, display_name)
+     WHERE id = ?`,
+  )
+  db.transaction(() => {
+    for (const r of rows) {
+      const id = computeIdentity(r.display_path, fs)
+      update.run(id.kind, id.key, id.displayName, r.id)
+    }
+  })()
 }
 
 function rebuildFtsTableIfEmpty(
