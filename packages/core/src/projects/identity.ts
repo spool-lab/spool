@@ -152,7 +152,7 @@ function parseManifestName(file: string, text: string): string | null {
     const m =
       text.match(/"name"\s*:\s*"([^"]+)"/) ||
       text.match(/^\s*name\s*=\s*"([^"]+)"/m)
-    if (m) return m[1]
+    if (m && m[1]) return m[1]
   }
   return null
 }
