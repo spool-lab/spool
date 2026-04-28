@@ -48,6 +48,28 @@ export interface Session {
   projectDisplayName: string
 }
 
+export type ProjectIdentityKind =
+  | 'git_remote'
+  | 'git_common_dir'
+  | 'manifest_path'
+  | 'path'
+  | 'loose'
+
+export interface ProjectIdentity {
+  kind: ProjectIdentityKind
+  key: string                       // normalized origin URL / abs path / 'loose'
+  displayName: string
+}
+
+export interface ProjectGroup {
+  identityKind: ProjectIdentityKind
+  identityKey: string
+  displayName: string
+  sources: SessionSource[]          // unique sources contributing
+  sessionCount: number
+  lastSessionAt: string | null
+}
+
 export interface Message {
   id: number
   sessionId: number
