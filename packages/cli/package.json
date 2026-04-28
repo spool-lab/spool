@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": false,
   "type": "module",
   "bin": {
@@ -20,7 +20,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && chmod +x bin/spool.js",
+    "build": "pnpm run clean && tsc && chmod +x bin/spool.js",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
