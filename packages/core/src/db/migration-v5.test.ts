@@ -144,6 +144,10 @@ describe('migration v5 (connector subsystem removal)', () => {
     const dbModule = await import('./db.js')
     const db = dbModule.getDB()
 
+    // Upgrade-path detection: DB pre-existed and was on v4
+    expect(dbModule.wasNewDb()).toBe(false)
+    expect(dbModule.getInitialUserVersion()).toBe(4)
+
     // user_version bumped to 5
     expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBe(5)
 
@@ -180,6 +184,10 @@ describe('migration v5 (connector subsystem removal)', () => {
     vi.resetModules()
     const dbModule = await import('./db.js')
     const db = dbModule.getDB()
+
+    // Upgrade-path detection: DB file did not exist before this run
+    expect(dbModule.wasNewDb()).toBe(true)
+    expect(dbModule.getInitialUserVersion()).toBe(0)
 
     expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBe(5)
 

@@ -9,6 +9,7 @@ import StarredEntryButton from './components/StarredEntryButton.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
+import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
@@ -65,6 +66,7 @@ export default function App() {
 
   // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
+  const [showDaemonNotice, setShowDaemonNotice] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
@@ -176,6 +178,13 @@ export default function App() {
       .finally(() => {
         themeHydrated.current = true
       })
+  }, [])
+
+  useEffect(() => {
+    if (!window.spool?.getDaemonNoticePending) return
+    window.spool.getDaemonNoticePending()
+      .then(pending => { if (pending) setShowDaemonNotice(true) })
+      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -586,6 +595,10 @@ export default function App() {
           themeEditor={themeEditor}
           onThemeEditorChange={setThemeEditor}
         />
+      )}
+
+      {showDaemonNotice && (
+        <DaemonNoticeModal onClose={() => setShowDaemonNotice(false)} />
       )}
     </div>
   )

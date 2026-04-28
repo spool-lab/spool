@@ -141,6 +141,13 @@ const api = {
   setThemeEditorState: (state: ThemeEditorStateV1): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:set-theme-editor-state', { state }),
 
+  // Spool Daemon notice
+  getDaemonNoticePending: (): Promise<boolean> =>
+    ipcRenderer.invoke('spool:get-daemon-notice-pending'),
+
+  daemonNoticeAction: (action: 'install' | 'dismiss'): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:daemon-notice-action', { action }),
+
   // Auto-update
   onUpdateStatus: (cb: (data: { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number })

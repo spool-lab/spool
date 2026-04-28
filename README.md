@@ -6,7 +6,7 @@ The missing search engine for your own data.
   <img src="docs/spool-v0.png" alt="Spool" width="720">
 </p>
 
-Search your Claude Code sessions, Codex CLI history, Gemini CLI chats, GitHub stars, Twitter bookmarks, and YouTube likes — locally, instantly.
+Search your Claude Code sessions, Codex CLI history, and Gemini CLI chats — locally, instantly.
 
 > **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
@@ -26,13 +26,14 @@ pnpm build
 
 ## What it does
 
-Spool indexes your AI conversations and bookmarks into a single local search box.
+Spool indexes your AI conversations into a single local search box.
 
 - **AI sessions** — watches Claude/Codex/Gemini session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, and Gemini’s project temp dirs under `~/.gemini/tmp/*/chats`
-- **Connectors** — sync bookmarks and stars from platforms like Twitter/X, GitHub, and more via installable connector plugins
 - **Agent search** — a `/spool` skill inside Claude Code feeds matching fragments back into your conversation
 
 Everything stays on your machine. Nothing leaves.
+
+> Looking for connectors (Twitter / GitHub / Reddit / etc.)? They now live in **[Spool Daemon](https://spool.pro/daemon)**, a sibling app focused on syncing platform data.
 
 ## Architecture
 
@@ -73,10 +74,6 @@ releases are never tied to a local developer certificate. The script blocks
 until CI finishes; artifacts appear on the release page when it returns.
 
 To test a local build without cutting a release, use `pnpm --filter @spool/app build:mac`.
-
-## Acknowledgements
-
-- **[fieldtheory-cli](https://github.com/afar1/fieldtheory-cli)** — Twitter/X bookmark sync implementation adapted from this project
 
 ## License
 

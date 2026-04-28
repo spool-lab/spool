@@ -1,8 +1,8 @@
 # @spool-lab/core
 
-The engine behind [Spool](https://spool.pro) — a local search engine for your AI sessions and connected sources.
+The engine behind [Spool](https://spool.pro) — a local search engine for your AI sessions.
 
-This package provides the core runtime: session parsing, full-text search, the connector sync engine, and the SQLite database layer. It powers both the Spool desktop app and the `@spool-lab/cli`.
+This package provides the core runtime: session parsing, full-text search, and the SQLite database layer. It powers both the Spool desktop app and the `@spool-lab/cli`.
 
 ## Usage
 
@@ -26,9 +26,8 @@ syncer.syncAll()
 
 - **Session parsers** — reads Claude Code, Codex, and Gemini CLI session files
 - **Full-text search** — FTS5 with unicode + trigram indexes for CJK support
-- **Sync engine** — paginated connector sync with cursor-based state, backfill, and error recovery
-- **Connector loader** — discovers and loads connector plugins from `~/.spool/connectors/`
-- **Connector registry** — in-memory registry of available connectors
+- **Watcher** — incremental indexing as new session files arrive
+- **Stars** — pin sessions for quick recall
 
 ## Native dependency
 
