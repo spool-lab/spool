@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Session, Message, StarKind } from '@spool-lab/core'
+import type { Session, Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 import SessionFindBar from './SessionFindBar.js'
-import StarButton from './StarButton.js'
 
 type Props = {
   sessionUuid: string
   targetMessageId?: number | null
   onCopySessionId: (source: Session['source']) => void
-  isStarred: boolean
-  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }
 
-export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, isStarred, onToggleStar }: Props) {
+export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -214,13 +211,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         </div>
 
         <div className="flex items-center gap-1.5 flex-none self-end">
-          <StarButton
-            uuid={sessionUuid}
-            isStarred={isStarred}
-            onToggle={onToggleStar}
-            size="md"
-            testId="session-star"
-          />
           <button
             onClick={handleCopySessionId}
             title="Copy session ID for CLI resume"
