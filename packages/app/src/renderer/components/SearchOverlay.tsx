@@ -226,7 +226,7 @@ export default function SearchOverlay({
           >
             <span className="flex items-center gap-1.5">
               <span>View all results</span>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden>
                 <path d="M3 2.5L6 5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
@@ -285,7 +285,7 @@ function SearchIcon() {
 
 function ZapIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
     </svg>
   )
@@ -293,7 +293,7 @@ function ZapIcon() {
 
 function SparklesIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
       <path d="M5 3v4M19 17v4M3 5h4M17 19h4"/>
     </svg>

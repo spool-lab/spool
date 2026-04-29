@@ -120,56 +120,56 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
             </span>
           )}
         </div>
-        {meta && (
-          <p className="mt-1 text-xs text-warm-muted dark:text-dark-muted flex items-center gap-2 flex-wrap">
-            <span>{meta.count} {meta.count === 1 ? 'session' : 'sessions'}</span>
-            {meta.lastActivity && <><span aria-hidden>·</span><span>Updated {meta.lastActivity}</span></>}
-            {meta.sources.length > 0 && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="flex items-center gap-1.5">
-                  {meta.sources.map(src => (
-                    <span key={src} className="flex items-center gap-1">
-                      <span
-                        aria-hidden
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: getSessionSourceColor(src) }}
-                      />
-                      <span>{getSessionSourceLabel(src)}</span>
-                    </span>
-                  ))}
-                </span>
-              </>
-            )}
-          </p>
-        )}
-
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
-          {availableSources.length > 1 && (
-            <div className="flex items-center gap-1" role="group" aria-label="Filter by source">
-              {availableSources.map(src => {
-                const active = activeSources.has(src)
-                return (
-                  <button
-                    key={src}
-                    type="button"
-                    data-testid="source-filter-pill"
-                    data-source={src}
-                    aria-pressed={active}
-                    onClick={() => toggleSource(src)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      active
-                        ? 'border-accent bg-accent/10 text-warm-text dark:text-dark-text'
-                        : 'border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted hover:border-accent/50'
-                    }`}
-                  >
-                    {getSessionSourceLabel(src)}
-                  </button>
-                )
-              })}
-            </div>
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
+          {meta && (
+            <p className="text-xs text-warm-muted dark:text-dark-muted flex items-center gap-2 flex-wrap min-w-0">
+              <span>{meta.count} {meta.count === 1 ? 'session' : 'sessions'}</span>
+              {meta.lastActivity && <><span aria-hidden>·</span><span>Updated {meta.lastActivity}</span></>}
+              {meta.sources.length > 0 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="flex items-center gap-2 flex-wrap">
+                    {meta.sources.map(src => {
+                      const isInteractive = availableSources.length > 1
+                      const active = activeSources.has(src)
+                      const noFilter = activeSources.size === 0
+                      const visualActive = noFilter || active
+                      const content = (
+                        <>
+                          <span
+                            aria-hidden
+                            className="w-1.5 h-1.5 rounded-full flex-none"
+                            style={{ background: getSessionSourceColor(src) }}
+                          />
+                          <span>{getSessionSourceLabel(src)}</span>
+                        </>
+                      )
+                      if (!isInteractive) {
+                        return (
+                          <span key={src} className="flex items-center gap-1">{content}</span>
+                        )
+                      }
+                      return (
+                        <button
+                          key={src}
+                          type="button"
+                          data-testid="source-filter-pill"
+                          data-source={src}
+                          aria-pressed={active}
+                          onClick={() => toggleSource(src)}
+                          className={`flex items-center gap-1 rounded transition-opacity hover:text-warm-text dark:hover:text-dark-text ${
+                            visualActive ? 'opacity-100' : 'opacity-40'
+                          } ${active ? 'text-warm-text dark:text-dark-text' : ''}`}
+                        >
+                          {content}
+                        </button>
+                      )
+                    })}
+                  </span>
+                </>
+              )}
+            </p>
           )}
-
           <div className="ml-auto">
             <Menu
               align="right"
@@ -206,6 +206,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
             />
           </div>
         </div>
+
       </div>
 
       <div className="flex-1 overflow-y-auto">

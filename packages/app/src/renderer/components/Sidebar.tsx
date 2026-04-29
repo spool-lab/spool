@@ -163,25 +163,27 @@ function getSyncStatusText(
 ): string {
   if (syncStatus) {
     if (syncStatus.phase === 'scanning') return 'Scanning…'
-    if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total}…`
+    if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total}`
     if (syncStatus.phase === 'indexing') return 'Building index…'
-    if (syncStatus.phase === 'done') return `Synced · ${status?.totalSessions ?? '…'} sessions`
+    if (syncStatus.phase === 'done' && status) {
+      return `${status.totalSessions} sessions · now`
+    }
   }
   if (!status) return 'Loading…'
-  const lastSync = status.lastSyncedAt ? formatTimeAgo(status.lastSyncedAt) : 'never'
-  return `Synced ${lastSync} · ${status.totalSessions} sessions`
+  const lastSync = status.lastSyncedAt ? formatShortTimeAgo(status.lastSyncedAt) : 'never'
+  return `${status.totalSessions} sessions · ${lastSync}`
 }
 
-function formatTimeAgo(iso: string): string {
+function formatShortTimeAgo(iso: string): string {
   try {
     const utcIso = iso.endsWith('Z') ? iso : iso + 'Z'
     const diff = Date.now() - new Date(utcIso).getTime()
     const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return 'just now'
-    if (minutes < 60) return `${minutes}m ago`
+    if (minutes < 1) return 'now'
+    if (minutes < 60) return `${minutes}m`
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h ago`
-    return `${Math.floor(hours / 24)}d ago`
+    if (hours < 24) return `${hours}h`
+    return `${Math.floor(hours / 24)}d`
   } catch {
     return iso
   }
