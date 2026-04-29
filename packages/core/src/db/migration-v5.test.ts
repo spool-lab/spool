@@ -148,8 +148,8 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(dbModule.wasNewDb()).toBe(false)
     expect(dbModule.getInitialUserVersion()).toBe(4)
 
-    // user_version bumped to 5
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBe(5)
+    // user_version bumped past 5 (current head is 6)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(5)
 
     // Connector tables and FTS gone
     const tablesAfter = db.prepare("SELECT name FROM sqlite_master WHERE type='table' OR type='virtual'").all() as Array<{ name: string }>
@@ -189,7 +189,7 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(dbModule.wasNewDb()).toBe(true)
     expect(dbModule.getInitialUserVersion()).toBe(0)
 
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBe(5)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(5)
 
     // Stars exists with narrow CHECK
     expect(() => db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'x')").run()).toThrow()

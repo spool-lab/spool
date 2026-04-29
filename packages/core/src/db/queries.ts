@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, StarKind, StarredItem } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, StarKind, StarredItem, ProjectIdentityKind } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
 import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
@@ -9,6 +9,7 @@ export function getOrCreateProject(
   slug: string,
   displayPath: string,
   displayName: string,
+  identity: { identityKind: ProjectIdentityKind; identityKey: string },
 ): number {
   const existing = db
     .prepare('SELECT id FROM projects WHERE source_id = ? AND slug = ?')
@@ -18,9 +19,9 @@ export function getOrCreateProject(
 
   const result = db
     .prepare(
-      'INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (?, ?, ?, ?)',
+      'INSERT INTO projects (source_id, slug, display_path, display_name, identity_kind, identity_key) VALUES (?, ?, ?, ?, ?, ?)',
     )
-    .run(sourceId, slug, displayPath, displayName)
+    .run(sourceId, slug, displayPath, displayName, identity.identityKind, identity.identityKey)
 
   return Number(result.lastInsertRowid)
 }

@@ -2,6 +2,8 @@ import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
+import { computeIdentity, type IdentityFs } from '../projects/identity.js'
+import { realFs } from '../projects/fs.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -42,7 +44,7 @@ export function getDBSize(): number {
   }
 }
 
-function runMigrations(db: Database.Database): void {
+export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sources (
       id        INTEGER PRIMARY KEY,
@@ -318,9 +320,61 @@ function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 5')
   }
 
+  if (version < 6) {
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE projects ADD COLUMN identity_kind TEXT;
+        ALTER TABLE projects ADD COLUMN identity_key  TEXT;
+        CREATE INDEX IF NOT EXISTS idx_projects_identity
+          ON projects (identity_kind, identity_key);
+
+        CREATE VIEW IF NOT EXISTS project_groups_v AS
+        SELECT
+          p.identity_kind,
+          p.identity_key,
+          MIN(p.display_name)              AS display_name,
+          GROUP_CONCAT(DISTINCT s.name)    AS sources_csv,
+          COALESCE(SUM(c.session_count),0) AS session_count,
+          MAX(c.last_session_at)           AS last_session_at
+        FROM projects p
+        JOIN sources s ON s.id = p.source_id
+        LEFT JOIN (
+          SELECT project_id,
+                 COUNT(*)         AS session_count,
+                 MAX(started_at)  AS last_session_at
+          FROM sessions
+          WHERE message_count > 0
+          GROUP BY project_id
+        ) c ON c.project_id = p.id
+        WHERE p.identity_kind IS NOT NULL
+        GROUP BY p.identity_kind, p.identity_key;
+      `)
+    })()
+    db.pragma('user_version = 6')
+    backfillProjectIdentities(db, realFs)
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
+}
+
+export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs) {
+  const rows = db.prepare(
+    `SELECT id, display_path FROM projects WHERE identity_kind IS NULL`
+  ).all() as { id: number; display_path: string }[]
+  if (rows.length === 0) return
+  const update = db.prepare(
+    `UPDATE projects
+     SET identity_kind = ?, identity_key = ?, display_name = COALESCE(?, display_name)
+     WHERE id = ?`,
+  )
+  db.transaction(() => {
+    for (const r of rows) {
+      const id = computeIdentity(r.display_path, fs)
+      update.run(id.kind, id.key, id.displayName, r.id)
+    }
+  })()
 }
 
 function rebuildFtsTableIfEmpty(
