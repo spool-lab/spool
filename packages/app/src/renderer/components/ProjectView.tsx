@@ -109,7 +109,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
 
   return (
     <div data-testid="project-view" className="flex flex-col h-full overflow-hidden">
-      <div className="flex-none px-6 pt-6 pb-3 border-b border-warm-border dark:border-dark-border">
+      <div className="flex-none px-6 pt-3 pb-3 border-b border-warm-border dark:border-dark-border">
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
             {group?.displayName ?? identityKey}

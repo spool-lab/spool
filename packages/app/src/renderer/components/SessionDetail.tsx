@@ -235,7 +235,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   return (
     <div className="flex flex-col h-full" data-testid="session-detail">
       {/* Session header */}
-      <div className="flex-none flex items-start gap-3 px-6 pt-6 pb-3 border-b border-warm-border dark:border-dark-border">
+      <div className="flex-none flex items-start gap-3 px-6 pt-3 pb-3 border-b border-warm-border dark:border-dark-border">
         {onBack && (
           <button
             type="button"

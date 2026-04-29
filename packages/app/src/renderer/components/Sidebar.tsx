@@ -33,7 +33,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       data-testid="sidebar"
       className="w-60 flex-none border-r border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
-      <div className="px-4 pt-5 pb-3 flex-none">
+      <div className="px-4 pt-3 pb-3 flex-none">
         <button
           type="button"
           data-testid="sidebar-home"
