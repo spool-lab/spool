@@ -5,6 +5,7 @@ import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
   starItem, unstarItem, listStarredItems, getStarredUuidsByType,
+  listProjectGroups,
 } from '@spool-lab/core'
 import type { FragmentResult, SessionSource, StarKind } from '@spool-lab/core'
 import { setupTray } from './tray.js'
@@ -274,6 +275,10 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
 
 ipcMain.handle('spool:list-sessions', (_e, { limit = 50 }: { limit?: number } = {}) => {
   return listRecentSessions(db, limit)
+})
+
+ipcMain.handle('spool:list-project-groups', () => {
+  return listProjectGroups(db)
 })
 
 ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string }) => {
