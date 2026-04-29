@@ -81,9 +81,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
         setPinnedSessions(prev => [candidate, ...prev])
       }
     } else {
-      const candidate = pinnedSessions.find(s => s.sessionUuid === sessionUuid)
       setPinnedSessions(prev => prev.filter(s => s.sessionUuid !== sessionUuid))
-      if (candidate) setSessions(prev => [candidate, ...(prev ?? [])])
     }
     setReloadKey(k => k + 1)
   }
@@ -189,7 +187,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
           <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
             Loading sessions…
           </div>
-        ) : sessions.length === 0 ? (
+        ) : sessions.length === 0 && pinnedSessions.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <p className="text-sm text-warm-muted dark:text-dark-muted">No sessions match these filters.</p>
             {activeSources.size > 0 && (
