@@ -164,12 +164,11 @@ describe('migration v5 (connector subsystem removal)', () => {
     const sources = db.prepare('SELECT name FROM sources').all() as Array<{ name: string }>
     expect(sources.map(s => s.name).sort()).toEqual(['claude', 'codex', 'gemini'])
 
-    // Session star preserved, capture star gone
-    const stars = db.prepare('SELECT item_type, item_uuid FROM stars').all()
-    expect(stars).toEqual([{ item_type: 'session', item_uuid: 'sess-uuid' }])
-
-    // Stars CHECK is now session-only — inserting 'capture' must throw
-    expect(() => db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'x')").run()).toThrow()
+    // After v7: stars dropped, session star preserved as pin, capture star gone
+    expect(tableNames.has('stars')).toBe(false)
+    expect(tableNames.has('pins')).toBe(true)
+    const pins = db.prepare('SELECT session_uuid FROM pins').all()
+    expect(pins).toEqual([{ session_uuid: 'sess-uuid' }])
 
     // Session itself still there
     const sess = db.prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'").get() as { session_uuid: string }
@@ -189,12 +188,11 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(dbModule.wasNewDb()).toBe(true)
     expect(dbModule.getInitialUserVersion()).toBe(0)
 
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(5)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(7)
 
-    // Stars exists with narrow CHECK
-    expect(() => db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'x')").run()).toThrow()
-    db.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('session', 'x')").run()
-    expect(db.prepare('SELECT COUNT(*) AS c FROM stars').get()).toEqual({ c: 1 })
+    // Fresh install lands on v7 schema: pins exists, stars dropped
+    db.prepare('INSERT INTO pins (session_uuid) VALUES (?)').run('x')
+    expect(db.prepare('SELECT COUNT(*) AS c FROM pins').get()).toEqual({ c: 1 })
 
     db.close()
   })
