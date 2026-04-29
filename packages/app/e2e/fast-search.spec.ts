@@ -148,7 +148,7 @@ test('source-filtered click still jumps to message with flash highlight', async 
   // Multi-source query so the filter tabs render.
   await search(window, 'CANARY')
   // Switch to the claude filter tab, then click a surviving row.
-  await window.getByRole('button', { name: 'Claude Code' }).click()
+  await window.getByRole('button', { name: 'Claude Code', exact: true }).click()
   await window.locator('[data-testid="fragment-row"]').first().click()
 
   const target = window.locator('[data-testid="target-message"]')

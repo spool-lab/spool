@@ -80,10 +80,15 @@ function ProjectRow({
   active: boolean
   onClick: () => void
 }) {
+  const sourceList = group.sources.map(getSessionSourceLabel).join(', ')
+  const ariaLabel = sourceList
+    ? `${group.displayName}, ${sourceList}, ${group.sessionCount} sessions`
+    : `${group.displayName}, ${group.sessionCount} sessions`
   return (
     <button
       data-testid="sidebar-project-row"
       data-identity-key={group.identityKey}
+      aria-label={ariaLabel}
       onClick={onClick}
       className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
         active
