@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Star } from 'lucide-react'
-import type { FragmentResult, StarKind } from '@spool-lab/core'
+import type { FragmentResult } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
-import StarButton from './StarButton.js'
 import { SourceBadge } from './Badges.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import { getSessionSourceLabel } from '../../shared/sessionSources.js'
@@ -16,25 +14,15 @@ type Props = {
   onOpenSession: (uuid: string, messageId?: number) => void
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
-  starredSessions: Set<string>
-  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }
 
-export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, starredSessions, onToggleStar }: Props) {
+export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId }: Props) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
-
-  const isResultStarred = (r: FragmentRowResult): boolean =>
-    starredSessions.has(r.sessionUuid)
 
   useEffect(() => {
     setSortOrder(defaultSortOrder)
   }, [defaultSortOrder])
-
-  useEffect(() => {
-    if (activeFilter === 'starred' && !results.some(isResultStarred)) setActiveFilter('all')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFilter, results, starredSessions])
 
   if (results.length === 0) {
     return (
@@ -53,19 +41,16 @@ export default function FragmentResults({ results, query, onOpenSession, default
   }
 
   const sourceKeys = [...new Set(results.map(r => r.source))]
-  const starredInResults = results.some(isResultStarred)
   const filtered = activeFilter === 'all'
     ? results
-    : activeFilter === 'starred'
-      ? results.filter(isResultStarred)
-      : results.filter(r => r.source === activeFilter)
+    : results.filter(r => r.source === activeFilter)
   const sortedResults = sortResults(filtered, sortOrder)
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-warm-border dark:border-dark-border px-4 min-h-11 flex-none">
         <div className="flex gap-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none">
-          {(['all', ...(starredInResults ? ['starred'] : []), ...sourceKeys] as string[]).map(src => (
+          {(['all', ...sourceKeys] as string[]).map(src => (
             <button
               key={src}
               onClick={() => setActiveFilter(src)}
@@ -75,10 +60,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
                   : 'border-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
               }`}
             >
-              {src === 'starred' && (
-                <Star size={11} strokeWidth={2} fill="currentColor" className="text-accent dark:text-accent-dark flex-none" />
-              )}
-              {src === 'all' ? 'All' : src === 'starred' ? 'Starred' : formatSourceFilterLabel(src)}
+              {src === 'all' ? 'All' : formatSourceFilterLabel(src)}
             </button>
           ))}
         </div>
@@ -115,8 +97,6 @@ export default function FragmentResults({ results, query, onOpenSession, default
               result={result}
               onOpenSession={onOpenSession}
               onCopySessionId={onCopySessionId}
-              isStarred={starredSessions.has(result.sessionUuid)}
-              onToggleStar={onToggleStar}
             />
           ))}
         </div>
@@ -136,14 +116,10 @@ function FragmentRow({
   result,
   onOpenSession,
   onCopySessionId,
-  isStarred,
-  onToggleStar,
 }: {
   result: FragmentRowResult
   onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
-  isStarred: boolean
-  onToggleStar: (kind: StarKind, uuid: string, next: boolean) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatRelativeDate(result.startedAt)
@@ -152,7 +128,6 @@ function FragmentRow({
   return (
     <div
       data-testid="fragment-row"
-      data-starred={isStarred ? '1' : '0'}
       className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
     >
       <div
@@ -167,12 +142,6 @@ function FragmentRow({
             {result.matchCount > 1 && <span data-testid="match-count"> · {result.matchCount} matches</span>}
           </span>
           <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-          <StarButton
-            uuid={result.sessionUuid}
-            isStarred={isStarred}
-            onToggle={onToggleStar}
-            testId="fragment-star"
-          />
         </div>
 
         <p
