@@ -14,13 +14,16 @@
 - **Differentiation:** Every competitor (Raycast, Alfred, DevonThink) uses cold grays or pure blacks. Spool's warm near-blacks and amber accent are a deliberate departure — the product deals with memory and personal thinking, and should feel accordingly.
 
 ## Layout Philosophy
-- **Core principle:** The search box is the universe's center. Everything else orbits it.
-- **Home state:** Google homepage feel — large centered logo, large centered search box, source chips below as ambient context. Empty space is intentional — it creates gravity toward the search box.
-- **Results state:** Bar compresses to top (logo shrinks to `S.`), results fill the page. Transition echoes Google's home→results animation.
-- **Approach:** Compact utility. Window width ~720px. Not a document, not a dashboard.
-- **Alignment:** Left-aligned results. Centered only on the home/idle screen.
-- **Max content width:** 720px (window width)
-- **Border radius:** pill (9999px) for search bar / 10px for cards / 8px for inputs / 6px for buttons / 4px for badges
+- **Core principle:** Spool is an AI session library. The sidebar (projects) and main pane (sessions) are the home; search is one of several entry points, reachable via ⌘K.
+- **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and is always visible. Main pane is the active surface — currently the search-first home, transitioning to a project view in subsequent PRs.
+- **Sidebar:** Warm surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label, then project rows. A divider separates derived projects from the always-last `Loose` entry.
+- **Project row:** Display name on the left, faint source-color dots in the middle, monospace count on the right. Active row uses `surface2` background. Hover lifts to the same `surface2`.
+- **Home state (transitional):** Google-homepage feel inside the main pane — large centered logo, large centered search box, source chips below. Empty space is intentional. This will be replaced by Project View in PR 4.
+- **Results state:** Search bar compresses to top of main pane (logo shrinks to `S.`), results fill the pane below. Sidebar remains visible.
+- **Approach:** Compact utility. Window width ~960px to fit sidebar + main pane comfortably. Not a document, not a dashboard.
+- **Alignment:** Left-aligned results. Centered only on the home/idle screen inside the main pane.
+- **Max content width:** Main pane content stays at ~720px max for readability; sidebar fixed 240px.
+- **Border radius:** pill (9999px) for search bar / 10px for cards / 8px for inputs / 6px for sidebar rows and buttons / 4px for badges
 
 ## Typography
 - **Logo/Display:** Geist Sans 700 — large, tight letter-spacing (−0.04em), the period after "Spool" in accent color.
