@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { computeIdentity, type IdentityFs } from '../projects/identity.js'
 import { realFs } from '../projects/fs.js'
@@ -228,22 +228,29 @@ export function runMigrations(db: Database.Database): void {
   // the next sequential version number.
   const version = (db.pragma('user_version') as [{ user_version: number }])[0].user_version
 
-  // Historical connector migrations (v1-v3): all operate on the captures /
-  // connector_sync_state tables that were dropped in v5. Wrapped to no-op
-  // when those tables aren't present (fresh install on the post-v5 schema).
+  // Historical connector migrations (v1-v3): all operate on tables that v5
+  // dropped (connector_sync_state, captures, capture_connectors,
+  // captures_fts*). Guard each on the relevant table existing — fresh
+  // installs (post-v5 schema) skip these without ever touching the SQL.
   if (version < 1) {
-    try { db.exec('ALTER TABLE connector_sync_state ADD COLUMN last_error_at TEXT') } catch {}
+    if (tableExists(db, 'connector_sync_state')) {
+      db.exec('ALTER TABLE connector_sync_state ADD COLUMN last_error_at TEXT')
+    }
     db.pragma('user_version = 1')
   }
 
   if (version < 2) {
-    try { db.exec("INSERT INTO captures_fts(captures_fts) VALUES('rebuild')") } catch {}
-    try { db.exec("INSERT INTO captures_fts_trigram(captures_fts_trigram) VALUES('rebuild')") } catch {}
+    if (tableExists(db, 'captures_fts')) {
+      db.exec("INSERT INTO captures_fts(captures_fts) VALUES('rebuild')")
+    }
+    if (tableExists(db, 'captures_fts_trigram')) {
+      db.exec("INSERT INTO captures_fts_trigram(captures_fts_trigram) VALUES('rebuild')")
+    }
     db.pragma('user_version = 2')
   }
 
   if (version < 3) {
-    try {
+    if (tableExists(db, 'captures') && tableExists(db, 'capture_connectors')) {
       db.transaction(() => {
         db.exec(`
           INSERT OR IGNORE INTO capture_connectors (capture_id, connector_id)
@@ -263,7 +270,7 @@ export function runMigrations(db: Database.Database): void {
         `)
         db.exec(`DROP INDEX IF EXISTS idx_captures_source`)
       })()
-    } catch {}
+    }
     db.pragma('user_version = 3')
   }
 
@@ -289,8 +296,9 @@ export function runMigrations(db: Database.Database): void {
     // SQLite can't ALTER a CHECK constraint, so we rebuild the stars table.
     // For users who never had the wide CHECK (fresh install on post-v5
     // schema), the rebuild is a no-op rename round-trip — safe and cheap.
-    // Captures data is dropped without backup; users were directed to Spool
-    // Daemon for connector functionality.
+    // Captures data is dropped here; users were directed to Spool Daemon for
+    // connector functionality. We snapshot first so the data is recoverable.
+    backupBeforeDestructive(db, 4)
     db.transaction(() => {
       db.exec(`DROP TRIGGER IF EXISTS captures_fts_insert`)
       db.exec(`DROP TRIGGER IF EXISTS captures_fts_delete`)
@@ -355,6 +363,7 @@ export function runMigrations(db: Database.Database): void {
   }
 
   if (version < 7) {
+    backupBeforeDestructive(db, 6)
     db.transaction(() => {
       db.exec(`
         CREATE TABLE pins (
@@ -391,6 +400,43 @@ export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs)
       update.run(id.kind, id.key, id.displayName, r.id)
     }
   })()
+}
+
+function tableExists(db: Database.Database, name: string): boolean {
+  const row = db.prepare(
+    `SELECT name FROM sqlite_master WHERE type IN ('table','virtual') AND name = ?`,
+  ).get(name) as { name: string } | undefined
+  return row !== undefined
+}
+
+/**
+ * Snapshot the DB to `<dbDir>/backups/spool-pre-v{fromVersion+1}-<ts>.db`
+ * via VACUUM INTO, before a destructive migration runs.
+ *
+ * Returns the backup file path on success, or null when a backup is skipped:
+ *   - in-memory DBs (db.memory)
+ *   - fresh-install / no-data DBs (sessions table empty or missing)
+ *
+ * Each call writes to a distinct path; v5 and v7 produce separate files.
+ */
+export function backupBeforeDestructive(
+  db: Database.Database,
+  fromVersion: number,
+): string | null {
+  if (db.memory) return null
+  const dbPath = db.name
+  if (!dbPath) return null
+  if (!tableExists(db, 'sessions')) return null
+
+  const sessions = db.prepare(`SELECT COUNT(*) AS c FROM sessions`).get() as { c: number }
+  if (sessions.c === 0) return null
+
+  const backupDir = join(dirname(dbPath), 'backups')
+  mkdirSync(backupDir, { recursive: true })
+  const ts = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupPath = join(backupDir, `spool-pre-v${fromVersion + 1}-${ts}.db`)
+  db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`)
+  return backupPath
 }
 
 function rebuildFtsTableIfEmpty(
