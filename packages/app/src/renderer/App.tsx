@@ -210,8 +210,9 @@ export default function App() {
     if (!q.trim()) { setResults([]); setIsSearching(false); return }
     const requestId = ++searchRequestSeq.current
     setIsSearching(true)
+    const scopedKey = searchScope === 'project' && activeProjectKey ? activeProjectKey : undefined
     try {
-      const res = window.spool ? await window.spool.search(q, 20) : []
+      const res = window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : []
       if (requestId !== searchRequestSeq.current) return
       startTransition(() => {
         setResults(res)
@@ -221,7 +222,7 @@ export default function App() {
         setIsSearching(false)
       }
     }
-  }, [])
+  }, [searchScope, activeProjectKey])
 
   const doPreviewSearch = useCallback(async (q: string) => {
     if (!q.trim() || !window.spool?.searchPreview) {
