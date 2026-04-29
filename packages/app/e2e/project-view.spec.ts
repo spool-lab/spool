@@ -57,7 +57,8 @@ test('changing sort order reloads sessions', async () => {
 
   const recentFirst = await window.locator('[data-testid="session-row"]').first().getAttribute('data-session-uuid')
 
-  await window.locator('[data-testid="project-sort"]').selectOption('oldest')
+  await window.locator('[data-testid="project-sort"]').click()
+  await window.getByRole('menuitem', { name: 'Oldest' }).click()
   await expect(window.locator('[data-testid="session-row"]').first()).toBeVisible({ timeout: 5000 })
 
   const oldestFirst = await window.locator('[data-testid="session-row"]').first().getAttribute('data-session-uuid')

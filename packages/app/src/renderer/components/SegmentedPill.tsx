@@ -6,6 +6,7 @@ interface SegmentedOption<T extends string> {
   icon?: ReactNode
   hideLabel?: boolean
   testId?: string
+  title?: string
 }
 
 interface Props<T extends string> {
@@ -33,6 +34,8 @@ export default function SegmentedPill<T extends string>({
           key={option.value}
           type="button"
           data-testid={option.testId}
+          title={option.title ?? option.label}
+          aria-label={option.title ?? option.label}
           onClick={() => onChange(option.value)}
           className={[
             'flex items-center gap-1 rounded-[16px] text-[11px] font-medium cursor-pointer border-none transition-all duration-[120ms]',

@@ -16,7 +16,7 @@ test('home view shows title and session counts after sync', async () => {
 
   await expect(window.locator('h1')).toContainText('AI Session Library')
   await waitForSync(window)
-  await expect(window.locator('[data-testid="library-project-card"]').first()).toBeVisible()
+  await expect(window.locator('[data-testid="session-row"]').first()).toBeVisible({ timeout: 5000 })
 })
 
 test('search finds fixture content by canary keyword', async () => {
@@ -121,9 +121,7 @@ test('session page can submit a new search without returning home first', async 
   await window.locator('[data-testid="fragment-row"]').first().click()
   await expect(window.locator('[data-testid="session-detail"]')).toBeVisible()
 
-  const input = window.locator('[data-testid="search-input"]')
-  await input.fill('TROMBONE_CANARY_99')
-  await input.press('Enter')
+  await search(window, 'TROMBONE_CANARY_99')
 
   await expect(window.locator('[data-testid="session-detail"]')).toHaveCount(0)
   await expect(window.locator('[data-testid="fragment-row"]').first()).toContainText('TROMBONE_CANARY_99')

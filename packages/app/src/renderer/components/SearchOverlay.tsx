@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import type { FragmentResult, SearchResult, SessionSource } from '@spool-lab/core'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { FragmentResult } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
+import SegmentedPill from './SegmentedPill.js'
+import type { SearchMode } from './SearchBar.js'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -12,11 +14,15 @@ type Props = {
   initialQuery: string
   scope: Scope
   scopeProjectName: string | null
+  scopeProjectKey: string | null
   defaultScope: Scope
+  mode: SearchMode
+  onModeChange?: (mode: SearchMode) => void
+  agentSelector?: ReactNode
   onClose: () => void
   onScopeChange: (scope: Scope) => void
   onCommit: (query: string) => void
-  onOpenResult: (uuid: string, messageId?: number) => void
+  onOpenResult: (uuid: string, messageId: number | undefined, query: string) => void
 }
 
 export default function SearchOverlay({
@@ -24,7 +30,11 @@ export default function SearchOverlay({
   initialQuery,
   scope,
   scopeProjectName,
+  scopeProjectKey,
   defaultScope,
+  mode,
+  onModeChange,
+  agentSelector,
   onClose,
   onScopeChange,
   onCommit,
@@ -47,6 +57,11 @@ export default function SearchOverlay({
 
   useEffect(() => {
     if (!open) return
+    if (mode === 'ai') {
+      setResults([])
+      setSearching(false)
+      return
+    }
     const trimmed = query.trim()
     if (!trimmed) {
       setResults([])
@@ -55,22 +70,20 @@ export default function SearchOverlay({
     }
     const seq = ++seqRef.current
     setSearching(true)
+    const scopedKey = scope === 'project' && scopeProjectKey ? scopeProjectKey : undefined
     const timer = setTimeout(async () => {
       try {
-        const raw = await window.spool.search(trimmed, 20)
+        const raw = await window.spool.search(trimmed, 20, undefined, false, scopedKey)
         if (seq !== seqRef.current) return
         const fragments = raw.filter((r): r is FragmentSearchResult => r.kind === 'fragment')
-        const filtered = scope === 'project' && scopeProjectName
-          ? fragments.filter(r => sourceMatchesProject(r, scopeProjectName))
-          : fragments
-        setResults(filtered)
+        setResults(fragments)
         setActiveIndex(0)
       } finally {
         if (seq === seqRef.current) setSearching(false)
       }
     }, 120)
     return () => clearTimeout(timer)
-  }, [open, query, scope, scopeProjectName])
+  }, [open, query, scope, scopeProjectKey, mode])
 
   function handleKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
@@ -96,12 +109,12 @@ export default function SearchOverlay({
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      if (event.shiftKey) {
+      if (event.shiftKey || mode === 'ai') {
         if (query.trim()) onCommit(query)
         return
       }
       const target = results[activeIndex]
-      if (target) onOpenResult(target.sessionUuid, target.messageId)
+      if (target) onOpenResult(target.sessionUuid, target.messageId, query)
     }
   }
 
@@ -129,6 +142,19 @@ export default function SearchOverlay({
             className="flex-1 bg-transparent outline-none text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint"
           />
           {searching && <span className="text-[10px] text-warm-faint">searching…</span>}
+          {onModeChange && (
+            <SegmentedPill
+              value={mode}
+              onChange={onModeChange}
+              compact
+              ariaLabel="Search mode"
+              options={[
+                { value: 'fast', label: 'Fast', icon: <ZapIcon />, hideLabel: true, title: 'Fast — instant FTS over your indexed sessions' },
+                { value: 'ai', label: 'Agent', icon: <SparklesIcon />, hideLabel: true, testId: 'mode-agent', title: 'Agent — let an AI agent answer using your sessions as context' },
+              ]}
+            />
+          )}
+          {mode === 'ai' && agentSelector}
         </div>
 
         <div className="px-4 py-2 flex items-center gap-2 border-b border-warm-border dark:border-dark-border">
@@ -152,7 +178,11 @@ export default function SearchOverlay({
         <div className="max-h-[50vh] overflow-y-auto">
           {results.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
-              {query.trim() ? 'No matches.' : `Default scope: ${defaultScope === 'project' ? 'current project' : 'all projects'}.`}
+              {mode === 'ai' && query.trim()
+                ? <>Press <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">↵</kbd> to ask the agent.</>
+                : query.trim()
+                  ? 'No matches.'
+                  : `Default scope: ${defaultScope === 'project' ? 'current project' : 'all projects'}.`}
             </div>
           ) : (
             <ul role="listbox">
@@ -162,7 +192,7 @@ export default function SearchOverlay({
                   role="option"
                   aria-selected={index === activeIndex}
                   onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => onOpenResult(result.sessionUuid, result.messageId)}
+                  onClick={() => onOpenResult(result.sessionUuid, result.messageId, query)}
                   className={`px-4 py-2.5 cursor-pointer border-b border-warm-border/50 dark:border-dark-border/50 ${
                     index === activeIndex ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
                   }`}
@@ -184,14 +214,25 @@ export default function SearchOverlay({
           )}
         </div>
 
-        <div className="px-4 py-2 text-[10px] text-warm-faint dark:text-dark-muted border-t border-warm-border dark:border-dark-border flex items-center gap-3">
-          <Hint label="↑↓" desc="navigate" />
-          <Hint label="↵" desc="open" />
-          <Hint label="⇧↵" desc="see all results" />
-          <Hint label="Tab" desc="scope" />
-          <Hint label="Esc" desc="close" />
-          <span className="ml-auto">{results.length > 0 ? `${results.length} results` : ''}</span>
-        </div>
+        {results.length > 0 && (
+          <button
+            type="button"
+            data-testid="search-overlay-view-all"
+            onClick={() => { if (query.trim()) onCommit(query) }}
+            className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-between text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>View all results</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                <path d="M3 2.5L6 5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="flex items-center gap-2">
+              <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">⇧↵</kbd>
+              <span className="text-warm-faint">{results.length} results</span>
+            </span>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -230,15 +271,6 @@ function ScopeChip({
   )
 }
 
-function Hint({ label, desc }: { label: string; desc: string }) {
-  return (
-    <span className="flex items-center gap-1">
-      <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">{label}</kbd>
-      <span>{desc}</span>
-    </span>
-  )
-}
-
 function SearchIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-warm-muted dark:text-dark-muted flex-none">
@@ -248,12 +280,23 @@ function SearchIcon() {
   )
 }
 
-function snippetWithStrong(snippet: string): string {
-  return snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
+function ZapIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+  )
 }
 
-function sourceMatchesProject(_result: SearchResult & { kind: 'fragment' }, _projectName: string): boolean {
-  // Project scoping is approximate when results don't expose identityKey; future:
-  // pass identityKey into search call. For now, compare by project name fragment.
-  return true
+function SparklesIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
+      <path d="M5 3v4M19 17v4M3 5h4M17 19h4"/>
+    </svg>
+  )
+}
+
+function snippetWithStrong(snippet: string): string {
+  return snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
 }

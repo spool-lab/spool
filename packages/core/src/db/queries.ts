@@ -225,38 +225,33 @@ export function getSessionWithMessages(
 export function searchFragments(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { limit?: number; source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): FragmentResult[] {
-  const { limit = 10, source, since, onlyPinned } = opts
+  const { limit = 10, source, since, onlyPinned, identityKey } = opts
 
   const rowLimit = Math.max(limit * 10, 50)
   const naturalTerms = getNaturalSearchTerms(query)
   const naturalPhrase = getNaturalSearchPhrase(query)
   const canUseSessionFts = canUseSessionSearchFts(query)
 
+  const sharedOpts = {
+    ...(source ? { source } : {}),
+    ...(since ? { since } : {}),
+    ...(onlyPinned ? { onlyPinned } : {}),
+    ...(identityKey ? { identityKey } : {}),
+  }
+
   if (naturalTerms.length === 1) {
-    return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', {
-      ...(source ? { source } : {}),
-      ...(since ? { since } : {}),
-      ...(onlyPinned ? { onlyPinned } : {}),
-    }).slice(0, limit)
+    return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', sharedOpts).slice(0, limit)
   }
 
   const groups = buildSearchPlan(query).map(step => {
     if (naturalTerms.length > 1 && (step.matchType === 'phrase' || step.matchType === 'all_terms')) {
-      return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, {
-        ...(source ? { source } : {}),
-        ...(since ? { since } : {}),
-        ...(onlyPinned ? { onlyPinned } : {}),
-      })
+      return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, sharedOpts)
     }
 
     const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'
-    const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, {
-      ...(source ? { source } : {}),
-      ...(since ? { since } : {}),
-      ...(onlyPinned ? { onlyPinned } : {}),
-    })
+    const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, sharedOpts)
     return collapseFragmentRows(rows, step.matchType)
   })
 
@@ -315,9 +310,9 @@ function searchFragmentRows(
   ftsTable: 'messages_fts' | 'messages_fts_trigram',
   ftsQuery: string,
   limit: number,
-  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyPinned } = opts
+  const { source, since, onlyPinned, identityKey } = opts
   const conditions: string[] = [`${ftsTable} MATCH ?`, 'm.is_sidechain = 0']
   const params: (string | number)[] = [ftsQuery]
 
@@ -331,6 +326,10 @@ function searchFragmentRows(
   }
   if (onlyPinned) {
     conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+  }
+  if (identityKey) {
+    conditions.push('p.identity_key = ?')
+    params.push(identityKey)
   }
   params.push(limit)
 
@@ -501,7 +500,7 @@ function searchFragmentSessionFallback(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): FragmentResult[] {
   if (terms.length < 1) return []
 
@@ -585,7 +584,7 @@ function searchSessionRowsByTerms(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): Array<Record<string, unknown>> {
   if (canUseSessionSearchFts(phrase)) {
     return searchSessionRowsByFts(db, terms, phrase, limit, matchType, opts)
@@ -598,9 +597,9 @@ function searchSessionRowsByLike(
   db: Database.Database,
   terms: string[],
   limit: number,
-  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyPinned } = opts
+  const { source, since, onlyPinned, identityKey } = opts
   const titleScoreParts: string[] = []
   const whereClauses: string[] = []
   const scoreParams: string[] = []
@@ -635,6 +634,10 @@ function searchSessionRowsByLike(
   }
   if (onlyPinned) {
     conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+  }
+  if (identityKey) {
+    conditions.push('p.identity_key = ?')
+    params.push(identityKey)
   }
   params.push(limit)
 
@@ -672,9 +675,9 @@ function searchSessionRowsByFts(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyPinned } = opts
+  const { source, since, onlyPinned, identityKey } = opts
   const ftsTable = selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
   const ftsQuery = matchType === 'phrase'
     ? `"${phrase.replace(/"/g, '""')}"`
@@ -707,6 +710,10 @@ function searchSessionRowsByFts(
   }
   if (onlyPinned) {
     conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+  }
+  if (identityKey) {
+    conditions.push('p.identity_key = ?')
+    params.push(identityKey)
   }
   params.push(limit)
 

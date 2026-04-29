@@ -41,8 +41,8 @@ export interface AgentsConfig {
 export type SpoolAPI = typeof api
 
 const api = {
-  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean): Promise<SearchResult[]> =>
-    ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned }),
+  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean, identityKey?: string): Promise<SearchResult[]> =>
+    ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned, identityKey }),
 
   searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search-preview', { query, limit, source }),

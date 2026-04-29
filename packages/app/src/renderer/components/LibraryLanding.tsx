@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
 
@@ -58,7 +58,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="px-8 pt-10 pb-4 flex-none">
+      <div className="px-6 pt-6 pb-4 flex-none">
         <h1 className="text-2xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
           AI Session Library
         </h1>
@@ -69,16 +69,19 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
       <div className="flex-1 overflow-y-auto pb-12">
         {recentSessions === null ? (
-          <p className="px-8 py-6 text-sm text-warm-faint dark:text-dark-muted">Loading…</p>
+          <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">Loading…</p>
         ) : totalSessions === 0 ? (
-          <p className="px-8 py-6 text-sm text-warm-faint dark:text-dark-muted">
+          <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">
             No sessions yet. Run <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code> to index your AI sessions.
           </p>
         ) : (
           <>
             {pinnedSessions.length > 0 && (
-              <div data-testid="library-pinned">
-                <SectionHeader label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`} accent />
+              <CollapsibleSection
+                label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`}
+                accent
+                testId="library-pinned"
+              >
                 <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
                   {pinnedSessions.map(session => (
                     <SessionRow
@@ -92,12 +95,16 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
                     />
                   ))}
                 </div>
-              </div>
+              </CollapsibleSection>
             )}
 
             {buckets.map(bucket => (
-              <div key={bucket.label} data-testid="library-bucket" data-bucket={bucket.label}>
-                <SectionHeader label={bucket.label} />
+              <CollapsibleSection
+                key={bucket.label}
+                label={bucket.label}
+                testId="library-bucket"
+                dataAttr={{ 'data-bucket': bucket.label }}
+              >
                 {bucket.sessions.map(session => (
                   <SessionRow
                     key={session.sessionUuid}
@@ -108,7 +115,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
                     onCopySessionId={onCopySessionId}
                   />
                 ))}
-              </div>
+              </CollapsibleSection>
             ))}
           </>
         )}
@@ -117,14 +124,45 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
   )
 }
 
-function SectionHeader({ label, accent = false }: { label: string; accent?: boolean }) {
+export function CollapsibleSection({
+  label,
+  accent = false,
+  children,
+  testId,
+  dataAttr,
+  defaultOpen = true,
+}: {
+  label: string
+  accent?: boolean
+  children: ReactNode
+  testId?: string
+  dataAttr?: Record<string, string>
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div
-      className={`px-8 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted ${
-        accent ? 'bg-accent/[0.04] dark:bg-accent-dark/[0.04]' : ''
-      }`}
-    >
-      {label}
+    <div data-testid={testId} {...(dataAttr ?? {})}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`group w-full flex items-center gap-1.5 px-6 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors select-none ${
+          accent ? 'bg-accent/[0.04] dark:bg-accent-dark/[0.04]' : ''
+        }`}
+      >
+        <span>{label}</span>
+        <svg
+          width="9"
+          height="9"
+          viewBox="0 0 9 9"
+          fill="none"
+          aria-hidden
+          className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+        >
+          <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && children}
     </div>
   )
 }

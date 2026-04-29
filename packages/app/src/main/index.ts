@@ -234,8 +234,8 @@ app.on('window-all-closed', () => {
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned }: { query: string; limit?: number; source?: string; onlyPinned?: boolean }) => {
-  const cacheKey = `${source ?? 'all'}|${limit}|${onlyPinned ? 'pinned' : 'full'}|${query}`
+ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned, identityKey }: { query: string; limit?: number; source?: string; onlyPinned?: boolean; identityKey?: string }) => {
+  const cacheKey = `${source ?? 'all'}|${identityKey ?? 'any'}|${limit}|${onlyPinned ? 'pinned' : 'full'}|${query}`
   if (!isSyncActive) {
     const cached = searchCache.get(cacheKey)
     if (cached) return cached
@@ -248,6 +248,7 @@ ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned }: {
     limit,
     ...(sessionSource ? { source: sessionSource } : {}),
     ...(onlyPinned ? { onlyPinned: true } : {}),
+    ...(identityKey ? { identityKey } : {}),
   }).map(f => ({ ...f, kind: 'fragment' as const }))
 
   if (!isSyncActive) {

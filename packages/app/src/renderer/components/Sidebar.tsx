@@ -56,24 +56,24 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         data-testid="sidebar-projects-toggle"
         aria-expanded={projectsOpen}
         onClick={() => setProjectsOpen(open => !open)}
-        className="mx-2 px-2 py-1 flex-none flex items-center gap-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
+        className="group mx-2 px-2 py-1 flex-none flex items-center gap-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
       >
+        <span>PROJECTS</span>
         <svg
           width="9"
           height="9"
           viewBox="0 0 9 9"
           fill="none"
           aria-hidden="true"
-          className={`flex-none transition-transform ${projectsOpen ? 'rotate-90' : ''}`}
+          className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
         >
           <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        PROJECTS
       </button>
 
-      {projectsOpen && (
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
-          {groups === null ? (
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+        {projectsOpen && (
+          groups === null ? (
             <SidebarSkeleton />
           ) : projectGroups.length === 0 && !looseGroup ? (
             <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">
@@ -101,11 +101,14 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                 </>
               )}
             </>
-          )}
-        </div>
-      )}
+          )
+        )}
+      </div>
 
-      <SidebarStatus syncStatus={syncStatus ?? null} onSettingsClick={onSettingsClick} />
+      <SidebarStatus
+        syncStatus={syncStatus ?? null}
+        {...(onSettingsClick ? { onSettingsClick } : {})}
+      />
     </aside>
   )
 }
@@ -128,7 +131,7 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none border-t border-warm-border dark:border-dark-border px-2 py-2 flex flex-col gap-1">
+    <div className="flex-none px-2 pt-1 pb-2 flex flex-col gap-0.5">
       {onSettingsClick && (
         <button
           type="button"
@@ -144,11 +147,9 @@ function SidebarStatus({
         </button>
       )}
 
-      <div className="border-t border-warm-border/60 dark:border-dark-border/60 mx-2 my-1" />
-
       <div className="flex items-center gap-2 px-2 py-1">
         <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
-        <span className="text-[11px] font-mono text-warm-muted dark:text-dark-muted truncate" title={text}>
+        <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
           {text}
         </span>
       </div>
@@ -205,17 +206,17 @@ function ProjectRow({
       data-identity-key={group.identityKey}
       aria-label={ariaLabel}
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+      className={`w-full text-left flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
-          : 'text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
+          : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
-      <span className="flex-1 truncate text-[13px] font-medium">
+      <span className="flex-1 truncate text-[12.5px]">
         {group.displayName}
       </span>
       <SourceDots sources={group.sources} />
-      <span className="flex-none font-mono text-[11px] tabular-nums text-warm-faint dark:text-dark-muted">
+      <span className="flex-none font-mono text-[10.5px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
         {group.sessionCount}
       </span>
     </button>

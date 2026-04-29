@@ -48,7 +48,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-warm-border dark:border-dark-border px-4 min-h-11 flex-none">
+      <div className="flex items-center gap-3 border-b border-warm-border dark:border-dark-border px-6 min-h-11 flex-none">
         <div className="flex gap-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none">
           {(['all', ...sourceKeys] as string[]).map(src => (
             <button
@@ -128,7 +128,7 @@ function FragmentRow({
   return (
     <div
       data-testid="fragment-row"
-      className="px-4 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className="px-6 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
     >
       <div
         className="cursor-pointer"

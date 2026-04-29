@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
+import Menu from './Menu.js'
+import { CollapsibleSection } from './LibraryLanding.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 
@@ -87,6 +89,9 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
   }
 
   const availableSources = group?.sources ?? []
+  const displayPath = useMemo(() => {
+    return pinnedSessions[0]?.projectDisplayPath ?? sessions?.[0]?.projectDisplayPath ?? null
+  }, [pinnedSessions, sessions])
   const meta = useMemo(() => {
     if (!group) return null
     const lastActivity = group.lastSessionAt ? formatRelativeDate(group.lastSessionAt) : null
@@ -104,10 +109,17 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
 
   return (
     <div data-testid="project-view" className="flex flex-col h-full overflow-hidden">
-      <div className="flex-none px-6 pt-5 pb-3 border-b border-warm-border dark:border-dark-border">
-        <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
-          {group?.displayName ?? identityKey}
-        </h1>
+      <div className="flex-none px-6 pt-6 pb-3 border-b border-warm-border dark:border-dark-border">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
+            {group?.displayName ?? identityKey}
+          </h1>
+          {displayPath && (
+            <span className="text-[11px] font-mono text-warm-faint/80 dark:text-dark-muted/80 truncate" title={displayPath}>
+              {displayPath}
+            </span>
+          )}
+        </div>
         {meta && (
           <p className="mt-1 text-xs text-warm-muted dark:text-dark-muted flex items-center gap-2 flex-wrap">
             <span>{meta.count} {meta.count === 1 ? 'session' : 'sessions'}</span>
@@ -158,26 +170,40 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
             </div>
           )}
 
-          <div className="ml-auto relative">
-            <select
-              value={sortOrder}
-              onChange={(event) => setSortOrder(event.target.value as ProjectSessionSortOrder)}
-              aria-label="Sort sessions"
-              data-testid="project-sort"
-              className="appearance-none h-8 rounded-full border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface pl-3 pr-9 text-xs font-medium text-warm-text dark:text-dark-text outline-none transition-colors hover:border-accent/50 focus:border-accent"
-            >
-              {SORT_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 12 12"
-              className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-warm-muted dark:text-dark-muted"
-              fill="none"
-            >
-              <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <div className="ml-auto">
+            <Menu
+              align="right"
+              testId="project-sort-menu"
+              trigger={({ open, toggle }) => (
+                <button
+                  type="button"
+                  data-testid="project-sort"
+                  data-value={sortOrder}
+                  aria-label="Sort sessions"
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                  onClick={toggle}
+                  className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                >
+                  <span>Sort: {SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Recent'}</span>
+                  <svg
+                    aria-hidden="true"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    className="text-warm-faint dark:text-dark-muted"
+                    fill="none"
+                  >
+                    <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              items={SORT_OPTIONS.map(option => ({
+                label: option.label,
+                active: sortOrder === option.value,
+                onSelect: () => setSortOrder(option.value),
+              }))}
+            />
           </div>
         </div>
       </div>
@@ -203,10 +229,11 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
         ) : (
           <>
             {pinnedSessions.length > 0 && (
-              <div data-testid="project-view-pinned">
-                <div className="px-4 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted bg-accent/[0.04] dark:bg-accent-dark/[0.04]">
-                  PINNED · {pinnedSessions.length} {pinnedSessions.length === 1 ? 'session' : 'sessions'}
-                </div>
+              <CollapsibleSection
+                label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`}
+                accent
+                testId="project-view-pinned"
+              >
                 <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
                   {pinnedSessions.map(session => (
                     <SessionRow
@@ -219,24 +246,33 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
                     />
                   ))}
                 </div>
+              </CollapsibleSection>
+            )}
+            {pinnedSessions.length > 0 && sessions.length > 0 ? (
+              <CollapsibleSection label="RECENT" testId="project-view-recent">
+                {sessions.map(session => (
+                  <SessionRow
+                    key={session.sessionUuid}
+                    session={session}
+                    onPinChange={handlePinChange}
+                    onOpenSession={onOpenSession}
+                    onCopySessionId={onCopySessionId}
+                  />
+                ))}
+              </CollapsibleSection>
+            ) : (
+              <div data-testid="project-view-recent">
+                {sessions.map(session => (
+                  <SessionRow
+                    key={session.sessionUuid}
+                    session={session}
+                    onPinChange={handlePinChange}
+                    onOpenSession={onOpenSession}
+                    onCopySessionId={onCopySessionId}
+                  />
+                ))}
               </div>
             )}
-            <div data-testid="project-view-recent">
-              {pinnedSessions.length > 0 && sessions.length > 0 && (
-                <div className="px-4 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted">
-                  RECENT
-                </div>
-              )}
-              {sessions.map(session => (
-                <SessionRow
-                  key={session.sessionUuid}
-                  session={session}
-                  onPinChange={handlePinChange}
-                  onOpenSession={onOpenSession}
-                  onCopySessionId={onCopySessionId}
-                />
-              ))}
-            </div>
           </>
         )}
       </div>
