@@ -13,7 +13,7 @@ test.afterAll(async () => {
 })
 
 async function openOverlayAndType(ctx: AppContext, query: string) {
-  await ctx.window.keyboard.press('Meta+k')
+  await ctx.window.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k')
   const input = ctx.window.locator('[data-testid="search-overlay-input"]')
   await expect(input).toBeVisible({ timeout: 3000 })
   await input.fill(query)
