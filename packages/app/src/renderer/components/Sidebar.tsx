@@ -212,6 +212,7 @@ function ProjectRow({
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
+      <FolderIcon active={active} />
       <span className="flex-1 truncate text-[12.5px]">
         {group.displayName}
       </span>
@@ -220,6 +221,26 @@ function ProjectRow({
         {group.sessionCount}
       </span>
     </button>
+  )
+}
+
+function FolderIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      className={`flex-none ${active ? 'text-warm-faint dark:text-dark-muted' : 'text-warm-faint/70 dark:text-dark-muted/70'}`}
+    >
+      <path
+        d="M1.5 4.2c0-.55.45-1 1-1h3l1.2 1.3h4.8c.55 0 1 .45 1 1v5.3c0 .55-.45 1-1 1H2.5c-.55 0-1-.45-1-1V4.2z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 

@@ -85,6 +85,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
             trigger={({ toggle }) => (
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={toggle}
                 title="More actions"
                 aria-label="More actions"

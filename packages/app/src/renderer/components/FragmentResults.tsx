@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FragmentResult } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
 import { SourceBadge } from './Badges.js'
+import Menu from './Menu.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import { getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
@@ -65,28 +66,39 @@ export default function FragmentResults({ results, query, onOpenSession, default
           ))}
         </div>
 
-        <div className="relative flex-none">
-          <select
-            value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value as SearchSortOrder)}
-            aria-label="Sort results"
-            className="appearance-none h-8 rounded-full border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface pl-3 pr-9 text-xs font-medium text-warm-text dark:text-dark-text outline-none transition-colors hover:border-accent/50 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 focus:border-accent"
-          >
-            {SEARCH_SORT_OPTIONS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 12 12"
-            className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-warm-muted dark:text-dark-muted"
-            fill="none"
-          >
-            <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
+        <Menu
+          align="right"
+          testId="search-sort-menu"
+          trigger={({ open, toggle }) => (
+            <button
+              type="button"
+              data-testid="search-sort"
+              data-value={sortOrder}
+              aria-label="Sort results"
+              aria-haspopup="menu"
+              aria-expanded={open}
+              onClick={toggle}
+              className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              <span>Sort: {SEARCH_SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Relevance'}</span>
+              <svg
+                aria-hidden="true"
+                width="9"
+                height="9"
+                viewBox="0 0 12 12"
+                className="text-warm-faint dark:text-dark-muted"
+                fill="none"
+              >
+                <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+          items={SEARCH_SORT_OPTIONS.map(option => ({
+            label: option.label,
+            active: sortOrder === option.value,
+            onSelect: () => setSortOrder(option.value),
+          }))}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">

@@ -58,11 +58,11 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 pt-6 pb-4 flex-none">
-        <h1 className="text-2xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
+      <div className="px-6 pt-5 pb-3 flex-none">
+        <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
           AI Session Library
         </h1>
-        <p className="mt-1 text-sm text-warm-muted dark:text-dark-muted">
+        <p className="mt-0.5 text-xs text-warm-muted dark:text-dark-muted">
           All your AI conversations, organized by your code projects.
         </p>
       </div>

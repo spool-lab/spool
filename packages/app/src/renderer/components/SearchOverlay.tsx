@@ -172,7 +172,10 @@ export default function SearchOverlay({
             onClick={() => onScopeChange('all')}
             testId="scope-all"
           />
-          <span className="ml-auto text-[10px] text-warm-faint">tab to switch</span>
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-warm-faint">
+            <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">Tab</kbd>
+            <span>to switch</span>
+          </span>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto">
