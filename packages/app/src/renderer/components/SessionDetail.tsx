@@ -251,71 +251,77 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <SourceModelChip source={session.source} model={session.model} />
-            <h2 className="flex-1 min-w-0 text-sm font-medium text-warm-text dark:text-dark-text truncate" title={session.title ?? undefined}>
-              {session.title ?? '(no title)'}
-            </h2>
+          <h2 className="text-sm font-medium text-warm-text dark:text-dark-text truncate" title={session.title ?? undefined}>
+            {session.title ?? '(no title)'}
+          </h2>
 
-            <div className="flex-none flex items-center gap-1.5">
-              <PinButton
-                sessionUuid={session.sessionUuid}
-                pinned={pinned}
-                onChange={setPinned}
+          <p className="mt-1 flex items-center gap-1.5 text-[11px] text-warm-faint dark:text-dark-muted min-w-0">
+            <span className="font-mono truncate" title={session.projectDisplayPath}>{session.projectDisplayPath}</span>
+            <span aria-hidden>·</span>
+            <span className="flex-none">{session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}</span>
+            <span aria-hidden>·</span>
+            <span className="flex-none">{formatRelativeDate(session.startedAt)}</span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1 flex-none">
+              <span
+                aria-hidden
+                className="block w-1.5 h-1.5 rounded-full"
+                style={{ background: getSessionSourceColor(session.source) }}
               />
-
-              <button
-                data-testid="detail-resume"
-                onClick={handleResume}
-                disabled={resuming}
-                title="Resume session in Terminal"
-                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent/90 dark:bg-accent-dark dark:hover:bg-accent-dark/90 rounded-md px-3 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
-                  <path d="M3 2L9 5.5L3 9V2Z" />
-                </svg>
-                {resuming ? 'Opening…' : 'Resume in Terminal'}
-              </button>
-
-              <Menu
-                align="right"
-                testId="detail-actions-menu"
-                trigger={({ toggle }) => (
-                  <button
-                    type="button"
-                    onClick={toggle}
-                    title="More actions"
-                    aria-label="More actions"
-                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                      <circle cx="3" cy="7" r="1.2" />
-                      <circle cx="7" cy="7" r="1.2" />
-                      <circle cx="11" cy="7" r="1.2" />
-                    </svg>
-                  </button>
-                )}
-                items={[
-                  {
-                    label: 'Copy session ID',
-                    onSelect: () => { void handleCopySessionId() },
-                  },
-                  ...(resumeCommandAvailable ? [{
-                    label: commandCopied ? 'Copied!' : 'Copy resume command',
-                    onSelect: () => { void handleCopyCommand() },
-                  }] : []),
-                ]}
-              />
-            </div>
-          </div>
-
-          <p className="mt-1 text-[11px] text-warm-faint dark:text-dark-muted truncate" title={session.projectDisplayPath}>
-            <span className="font-mono">{session.projectDisplayPath}</span>
-            <span aria-hidden className="mx-1.5">·</span>
-            {session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}
-            <span aria-hidden className="mx-1.5">·</span>
-            {formatRelativeDate(session.startedAt)}
+              <span className="font-mono">{getSessionSourceShortLabel(session.source)}</span>
+            </span>
           </p>
+        </div>
+
+        <div className="flex-none self-end flex items-center gap-1.5">
+          <PinButton
+            sessionUuid={session.sessionUuid}
+            pinned={pinned}
+            onChange={setPinned}
+          />
+
+          <button
+            data-testid="detail-resume"
+            onClick={handleResume}
+            disabled={resuming}
+            title="Resume session in Terminal"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent/90 dark:bg-accent-dark dark:hover:bg-accent-dark/90 rounded-md px-3 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+              <path d="M3 2L9 5.5L3 9V2Z" />
+            </svg>
+            {resuming ? 'Opening…' : 'Resume in Terminal'}
+          </button>
+
+          <Menu
+            align="right"
+            testId="detail-actions-menu"
+            trigger={({ toggle }) => (
+              <button
+                type="button"
+                onClick={toggle}
+                title="More actions"
+                aria-label="More actions"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="3" cy="7" r="1.2" />
+                  <circle cx="7" cy="7" r="1.2" />
+                  <circle cx="11" cy="7" r="1.2" />
+                </svg>
+              </button>
+            )}
+            items={[
+              {
+                label: 'Copy session ID',
+                onSelect: () => { void handleCopySessionId() },
+              },
+              ...(resumeCommandAvailable ? [{
+                label: commandCopied ? 'Copied!' : 'Copy resume command',
+                onSelect: () => { void handleCopyCommand() },
+              }] : []),
+            ]}
+          />
         </div>
       </div>
 
@@ -369,20 +375,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
 function formatDate(iso: string): string {
   try { return new Date(iso).toLocaleString() } catch { return iso }
-}
-
-function SourceModelChip({ source }: { source: Session['source']; model: string | null }) {
-  const sourceLabel = getSessionSourceShortLabel(source)
-  return (
-    <span className="flex-none inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-md bg-warm-surface dark:bg-dark-surface">
-      <span
-        aria-hidden
-        className="block w-1.5 h-1.5 rounded-full flex-none"
-        style={{ background: getSessionSourceColor(source) }}
-      />
-      <span className="text-warm-text dark:text-dark-text">{sourceLabel}</span>
-    </span>
-  )
 }
 
 function getFindRanges(text: string, normalizedQuery: string): FindRange[] {

@@ -22,7 +22,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       .then(result => { if (!cancelled) setGroups(result) })
       .catch(() => { if (!cancelled) setGroups([]) })
     return () => { cancelled = true }
-  }, [])
+  }, [syncStatus?.phase])
 
   const visibleGroups = (groups ?? []).filter(g => g.sessionCount > 0)
   const projectGroups = visibleGroups.filter(g => g.identityKind !== 'loose')
