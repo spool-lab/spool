@@ -73,7 +73,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         </svg>
       </button>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-none">
         {projectsOpen && (
           groups === null ? (
             <SidebarSkeleton />
@@ -137,7 +137,7 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none px-2 pt-1 pb-2 flex items-center gap-2">
+    <div className="flex-none pl-2 pr-1.5 pt-1 pb-2 flex items-center gap-2">
       <div className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1">
         <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
         <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
