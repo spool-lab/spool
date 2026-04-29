@@ -8,6 +8,7 @@ export interface ListSessionsByIdentityOptions {
   sources?: SessionSource[]
   sortOrder?: ProjectSessionSortOrder
   limit?: number
+  excludePinned?: boolean
 }
 
 export function listSessionsByIdentity(
@@ -15,7 +16,7 @@ export function listSessionsByIdentity(
   identityKey: string,
   options: ListSessionsByIdentityOptions = {},
 ): Session[] {
-  const { sources, sortOrder = 'recent', limit = 500 } = options
+  const { sources, sortOrder = 'recent', limit = 500, excludePinned = false } = options
 
   const conditions: string[] = ['p.identity_key = ?']
   const params: unknown[] = [identityKey]
@@ -24,6 +25,10 @@ export function listSessionsByIdentity(
     const placeholders = sources.map(() => '?').join(',')
     conditions.push(`src.name IN (${placeholders})`)
     params.push(...sources)
+  }
+
+  if (excludePinned) {
+    conditions.push('NOT EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = s.session_uuid)')
   }
 
   const orderBy = orderByClause(sortOrder)
@@ -36,6 +41,19 @@ export function listSessionsByIdentity(
   params.push(limit)
 
   const rows = db.prepare(sql).all(...params) as Array<Record<string, unknown>>
+  return rows.map(rowToSession)
+}
+
+export function listPinnedSessionsByIdentity(
+  db: Database.Database,
+  identityKey: string,
+): Session[] {
+  const rows = db.prepare(`
+    ${SESSION_SELECT}
+    JOIN pins ON pins.session_uuid = s.session_uuid
+    WHERE p.identity_key = ?
+    ORDER BY pins.pinned_at DESC
+  `).all(identityKey) as Array<Record<string, unknown>>
   return rows.map(rowToSession)
 }
 
