@@ -167,6 +167,10 @@ export function CollapsibleSection({
   )
 }
 
+export function bucketSessionsByDate(sessions: Session[]): DateBucket[] {
+  return bucketByDate(sessions)
+}
+
 function bucketByDate(sessions: Session[]): DateBucket[] {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()

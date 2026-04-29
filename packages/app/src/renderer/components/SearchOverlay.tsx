@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { FragmentResult } from '@spool-lab/core'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { FragmentResult, Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import SegmentedPill from './SegmentedPill.js'
+import { bucketSessionsByDate } from './LibraryLanding.js'
 import type { SearchMode } from './SearchBar.js'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
@@ -42,10 +43,17 @@ export default function SearchOverlay({
 }: Props) {
   const [query, setQuery] = useState(initialQuery)
   const [results, setResults] = useState<FragmentSearchResult[]>([])
+  const [recents, setRecents] = useState<Session[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const seqRef = useRef(0)
+
+  const showRecents = !query.trim()
+  const buckets = useMemo(() => (showRecents ? bucketSessionsByDate(recents) : []), [showRecents, recents])
+  const flatRecents = useMemo(() => buckets.flatMap(b => b.sessions), [buckets])
+
+  useEffect(() => { setActiveIndex(0) }, [showRecents, scope])
 
   useEffect(() => {
     if (open) {
@@ -54,6 +62,19 @@ export default function SearchOverlay({
       requestAnimationFrame(() => inputRef.current?.select())
     }
   }, [open, initialQuery])
+
+  useEffect(() => {
+    if (!open || !showRecents) return
+    let cancelled = false
+    const fetchRecents = scope === 'project' && scopeProjectKey
+      ? window.spool.listSessionsByIdentity(scopeProjectKey, { limit: 30 })
+      : window.spool.listSessions(30)
+    /* recents and FTS both limit to 30 for consistent footer counts */
+    fetchRecents
+      .then(sessions => { if (!cancelled) setRecents(sessions) })
+      .catch(() => { if (!cancelled) setRecents([]) })
+    return () => { cancelled = true }
+  }, [open, showRecents, scope, scopeProjectKey])
 
   useEffect(() => {
     if (!open) return
@@ -73,7 +94,7 @@ export default function SearchOverlay({
     const scopedKey = scope === 'project' && scopeProjectKey ? scopeProjectKey : undefined
     const timer = setTimeout(async () => {
       try {
-        const raw = await window.spool.search(trimmed, 20, undefined, false, scopedKey)
+        const raw = await window.spool.search(trimmed, 30, undefined, false, scopedKey)
         if (seq !== seqRef.current) return
         const fragments = raw.filter((r): r is FragmentSearchResult => r.kind === 'fragment')
         setResults(fragments)
@@ -99,7 +120,8 @@ export default function SearchOverlay({
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setActiveIndex(i => Math.min(results.length - 1, i + 1))
+      const max = showRecents ? flatRecents.length - 1 : results.length - 1
+      setActiveIndex(i => Math.min(max, i + 1))
       return
     }
     if (event.key === 'ArrowUp') {
@@ -111,6 +133,11 @@ export default function SearchOverlay({
       event.preventDefault()
       if (event.shiftKey || mode === 'ai') {
         if (query.trim()) onCommit(query)
+        return
+      }
+      if (showRecents) {
+        const session = flatRecents[activeIndex]
+        if (session) onOpenResult(session.sessionUuid, undefined, '')
         return
       }
       const target = results[activeIndex]
@@ -138,7 +165,7 @@ export default function SearchOverlay({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKey}
-            placeholder="Search your sessions…"
+            placeholder={mode === 'ai' ? 'Ask anything about your sessions…' : 'Search your sessions…'}
             className="flex-1 bg-transparent outline-none text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint"
           />
           {searching && <span className="text-[10px] text-warm-faint">searching…</span>}
@@ -149,12 +176,11 @@ export default function SearchOverlay({
               compact
               ariaLabel="Search mode"
               options={[
-                { value: 'fast', label: 'Fast', icon: <ZapIcon />, hideLabel: true, title: 'Fast — instant FTS over your indexed sessions' },
-                { value: 'ai', label: 'Agent', icon: <SparklesIcon />, hideLabel: true, testId: 'mode-agent', title: 'Agent — let an AI agent answer using your sessions as context' },
+                { value: 'fast', label: 'Fast', icon: <ZapIcon />, hideLabel: true, title: 'Fast search — find sessions by keyword' },
+                { value: 'ai', label: 'Agent', icon: <SparklesIcon />, hideLabel: true, testId: 'mode-agent', title: 'Agent — ask in natural language; the agent searches and answers' },
               ]}
             />
           )}
-          {mode === 'ai' && agentSelector}
         </div>
 
         <div className="px-4 py-2 flex items-center gap-2 border-b border-warm-border dark:border-dark-border">
@@ -172,20 +198,75 @@ export default function SearchOverlay({
             onClick={() => onScopeChange('all')}
             testId="scope-all"
           />
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-warm-faint">
-            <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">Tab</kbd>
-            <span>to switch</span>
-          </span>
+          {scopeProjectName && (
+            <span className="flex items-center gap-1.5 text-[10px] text-warm-faint">
+              <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">Tab</kbd>
+              <span>to switch</span>
+            </span>
+          )}
+          {agentSelector && mode === 'ai' && (
+            <div className="ml-auto flex items-center gap-1.5 text-[10px] text-warm-faint">
+              <span className="uppercase tracking-wider">Asking:</span>
+              {agentSelector}
+            </div>
+          )}
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto">
-          {results.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
-              {mode === 'ai' && query.trim()
-                ? <>Press <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">↵</kbd> to ask the agent.</>
-                : query.trim()
-                  ? 'No matches.'
-                  : `Default scope: ${defaultScope === 'project' ? 'current project' : 'all projects'}.`}
+        <div className="min-h-[220px] max-h-[min(420px,55vh)] overflow-y-auto">
+          {showRecents ? (
+            flatRecents.length === 0 ? (
+              <div className="min-h-[220px] flex items-center justify-center px-4 text-center text-sm text-warm-faint dark:text-dark-muted">
+                {scope === 'project' ? 'No sessions in this project yet.' : 'No sessions yet.'}
+              </div>
+            ) : (
+              (() => {
+                let runningIdx = 0
+                return (
+                  <ul role="listbox">
+                    {buckets.map(bucket => (
+                      <li key={bucket.label}>
+                        <div className="px-4 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted">
+                          {bucket.label}
+                        </div>
+                        <ul>
+                          {bucket.sessions.map(session => {
+                            const idx = runningIdx++
+                            const active = idx === activeIndex
+                            return (
+                              <li
+                                key={session.sessionUuid}
+                                role="option"
+                                aria-selected={active}
+                                onMouseEnter={() => setActiveIndex(idx)}
+                                onClick={() => onOpenResult(session.sessionUuid, undefined, '')}
+                                className={`px-4 py-2 cursor-pointer flex items-center gap-2 ${
+                                  active ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
+                                }`}
+                              >
+                                <SourceBadge source={session.source} />
+                                <span className="flex-1 truncate text-sm text-warm-text dark:text-dark-text">
+                                  {session.title?.trim() || '(no title)'}
+                                </span>
+                                <span className="flex-none text-[11px] text-warm-faint dark:text-dark-muted">
+                                  {formatRelativeDate(session.startedAt)}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              })()
+            )
+          ) : results.length === 0 ? (
+            <div className="h-full flex items-center justify-center px-4 text-center text-sm text-warm-faint dark:text-dark-muted">
+              <span>
+                {mode === 'ai' && query.trim()
+                  ? <>Press <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">↵</kbd> to ask the agent.</>
+                  : 'No matches.'}
+              </span>
             </div>
           ) : (
             <ul role="listbox">
@@ -217,7 +298,11 @@ export default function SearchOverlay({
           )}
         </div>
 
-        {results.length > 0 && (
+        {showRecents && flatRecents.length > 0 ? (
+          <div className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-end text-warm-faint dark:text-dark-muted">
+            <span>{flatRecents.length} recent {flatRecents.length === 1 ? 'session' : 'sessions'}</span>
+          </div>
+        ) : results.length > 0 && (
           <button
             type="button"
             data-testid="search-overlay-view-all"

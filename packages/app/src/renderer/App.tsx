@@ -645,6 +645,7 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
   return (
     <div className="relative flex-none">
       <button
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen(!open)}
         className="text-[11px] text-warm-muted dark:text-dark-muted font-mono whitespace-nowrap hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
@@ -655,6 +656,7 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
           {agents.map(a => (
             <button
               key={a.id}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => { onSelect(a.id); setOpen(false) }}
               className={`block w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors ${
                 a.id === activeAgent
