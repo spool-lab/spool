@@ -242,7 +242,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             onClick={onBack}
             aria-label="Back"
             title="Back"
-            className="flex-none mt-1 flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
           >
             <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
               <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
