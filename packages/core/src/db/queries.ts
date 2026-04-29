@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, StarKind, StarredItem, ProjectIdentityKind } from '../types.js'
+import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, ProjectIdentityKind } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
 import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
@@ -224,9 +224,9 @@ export function getSessionWithMessages(
 export function searchFragments(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { limit?: number; source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): FragmentResult[] {
-  const { limit = 10, source, since, onlyStarred } = opts
+  const { limit = 10, source, since, onlyPinned } = opts
 
   const rowLimit = Math.max(limit * 10, 50)
   const naturalTerms = getNaturalSearchTerms(query)
@@ -237,7 +237,7 @@ export function searchFragments(
     return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', {
       ...(source ? { source } : {}),
       ...(since ? { since } : {}),
-      ...(onlyStarred ? { onlyStarred } : {}),
+      ...(onlyPinned ? { onlyPinned } : {}),
     }).slice(0, limit)
   }
 
@@ -246,7 +246,7 @@ export function searchFragments(
       return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, {
         ...(source ? { source } : {}),
         ...(since ? { since } : {}),
-        ...(onlyStarred ? { onlyStarred } : {}),
+        ...(onlyPinned ? { onlyPinned } : {}),
       })
     }
 
@@ -254,7 +254,7 @@ export function searchFragments(
     const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, {
       ...(source ? { source } : {}),
       ...(since ? { since } : {}),
-      ...(onlyStarred ? { onlyStarred } : {}),
+      ...(onlyPinned ? { onlyPinned } : {}),
     })
     return collapseFragmentRows(rows, step.matchType)
   })
@@ -314,9 +314,9 @@ function searchFragmentRows(
   ftsTable: 'messages_fts' | 'messages_fts_trigram',
   ftsQuery: string,
   limit: number,
-  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyStarred } = opts
+  const { source, since, onlyPinned } = opts
   const conditions: string[] = [`${ftsTable} MATCH ?`, 'm.is_sidechain = 0']
   const params: (string | number)[] = [ftsQuery]
 
@@ -328,8 +328,8 @@ function searchFragmentRows(
     conditions.push('m.timestamp >= ?')
     params.push(since)
   }
-  if (onlyStarred) {
-    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
+  if (onlyPinned) {
+    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -500,7 +500,7 @@ function searchFragmentSessionFallback(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): FragmentResult[] {
   if (terms.length < 1) return []
 
@@ -584,7 +584,7 @@ function searchSessionRowsByTerms(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): Array<Record<string, unknown>> {
   if (canUseSessionSearchFts(phrase)) {
     return searchSessionRowsByFts(db, terms, phrase, limit, matchType, opts)
@@ -597,9 +597,9 @@ function searchSessionRowsByLike(
   db: Database.Database,
   terms: string[],
   limit: number,
-  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyStarred } = opts
+  const { source, since, onlyPinned } = opts
   const titleScoreParts: string[] = []
   const whereClauses: string[] = []
   const scoreParams: string[] = []
@@ -632,8 +632,8 @@ function searchSessionRowsByLike(
     conditions.push('sess.started_at >= ?')
     params.push(since)
   }
-  if (onlyStarred) {
-    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
+  if (onlyPinned) {
+    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -671,9 +671,9 @@ function searchSessionRowsByFts(
   phrase: string,
   limit: number,
   matchType: SearchMatchType,
-  opts: { source?: SessionSource; since?: string; onlyStarred?: boolean } = {},
+  opts: { source?: SessionSource; since?: string; onlyPinned?: boolean } = {},
 ): Array<Record<string, unknown>> {
-  const { source, since, onlyStarred } = opts
+  const { source, since, onlyPinned } = opts
   const ftsTable = selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
   const ftsQuery = matchType === 'phrase'
     ? `"${phrase.replace(/"/g, '""')}"`
@@ -704,8 +704,8 @@ function searchSessionRowsByFts(
     conditions.push('sess.started_at >= ?')
     params.push(since)
   }
-  if (onlyStarred) {
-    conditions.push("EXISTS (SELECT 1 FROM stars WHERE stars.item_type = 'session' AND stars.item_uuid = sess.session_uuid)")
+  if (onlyPinned) {
+    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
   }
   params.push(limit)
 
@@ -852,69 +852,32 @@ function escapeLike(value: string): string {
     .replace(/_/g, '\\_')
 }
 
-// ── Stars (sessions + captures) ─────────────────────────────────────────────
+// ── Pins (sessions) ─────────────────────────────────────────────────────────
 
-export function starItem(db: Database.Database, kind: StarKind, uuid: string): void {
+export function pinSession(db: Database.Database, sessionUuid: string): void {
   db.prepare(
-    'INSERT OR IGNORE INTO stars (item_type, item_uuid) VALUES (?, ?)',
-  ).run(kind, uuid)
+    'INSERT OR IGNORE INTO pins (session_uuid) VALUES (?)',
+  ).run(sessionUuid)
 }
 
-export function unstarItem(db: Database.Database, kind: StarKind, uuid: string): void {
-  db.prepare('DELETE FROM stars WHERE item_type = ? AND item_uuid = ?').run(kind, uuid)
+export function unpinSession(db: Database.Database, sessionUuid: string): void {
+  db.prepare('DELETE FROM pins WHERE session_uuid = ?').run(sessionUuid)
 }
 
-export function isStarred(db: Database.Database, kind: StarKind, uuid: string): boolean {
+export function isPinned(db: Database.Database, sessionUuid: string): boolean {
   const row = db
-    .prepare('SELECT 1 AS hit FROM stars WHERE item_type = ? AND item_uuid = ?')
-    .get(kind, uuid) as { hit: number } | undefined
+    .prepare('SELECT 1 AS hit FROM pins WHERE session_uuid = ?')
+    .get(sessionUuid) as { hit: number } | undefined
   return row !== undefined
 }
 
-export function getStarredUuidsByType(
-  db: Database.Database,
-): { session: string[] } {
+export function getPinnedUuids(db: Database.Database): string[] {
   const rows = db.prepare(`
-    SELECT item_uuid AS uuid
-    FROM stars
-    WHERE item_type = 'session'
-      AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid)
+    SELECT session_uuid AS uuid
+    FROM pins
+    WHERE EXISTS (SELECT 1 FROM sessions WHERE session_uuid = pins.session_uuid)
   `).all() as Array<{ uuid: string }>
-  return { session: rows.map(r => r.uuid) }
-}
-
-export function listStarredItems(db: Database.Database, limit = 200): StarredItem[] {
-  // Orphan-filter at the SQL level so LIMIT counts only live rows; otherwise
-  // a user with 200+ orphaned stars could see an empty page.
-  const rows = db.prepare(`
-    SELECT item_uuid AS uuid, starred_at AS starredAt
-    FROM stars
-    WHERE item_type = 'session'
-      AND EXISTS (SELECT 1 FROM sessions WHERE session_uuid = stars.item_uuid)
-    ORDER BY starred_at DESC
-    LIMIT ?
-  `).all(limit) as Array<{ uuid: string; starredAt: string }>
-
-  if (rows.length === 0) return []
-
-  const sessionUuids = rows.map(r => r.uuid)
-  const sessionMap = new Map<string, Session>()
-  const placeholders = sessionUuids.map(() => '?').join(', ')
-  const sessRows = db.prepare(`
-    ${SESSION_SELECT}
-    WHERE s.session_uuid IN (${placeholders})
-  `).all(...sessionUuids) as Array<Record<string, unknown>>
-  for (const row of sessRows) {
-    const session = rowToSession(row)
-    sessionMap.set(session.sessionUuid, session)
-  }
-
-  const items: StarredItem[] = []
-  for (const r of rows) {
-    const session = sessionMap.get(r.uuid)
-    if (session) items.push({ kind: 'session', starredAt: r.starredAt, session })
-  }
-  return items
+  return rows.map(r => r.uuid)
 }
 
 export function getStatus(db: Database.Database): StatusInfo {

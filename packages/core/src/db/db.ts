@@ -354,6 +354,22 @@ export function runMigrations(db: Database.Database): void {
     backfillProjectIdentities(db, realFs)
   }
 
+  if (version < 7) {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE pins (
+          session_uuid TEXT PRIMARY KEY,
+          pinned_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_pins_pinned_at ON pins (pinned_at DESC);
+        INSERT OR IGNORE INTO pins (session_uuid, pinned_at)
+          SELECT item_uuid, starred_at FROM stars WHERE item_type = 'session';
+        DROP TABLE stars;
+      `)
+    })()
+    db.pragma('user_version = 7')
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')

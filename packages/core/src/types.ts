@@ -121,8 +121,3 @@ export interface SyncResult {
 
 export type SearchResult = FragmentResult & { kind: 'fragment' }
 
-// ── Stars ──────────────────────────────────────────────────────────────────
-
-export type StarKind = 'session'
-
-export type StarredItem = { kind: 'session'; starredAt: string; session: Session }

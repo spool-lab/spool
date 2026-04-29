@@ -21,7 +21,7 @@ describe('migration v6', () => {
       expect.arrayContaining(['identity_kind', 'identity_key'])
     )
     const v = db.pragma('user_version') as Array<{ user_version: number }>
-    expect(v[0].user_version).toBe(6)
+    expect(v[0].user_version).toBeGreaterThanOrEqual(6)
   })
 
   it('creates project_groups_v view', () => {

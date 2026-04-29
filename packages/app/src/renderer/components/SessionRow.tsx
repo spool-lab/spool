@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
+import PinButton from './PinButton.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 
 type Props = {
   session: Session
+  pinned?: boolean
+  onPinChange?: (uuid: string, pinned: boolean) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
 }
 
-export default function SessionRow({ session, onOpenSession, onCopySessionId }: Props) {
+export default function SessionRow({ session, pinned = false, onPinChange, onOpenSession, onCopySessionId }: Props) {
   const [resuming, setResuming] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -63,26 +66,35 @@ export default function SessionRow({ session, onOpenSession, onCopySessionId }: 
         </p>
       </div>
 
-      <div className="flex-none flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onClick={handleResume}
-          title="Resume in terminal"
-          aria-label="Resume in terminal"
-          disabled={resuming}
-          className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {resuming ? <SpinnerIcon /> : <PlayIcon />}
-        </button>
-        <button
-          type="button"
-          onClick={handleCopyId}
-          title="Copy session ID"
-          aria-label="Copy session ID"
-          className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
-        >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-        </button>
+      <div className="flex-none flex items-center gap-1">
+        <span className={pinned ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'}>
+          <PinButton
+            sessionUuid={session.sessionUuid}
+            pinned={pinned}
+            onChange={(next) => onPinChange?.(session.sessionUuid, next)}
+          />
+        </span>
+        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleResume}
+            title="Resume in terminal"
+            aria-label="Resume in terminal"
+            disabled={resuming}
+            className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {resuming ? <SpinnerIcon /> : <PlayIcon />}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyId}
+            title="Copy session ID"
+            aria-label="Copy session ID"
+            className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+        </span>
       </div>
     </div>
   )
