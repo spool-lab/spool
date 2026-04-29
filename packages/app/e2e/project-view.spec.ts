@@ -35,7 +35,7 @@ test('clicking sidebar wordmark returns to home', async () => {
 
   await window.locator('[data-testid="sidebar-home"]').click()
   await expect(window.locator('[data-testid="project-view"]')).toBeHidden()
-  await expect(window.locator('h1')).toContainText('Spool')
+  await expect(window.locator('[data-testid="library-landing"]')).toBeVisible()
 })
 
 test('clicking session row opens session detail', async () => {

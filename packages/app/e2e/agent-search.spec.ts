@@ -16,8 +16,9 @@ test.describe('Agent mode — success', () => {
     const { window } = ctx
 
     await waitForSync(window)
-    await window.locator('[data-testid="mode-agent"]').click()
     await search(window, 'XYLOPHONE_CANARY_42')
+    await window.locator('[data-testid="mode-agent"]').click()
+    await window.locator('[data-testid="search-input"]').press('Enter')
 
     const card = window.locator('[data-testid="ai-answer-card"]')
     await expect(card).toBeVisible({ timeout: 15000 })
@@ -44,7 +45,9 @@ test.describe('Agent mode — success', () => {
   test('second query replaces previous answer', async () => {
     const { window } = ctx
 
-    await search(window, 'another question')
+    const compactInput = window.locator('[data-testid="search-input"]')
+    await compactInput.fill('another question')
+    await compactInput.press('Enter')
 
     const answerText = window.locator('[data-testid="ai-answer-text"]')
     await expect(answerText).toContainText('MOCK_ACP_RESPONSE_42', { timeout: 10000 })
@@ -66,8 +69,9 @@ test.describe('Agent mode — error', () => {
     const { window } = ctx
 
     await waitForSync(window)
-    await window.locator('[data-testid="mode-agent"]').click()
     await search(window, 'test query')
+    await window.locator('[data-testid="mode-agent"]').click()
+    await window.locator('[data-testid="search-input"]').press('Enter')
 
     const card = window.locator('[data-testid="ai-answer-card"]')
     await expect(card).toBeVisible({ timeout: 15000 })
