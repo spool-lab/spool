@@ -10,9 +10,11 @@ type Props = {
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
   onSettingsClick?: () => void
+  showSourceDots?: boolean
+  showSessionCount?: boolean
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, onSettingsClick }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, onSettingsClick, showSourceDots = true, showSessionCount = true }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
 
@@ -86,6 +88,8 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                   key={group.identityKey}
                   group={group}
                   active={group.identityKey === activeIdentityKey}
+                  showSourceDots={showSourceDots}
+                  showSessionCount={showSessionCount}
                   onClick={() => onSelectProject(group.identityKey)}
                 />
               ))}
@@ -96,6 +100,8 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                   <ProjectRow
                     group={looseGroup}
                     active={looseGroup.identityKey === activeIdentityKey}
+                    showSourceDots={showSourceDots}
+                    showSessionCount={showSessionCount}
                     onClick={() => onSelectProject(looseGroup.identityKey)}
                   />
                 </>
@@ -131,28 +137,26 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none px-2 pt-1 pb-2 flex flex-col gap-0.5">
+    <div className="flex-none px-2 pt-1 pb-2 flex items-center gap-2">
+      <div className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1">
+        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
+        <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
+          {text}
+        </span>
+      </div>
       {onSettingsClick && (
         <button
           type="button"
           onClick={onSettingsClick}
           title="Settings"
           aria-label="Settings"
-          className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
           </svg>
-          <span className="font-medium">Settings</span>
         </button>
       )}
-
-      <div className="flex items-center gap-2 px-2 py-1">
-        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
-        <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
-          {text}
-        </span>
-      </div>
     </div>
   )
 }
@@ -192,10 +196,14 @@ function formatShortTimeAgo(iso: string): string {
 function ProjectRow({
   group,
   active,
+  showSourceDots,
+  showSessionCount,
   onClick,
 }: {
   group: ProjectGroup
   active: boolean
+  showSourceDots: boolean
+  showSessionCount: boolean
   onClick: () => void
 }) {
   const sourceList = group.sources.map(getSessionSourceLabel).join(', ')
@@ -218,10 +226,12 @@ function ProjectRow({
       <span className="flex-1 truncate text-[12.5px]">
         {group.displayName}
       </span>
-      <SourceDots sources={group.sources} />
-      <span className="flex-none font-mono text-[10.5px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
-        {group.sessionCount}
-      </span>
+      {showSourceDots && <SourceDots sources={group.sources} />}
+      {showSessionCount && (
+        <span className="flex-none font-mono text-[10.5px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
+          {group.sessionCount}
+        </span>
+      )}
     </button>
   )
 }

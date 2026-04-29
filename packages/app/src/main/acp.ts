@@ -49,6 +49,10 @@ export interface AgentsConfig {
   defaultSearchSort?: 'relevance' | 'newest' | 'oldest'
   /** Preferred terminal app for session resume (e.g. "iTerm2", "Warp"). Auto-detected if unset. */
   terminal?: string
+  /** Show colored source dots in sidebar project rows (default: true) */
+  sidebarShowSourceDots?: boolean
+  /** Show session count in sidebar project rows (default: true) */
+  sidebarShowSessionCount?: boolean
   /** Built-in Open Agent SDK configuration */
   sdkAgent?: SdkAgentConfig
   /** Custom agent definitions (extend beyond builtins) */

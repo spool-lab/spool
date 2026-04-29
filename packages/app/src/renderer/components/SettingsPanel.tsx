@@ -194,12 +194,14 @@ export default function SettingsPanel({
 // ── General Tab ────────────────────────────────────────────────────────────
 
 function GeneralTab() {
-  const [config, setConfig] = useState<AgentsConfig>({})
+  const [config, setConfig] = useState<AgentsConfig | null>(null)
 
   useEffect(() => {
     if (!window.spool) return
     window.spool.getAgentsConfig().then(setConfig).catch(console.error)
   }, [])
+
+  if (config === null) return null
 
   const updateConfig = async (patch: Partial<AgentsConfig>) => {
     const next: AgentsConfig = { ...config, ...patch }
@@ -227,6 +229,23 @@ function GeneralTab() {
             options={SEARCH_SORT_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           />
         </div>
+      </Section>
+
+      {/* Sidebar */}
+      <Section title="Sidebar">
+        <ToggleRow
+          label="Show source dots"
+          description="Colored dots on each project row indicating which CLIs the project has sessions from."
+          checked={config.sidebarShowSourceDots ?? true}
+          onChange={(v) => updateConfig({ sidebarShowSourceDots: v })}
+        />
+        <div className="mt-3" />
+        <ToggleRow
+          label="Show session count"
+          description="Number of sessions in each project, shown on the right of the row."
+          checked={config.sidebarShowSessionCount ?? true}
+          onChange={(v) => updateConfig({ sidebarShowSessionCount: v })}
+        />
       </Section>
 
       {/* Terminal */}
@@ -533,6 +552,48 @@ function SmallSelect({ value, onChange, options }: { value: string; onChange: (v
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       <ChevronDown />
+    </div>
+  )
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string
+  description?: string
+  checked: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <span className="text-xs text-warm-muted dark:text-dark-muted">{label}</span>
+        {description && (
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative flex-none w-8 h-[18px] rounded-full transition-colors focus:outline-none ${
+          checked
+            ? 'bg-accent dark:bg-accent-dark'
+            : 'bg-warm-border dark:bg-dark-border'
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`absolute top-[2px] block w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all ${
+            checked ? 'left-[16px]' : 'left-[2px]'
+          }`}
+        />
+      </button>
     </div>
   )
 }

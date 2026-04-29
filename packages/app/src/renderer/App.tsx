@@ -68,6 +68,8 @@ export default function App() {
   const [showDaemonNotice, setShowDaemonNotice] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
+  const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
+  const [sidebarShowSessionCount, setSidebarShowSessionCount] = useState(true)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
@@ -129,6 +131,8 @@ export default function App() {
       const ready = agents.filter(a => a.status === 'ready')
       setAvailableAgents(ready)
       setDefaultSearchSort(config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER)
+      setSidebarShowSourceDots(config.sidebarShowSourceDots ?? true)
+      setSidebarShowSessionCount(config.sidebarShowSessionCount ?? true)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -448,6 +452,8 @@ export default function App() {
         }}
         onOpenSearch={handleSearchOpen}
         syncStatus={syncStatus}
+        showSourceDots={sidebarShowSourceDots}
+        showSessionCount={sidebarShowSessionCount}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       <div className="relative flex flex-col flex-1 min-w-0">

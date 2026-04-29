@@ -27,6 +27,8 @@ export interface AgentsConfig {
   defaultAgent?: string
   defaultSearchSort?: SearchSortOrder
   terminal?: string
+  sidebarShowSourceDots?: boolean
+  sidebarShowSessionCount?: boolean
   sdkAgent?: SdkAgentConfig
   customAgents?: Record<string, {
     name?: string
