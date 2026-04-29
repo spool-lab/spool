@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
-import type { FragmentResult, StarKind, StarredItem, SearchResult, StatusInfo } from '@spool-lab/core'
+import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
-import StarredItems from './components/StarredItems.js'
-import StarredEntryButton from './components/StarredEntryButton.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
@@ -16,11 +14,10 @@ import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editor
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
-type View = 'search' | 'session' | 'starred'
+type View = 'search' | 'session'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
-type SessionStarredItem = StarredItem & { kind: 'session' }
 
 interface AgentInfo {
   id: string
@@ -75,101 +72,7 @@ export default function App() {
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
 
-  const [starredSessions, setStarredSessions] = useState<Set<string>>(new Set())
-  const [starredItems, setStarredItems] = useState<SessionStarredItem[]>([])
-  const [starredScopedResults, setStarredScopedResults] = useState<SearchResult[]>([])
-  const [isStarredSearching, setIsStarredSearching] = useState(false)
-  const starredSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const starredSearchSeq = useRef(0)
-  const totalStarred = starredSessions.size
-
   const isHomeMode = homeMode && view === 'search' && !selectedSession
-
-  const refreshStarredUuids = useCallback(() => {
-    if (!window.spool?.getStarredUuids) return
-    window.spool.getStarredUuids()
-      .then(uuids => {
-        setStarredSessions(prev => setsEqual(prev, uuids.session) ? prev : new Set(uuids.session))
-      })
-      .catch(console.error)
-  }, [])
-
-  const refreshStarredItems = useCallback(() => {
-    if (!window.spool?.listStarredItems) return
-    window.spool.listStarredItems()
-      .then(items => setStarredItems(items.filter((it): it is SessionStarredItem => it.kind === 'session')))
-      .catch(console.error)
-  }, [])
-
-  useEffect(() => { refreshStarredUuids() }, [refreshStarredUuids])
-  useEffect(() => {
-    if (view === 'starred') refreshStarredItems()
-  }, [view, refreshStarredItems])
-
-  const handleToggleStar = useCallback((_kind: StarKind, uuid: string, next: boolean) => {
-    const withUuid = (uuids: Set<string>) => {
-      const out = new Set(uuids)
-      if (next) out.add(uuid)
-      else out.delete(uuid)
-      return out
-    }
-
-    setStarredSessions(withUuid)
-    if (!next) {
-      setStarredItems(prev => prev.filter(it => it.session.sessionUuid !== uuid))
-    }
-
-    const request = next
-      ? window.spool.starItem('session', uuid)
-      : window.spool.unstarItem('session', uuid)
-
-    request.catch(err => {
-      console.error(err)
-      setStarredSessions(prev => {
-        const reverted = new Set(prev)
-        if (next) reverted.delete(uuid)
-        else reverted.add(uuid)
-        return reverted
-      })
-      refreshStarredUuids()
-      if (view === 'starred') refreshStarredItems()
-    })
-  }, [refreshStarredUuids, refreshStarredItems, view])
-
-  const handleToggleStarredView = useCallback(() => {
-    if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
-    starredSearchSeq.current++
-    setQuery('')
-    setSelectedSession(null)
-    setTargetMessageId(null)
-    setStarredScopedResults([])
-    setIsStarredSearching(false)
-    if (view === 'starred') {
-      setView('search')
-      setHomeMode(true)
-    } else {
-      setView('starred')
-      setHomeMode(false)
-    }
-  }, [view])
-
-  const runStarredScopedSearch = useCallback(async (q: string) => {
-    const needle = q.trim()
-    if (!needle || !window.spool) {
-      setStarredScopedResults([])
-      setIsStarredSearching(false)
-      return
-    }
-    const requestId = ++starredSearchSeq.current
-    setIsStarredSearching(true)
-    try {
-      const res = await window.spool.search(needle, 50, undefined, true)
-      if (requestId !== starredSearchSeq.current) return
-      startTransition(() => { setStarredScopedResults(res) })
-    } finally {
-      if (requestId === starredSearchSeq.current) setIsStarredSearching(false)
-    }
-  }, [])
 
   useEffect(() => {
     loadThemeEditorState()
@@ -233,7 +136,6 @@ export default function App() {
       if (searchTimer.current) clearTimeout(searchTimer.current)
       if (toastTimer.current) clearTimeout(toastTimer.current)
       if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
-      if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
     }
   }, [])
 
@@ -351,15 +253,7 @@ export default function App() {
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
     if (!q.trim()) setHomeMode(true)
-    if (view === 'starred') {
-      if (starredSearchTimer.current) clearTimeout(starredSearchTimer.current)
-      if (!q.trim()) {
-        setStarredScopedResults([])
-        setIsStarredSearching(false)
-      } else {
-        starredSearchTimer.current = setTimeout(() => runStarredScopedSearch(q), 120)
-      }
-    } else if (searchMode === 'fast') {
+    if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
       searchTimer.current = setTimeout(() => doSearch(q), 120)
       void doPreviewSearch(q)
@@ -369,7 +263,7 @@ export default function App() {
       setAiError(null)
       aiAnswerRef.current = ''
     }
-  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError, view, runStarredScopedSearch])
+  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError])
 
   const handleSubmit = useCallback(() => {
     if (!query.trim()) return
@@ -424,14 +318,6 @@ export default function App() {
     setTargetMessageId(null)
   }, [])
 
-  const handleBackToHome = useCallback(() => {
-    setView('search')
-    setSelectedSession(null)
-    setTargetMessageId(null)
-    setHomeMode(true)
-    setQuery('')
-  }, [])
-
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
@@ -446,20 +332,12 @@ export default function App() {
   const hasAgents = availableAgents.length > 0
   const fragmentSources = deferredResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
-  const fragmentScopedResults = starredScopedResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
           <>
-            <div className="absolute top-3 right-3 z-20">
-              <StarredEntryButton
-                count={totalStarred}
-                active={false}
-                onClick={handleToggleStarredView}
-              />
-            </div>
             <HomeView
               query={query}
               onChange={handleQueryChange}
@@ -486,12 +364,11 @@ export default function App() {
                 query={query}
                 onChange={handleQueryChange}
                 onSubmit={handleSubmit}
-                {...(view === 'session' ? { onBack: handleBack } : view === 'starred' ? { onBack: handleBackToHome } : {})}
+                {...(view === 'session' ? { onBack: handleBack } : {})}
                 isSearching={isSearching}
                 variant="compact"
                 mode={searchMode}
                 {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-                {...(view === 'starred' ? { placeholder: 'Filter starred…', scoped: true } : {})}
               />
               {searchMode === 'ai' && availableAgents.length > 0 && (
                 <AgentSelector
@@ -500,11 +377,6 @@ export default function App() {
                   onSelect={setAiAgent}
                 />
               )}
-              <StarredEntryButton
-                count={totalStarred}
-                active={view === 'starred'}
-                onClick={handleToggleStarredView}
-              />
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">
@@ -512,20 +384,6 @@ export default function App() {
                 <SessionDetail
                   sessionUuid={selectedSession}
                   targetMessageId={targetMessageId}
-                  onCopySessionId={handleCopySessionId}
-                  isStarred={starredSessions.has(selectedSession)}
-                  onToggleStar={handleToggleStar}
-                />
-              ) : view === 'starred' ? (
-                <StarredItems
-                  items={starredItems}
-                  filterQuery={query}
-                  scopedResults={fragmentScopedResults}
-                  isScopedSearching={isStarredSearching}
-                  starredSessions={starredSessions}
-                  defaultSortOrder={defaultSearchSort}
-                  onOpenSession={handleOpenSession}
-                  onToggleStar={handleToggleStar}
                   onCopySessionId={handleCopySessionId}
                 />
               ) : (
@@ -561,8 +419,6 @@ export default function App() {
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
-                        starredSessions={starredSessions}
-                        onToggleStar={handleToggleStar}
                       />
                     </div>
                   )}
@@ -662,11 +518,5 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
       )}
     </div>
   )
-}
-
-function setsEqual(a: Set<string>, b: string[]): boolean {
-  if (a.size !== b.length) return false
-  for (const v of b) if (!a.has(v)) return false
-  return true
 }
 
