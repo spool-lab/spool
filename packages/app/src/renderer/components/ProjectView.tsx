@@ -20,8 +20,10 @@ const SORT_OPTIONS: { value: ProjectSessionSortOrder; label: string }[] = [
 export default function ProjectView({ identityKey, onOpenSession, onCopySessionId }: Props) {
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
+  const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [sortOrder, setSortOrder] = useState<ProjectSessionSortOrder>('recent')
   const [activeSources, setActiveSources] = useState<Set<SessionSource>>(new Set())
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     setActiveSources(new Set())
@@ -43,14 +45,48 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
     let cancelled = false
     setSessions(null)
     const sourcesArray = Array.from(activeSources)
-    window.spool.listSessionsByIdentity(identityKey, {
-      sortOrder,
+    const sharedOptions = {
       ...(sourcesArray.length > 0 ? { sources: sourcesArray } : {}),
-    })
-      .then(result => { if (!cancelled) setSessions(result) })
-      .catch(() => { if (!cancelled) setSessions([]) })
+    }
+    Promise.all([
+      window.spool.listPinnedSessionsByIdentity(identityKey),
+      window.spool.listSessionsByIdentity(identityKey, {
+        sortOrder,
+        excludePinned: true,
+        ...sharedOptions,
+      }),
+    ])
+      .then(([pinned, recent]) => {
+        if (cancelled) return
+        const filteredPinned = sourcesArray.length > 0
+          ? pinned.filter(s => sourcesArray.includes(s.source))
+          : pinned
+        setPinnedSessions(filteredPinned)
+        setSessions(recent)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPinnedSessions([])
+          setSessions([])
+        }
+      })
     return () => { cancelled = true }
-  }, [identityKey, sortOrder, activeSources])
+  }, [identityKey, sortOrder, activeSources, reloadKey])
+
+  function handlePinChange(sessionUuid: string, pinned: boolean) {
+    if (pinned) {
+      const candidate = sessions?.find(s => s.sessionUuid === sessionUuid)
+      if (candidate) {
+        setSessions(prev => (prev ?? []).filter(s => s.sessionUuid !== sessionUuid))
+        setPinnedSessions(prev => [candidate, ...prev])
+      }
+    } else {
+      const candidate = pinnedSessions.find(s => s.sessionUuid === sessionUuid)
+      setPinnedSessions(prev => prev.filter(s => s.sessionUuid !== sessionUuid))
+      if (candidate) setSessions(prev => [candidate, ...(prev ?? [])])
+    }
+    setReloadKey(k => k + 1)
+  }
 
   const availableSources = group?.sources ?? []
   const meta = useMemo(() => {
@@ -167,16 +203,43 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
             )}
           </div>
         ) : (
-          <div data-testid="project-view-recent">
-            {sessions.map(session => (
-              <SessionRow
-                key={session.sessionUuid}
-                session={session}
-                onOpenSession={onOpenSession}
-                onCopySessionId={onCopySessionId}
-              />
-            ))}
-          </div>
+          <>
+            {pinnedSessions.length > 0 && (
+              <div data-testid="project-view-pinned">
+                <div className="px-4 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted bg-accent/[0.04] dark:bg-accent-dark/[0.04]">
+                  PINNED · {pinnedSessions.length} {pinnedSessions.length === 1 ? 'session' : 'sessions'}
+                </div>
+                <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
+                  {pinnedSessions.map(session => (
+                    <SessionRow
+                      key={session.sessionUuid}
+                      session={session}
+                      pinned
+                      onPinChange={handlePinChange}
+                      onOpenSession={onOpenSession}
+                      onCopySessionId={onCopySessionId}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div data-testid="project-view-recent">
+              {pinnedSessions.length > 0 && sessions.length > 0 && (
+                <div className="px-4 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted">
+                  RECENT
+                </div>
+              )}
+              {sessions.map(session => (
+                <SessionRow
+                  key={session.sessionUuid}
+                  session={session}
+                  onPinChange={handlePinChange}
+                  onOpenSession={onOpenSession}
+                  onCopySessionId={onCopySessionId}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
