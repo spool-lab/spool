@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
+import Sidebar from './components/Sidebar.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
@@ -71,6 +72,7 @@ export default function App() {
   const themeHydrated = useRef(false)
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
+  const [activeProjectKey, setActiveProjectKey] = useState<string | null>(null)
 
   const isHomeMode = homeMode && view === 'search' && !selectedSession
 
@@ -334,7 +336,9 @@ export default function App() {
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
   return (
-    <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+    <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+      <Sidebar activeIdentityKey={activeProjectKey} onSelectProject={setActiveProjectKey} />
+      <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
           <>
@@ -436,6 +440,7 @@ export default function App() {
         {...(activeAgentMode ? { aiAgentMode: activeAgentMode } : {})}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
+      </div>
 
       {resumeToastCommand && (
         <ResumeToast command={resumeToastCommand} />
