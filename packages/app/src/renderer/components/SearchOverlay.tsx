@@ -80,6 +80,7 @@ export default function SearchOverlay({
     }
     if (event.key === 'Tab') {
       event.preventDefault()
+      if (!scopeProjectName) return
       onScopeChange(scope === 'all' ? 'project' : 'all')
       return
     }
