@@ -71,6 +71,9 @@ const api = {
   getPinnedUuids: (): Promise<string[]> =>
     ipcRenderer.invoke('spool:get-pinned-uuids'),
 
+  listPinnedSessions: (): Promise<Session[]> =>
+    ipcRenderer.invoke('spool:list-pinned-sessions'),
+
   listPinnedSessionsByIdentity: (identityKey: string): Promise<Session[]> =>
     ipcRenderer.invoke('spool:list-pinned-sessions-by-identity', { identityKey }),
 

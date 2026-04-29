@@ -3,7 +3,6 @@ import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import SessionDetail from './components/SessionDetail.js'
-import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
@@ -422,6 +421,9 @@ export default function App() {
           setView('search')
           setQuery('')
         }}
+        onOpenSearch={handleSearchOpen}
+        syncStatus={syncStatus}
+        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
@@ -435,32 +437,32 @@ export default function App() {
               setView('search')
               setQuery('')
             }}
-            onOpenSearch={handleSearchOpen}
+            onOpenSession={handleOpenSession}
+            onCopySessionId={handleCopySessionId}
           />
         ) : (
           <>
-            <div className="flex items-center gap-3 px-4 h-10 flex-none mt-2">
-              <span className="text-base font-bold tracking-[-0.04em] flex-none select-none">
-                S<span className="text-accent">.</span>
-              </span>
-              <SearchBar
-                query={query}
-                onChange={handleQueryChange}
-                onSubmit={handleSubmit}
-                {...(view === 'session' ? { onBack: handleBack } : {})}
-                isSearching={isSearching}
-                variant="compact"
-                mode={searchMode}
-                {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-              />
-              {searchMode === 'ai' && availableAgents.length > 0 && (
-                <AgentSelector
-                  agents={availableAgents}
-                  activeAgent={aiAgent}
-                  onSelect={setAiAgent}
+            {!showProjectView && (
+              <div className="flex items-center gap-3 px-4 h-10 flex-none mt-2">
+                <SearchBar
+                  query={query}
+                  onChange={handleQueryChange}
+                  onSubmit={handleSubmit}
+                  {...(view === 'session' ? { onBack: handleBack } : {})}
+                  isSearching={isSearching}
+                  variant="compact"
+                  mode={searchMode}
+                  {...(hasAgents ? { onModeChange: handleModeChange } : {})}
                 />
-              )}
-            </div>
+                {searchMode === 'ai' && availableAgents.length > 0 && (
+                  <AgentSelector
+                    agents={availableAgents}
+                    activeAgent={aiAgent}
+                    onSelect={setAiAgent}
+                  />
+                )}
+              </div>
+            )}
 
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === 'session' && selectedSession ? (
@@ -474,7 +476,6 @@ export default function App() {
                   identityKey={activeProjectKey}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
-                  onOpenSearch={handleSearchOpen}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
@@ -519,13 +520,6 @@ export default function App() {
         )}
       </div>
 
-      <StatusBar
-        syncStatus={syncStatus}
-        searchMode={searchMode}
-        aiAgent={activeAgentName}
-        {...(activeAgentMode ? { aiAgentMode: activeAgentMode } : {})}
-        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
-      />
       </div>
 
       {resumeToastCommand && (

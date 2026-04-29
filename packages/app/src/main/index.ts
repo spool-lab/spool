@@ -4,7 +4,7 @@ import { Worker } from 'node:worker_threads'
 import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
-  pinSession, unpinSession, getPinnedUuids,
+  pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity,
 } from '@spool-lab/core'
 import type { FragmentResult, SessionSource, ListSessionsByIdentityOptions } from '@spool-lab/core'
@@ -86,10 +86,10 @@ const searchCache = new SearchCache()
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     title: isDevMode ? 'Spool DEV' : 'Spool',
-    width: 960,
-    height: 620,
+    width: 1180,
+    height: 780,
     minWidth: 800,
-    minHeight: 480,
+    minHeight: 520,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141410' : '#FAFAF8',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -307,6 +307,10 @@ ipcMain.handle('spool:unpin-session', (_e, { uuid }: { uuid: string }) => {
 
 ipcMain.handle('spool:get-pinned-uuids', () => {
   return getPinnedUuids(db)
+})
+
+ipcMain.handle('spool:list-pinned-sessions', () => {
+  return listPinnedSessions(db)
 })
 
 ipcMain.handle('spool:list-pinned-sessions-by-identity', (_e, { identityKey }: { identityKey: string }) => {

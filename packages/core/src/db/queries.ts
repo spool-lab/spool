@@ -179,6 +179,7 @@ export function listRecentSessions(
 ): Session[] {
   return (db.prepare(`
     ${SESSION_SELECT}
+    WHERE s.message_count > 0
     ORDER BY s.started_at DESC
     LIMIT ?
   `).all(limit) as Array<Record<string, unknown>>).map(rowToSession)
@@ -878,6 +879,16 @@ export function getPinnedUuids(db: Database.Database): string[] {
     WHERE EXISTS (SELECT 1 FROM sessions WHERE session_uuid = pins.session_uuid)
   `).all() as Array<{ uuid: string }>
   return rows.map(r => r.uuid)
+}
+
+export function listPinnedSessions(db: Database.Database): Session[] {
+  const rows = db.prepare(`
+    ${SESSION_SELECT}
+    JOIN pins ON pins.session_uuid = s.session_uuid
+    WHERE s.message_count > 0
+    ORDER BY pins.pinned_at DESC
+  `).all() as Array<Record<string, unknown>>
+  return rows.map(rowToSession)
 }
 
 export function getStatus(db: Database.Database): StatusInfo {

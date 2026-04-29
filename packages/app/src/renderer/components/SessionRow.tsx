@@ -7,12 +7,13 @@ import { formatRelativeDate } from '../../shared/formatDate.js'
 type Props = {
   session: Session
   pinned?: boolean
+  showProject?: boolean
   onPinChange?: (uuid: string, pinned: boolean) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
 }
 
-export default function SessionRow({ session, pinned = false, onPinChange, onOpenSession, onCopySessionId }: Props) {
+export default function SessionRow({ session, pinned = false, showProject = false, onPinChange, onOpenSession, onCopySessionId }: Props) {
   const [resuming, setResuming] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -61,6 +62,7 @@ export default function SessionRow({ session, pinned = false, onPinChange, onOpe
           </span>
         </div>
         <p className="text-xs text-warm-faint dark:text-dark-muted truncate">
+          {showProject && <span className="text-warm-muted dark:text-dark-muted">{session.projectDisplayName} · </span>}
           {date} · {session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}
           {session.model && ` · ${session.model}`}
         </p>

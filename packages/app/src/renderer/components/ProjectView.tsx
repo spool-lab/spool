@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
-import { SearchTrigger } from './LibraryLanding.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 
@@ -9,7 +8,6 @@ type Props = {
   identityKey: string
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
-  onOpenSearch?: () => void
 }
 
 const SORT_OPTIONS: { value: ProjectSessionSortOrder; label: string }[] = [
@@ -19,7 +17,7 @@ const SORT_OPTIONS: { value: ProjectSessionSortOrder; label: string }[] = [
   { value: 'title', label: 'Title' },
 ]
 
-export default function ProjectView({ identityKey, onOpenSession, onCopySessionId, onOpenSearch }: Props) {
+export default function ProjectView({ identityKey, onOpenSession, onCopySessionId }: Props) {
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
@@ -107,12 +105,9 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
   return (
     <div data-testid="project-view" className="flex flex-col h-full overflow-hidden">
       <div className="flex-none px-6 pt-5 pb-3 border-b border-warm-border dark:border-dark-border">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
-            {group?.displayName ?? identityKey}
-          </h1>
-          {onOpenSearch && <SearchTrigger onClick={onOpenSearch} />}
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
+          {group?.displayName ?? identityKey}
+        </h1>
         {meta && (
           <p className="mt-1 text-xs text-warm-muted dark:text-dark-muted flex items-center gap-2 flex-wrap">
             <span>{meta.count} {meta.count === 1 ? 'session' : 'sessions'}</span>
