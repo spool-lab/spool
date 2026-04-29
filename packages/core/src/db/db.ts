@@ -361,7 +361,7 @@ export function runMigrations(db: Database.Database): void {
           session_uuid TEXT PRIMARY KEY,
           pinned_at    TEXT NOT NULL DEFAULT (datetime('now'))
         );
-        CREATE INDEX idx_pins_pinned_at ON pins (pinned_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_pins_pinned_at ON pins (pinned_at DESC);
         INSERT OR IGNORE INTO pins (session_uuid, pinned_at)
           SELECT item_uuid, starred_at FROM stars WHERE item_type = 'session';
         DROP TABLE stars;
