@@ -11,7 +11,7 @@ test.afterAll(async () => {
   await ctx?.cleanup()
 })
 
-test('session detail shows Pin, Copy ID, Copy command, Resume buttons', async () => {
+test('session detail shows Pin, action menu (Copy ID + Copy command), Resume', async () => {
   const { window } = ctx
   await waitForSync(window)
 
@@ -20,9 +20,11 @@ test('session detail shows Pin, Copy ID, Copy command, Resume buttons', async ()
   await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 5000 })
 
   await expect(window.locator('[data-testid="pin-button"]')).toBeVisible()
-  await expect(window.locator('[data-testid="detail-copy-id"]')).toBeVisible()
-  await expect(window.locator('[data-testid="detail-copy-command"]')).toBeVisible()
   await expect(window.locator('[data-testid="detail-resume"]')).toBeVisible()
+
+  await window.locator('[data-testid="detail-actions-menu"] button').first().click()
+  await expect(window.getByRole('menuitem', { name: 'Copy session ID' })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: /Copy resume command/ })).toBeVisible()
 })
 
 test('pinning from session detail persists', async () => {
