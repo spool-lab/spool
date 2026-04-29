@@ -70,7 +70,11 @@ export async function waitForSync(window: Page) {
 }
 
 export async function search(window: Page, query: string) {
-  const input = window.locator('[data-testid="search-input"]')
+  // Open overlay via ⌘K / Ctrl+K depending on platform
+  await window.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k')
+  const input = window.locator('[data-testid="search-overlay-input"]')
+  await expect(input).toBeVisible({ timeout: 3000 })
   await input.fill(query)
-  await input.press('Enter')
+  await input.press('Shift+Enter')
+  await expect(window.locator('[data-testid="search-overlay"]')).toBeHidden({ timeout: 2000 })
 }

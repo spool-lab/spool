@@ -14,10 +14,9 @@ test.afterAll(async () => {
 test('home view shows title and session counts after sync', async () => {
   const { window } = ctx
 
-  await expect(window.locator('h1')).toContainText('Spool')
+  await expect(window.locator('h1')).toContainText('AI Session Library')
   await waitForSync(window)
-  await expect(window.locator('text=Claude Chats')).toBeVisible()
-  await expect(window.locator('text=Gemini Chats')).toBeVisible()
+  await expect(window.locator('[data-testid="library-project-card"]').first()).toBeVisible()
 })
 
 test('search finds fixture content by canary keyword', async () => {
