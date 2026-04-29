@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, StarKind, StarredItem, ProjectGroup, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 
@@ -41,8 +41,8 @@ export interface AgentsConfig {
 export type SpoolAPI = typeof api
 
 const api = {
-  search: (query: string, limit?: number, source?: string, onlyStarred?: boolean): Promise<SearchResult[]> =>
-    ipcRenderer.invoke('spool:search', { query, limit, source, onlyStarred }),
+  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean): Promise<SearchResult[]> =>
+    ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned }),
 
   searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search-preview', { query, limit, source }),
@@ -62,17 +62,17 @@ const api = {
   getStatus: (): Promise<StatusInfo> =>
     ipcRenderer.invoke('spool:get-status'),
 
-  starItem: (kind: StarKind, uuid: string): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('spool:star-item', { kind, uuid }),
+  pinSession: (uuid: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:pin-session', { uuid }),
 
-  unstarItem: (kind: StarKind, uuid: string): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('spool:unstar-item', { kind, uuid }),
+  unpinSession: (uuid: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:unpin-session', { uuid }),
 
-  listStarredItems: (limit?: number): Promise<StarredItem[]> =>
-    ipcRenderer.invoke('spool:list-starred-items', { limit }),
+  getPinnedUuids: (): Promise<string[]> =>
+    ipcRenderer.invoke('spool:get-pinned-uuids'),
 
-  getStarredUuids: (): Promise<{ session: string[] }> =>
-    ipcRenderer.invoke('spool:get-starred-uuids'),
+  listPinnedSessionsByIdentity: (identityKey: string): Promise<Session[]> =>
+    ipcRenderer.invoke('spool:list-pinned-sessions-by-identity', { identityKey }),
 
   getRuntimeInfo: (): Promise<{ isDev: boolean; appPath: string; appName: string }> =>
     ipcRenderer.invoke('spool:get-runtime-info'),

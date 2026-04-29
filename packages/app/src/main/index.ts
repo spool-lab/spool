@@ -4,10 +4,10 @@ import { Worker } from 'node:worker_threads'
 import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
-  starItem, unstarItem, listStarredItems, getStarredUuidsByType,
-  listProjectGroups, listSessionsByIdentity,
+  pinSession, unpinSession, getPinnedUuids,
+  listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity,
 } from '@spool-lab/core'
-import type { FragmentResult, SessionSource, StarKind, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type { FragmentResult, SessionSource, ListSessionsByIdentityOptions } from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -234,8 +234,8 @@ app.on('window-all-closed', () => {
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyStarred }: { query: string; limit?: number; source?: string; onlyStarred?: boolean }) => {
-  const cacheKey = `${source ?? 'all'}|${limit}|${onlyStarred ? 'starred' : 'full'}|${query}`
+ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned }: { query: string; limit?: number; source?: string; onlyPinned?: boolean }) => {
+  const cacheKey = `${source ?? 'all'}|${limit}|${onlyPinned ? 'pinned' : 'full'}|${query}`
   if (!isSyncActive) {
     const cached = searchCache.get(cacheKey)
     if (cached) return cached
@@ -247,7 +247,7 @@ ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyStarred }: 
   const results = searchFragments(db, query, {
     limit,
     ...(sessionSource ? { source: sessionSource } : {}),
-    ...(onlyStarred ? { onlyStarred: true } : {}),
+    ...(onlyPinned ? { onlyPinned: true } : {}),
   }).map(f => ({ ...f, kind: 'fragment' as const }))
 
   if (!isSyncActive) {
@@ -293,24 +293,24 @@ ipcMain.handle('spool:get-status', () => {
   return getStatus(db)
 })
 
-ipcMain.handle('spool:star-item', (_e, { kind, uuid }: { kind: StarKind; uuid: string }) => {
-  starItem(db, kind, uuid)
+ipcMain.handle('spool:pin-session', (_e, { uuid }: { uuid: string }) => {
+  pinSession(db, uuid)
   searchCache.clear()
   return { ok: true }
 })
 
-ipcMain.handle('spool:unstar-item', (_e, { kind, uuid }: { kind: StarKind; uuid: string }) => {
-  unstarItem(db, kind, uuid)
+ipcMain.handle('spool:unpin-session', (_e, { uuid }: { uuid: string }) => {
+  unpinSession(db, uuid)
   searchCache.clear()
   return { ok: true }
 })
 
-ipcMain.handle('spool:list-starred-items', (_e, { limit = 200 }: { limit?: number } = {}) => {
-  return listStarredItems(db, limit)
+ipcMain.handle('spool:get-pinned-uuids', () => {
+  return getPinnedUuids(db)
 })
 
-ipcMain.handle('spool:get-starred-uuids', () => {
-  return getStarredUuidsByType(db)
+ipcMain.handle('spool:list-pinned-sessions-by-identity', (_e, { identityKey }: { identityKey: string }) => {
+  return listPinnedSessionsByIdentity(db, identityKey)
 })
 
 ipcMain.handle('spool:get-runtime-info', () => {
