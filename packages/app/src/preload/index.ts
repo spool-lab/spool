@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, StarKind, StarredItem, ProjectGroup } from '@spool-lab/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, StarKind, StarredItem, ProjectGroup, ListSessionsByIdentityOptions } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 
@@ -52,6 +52,9 @@ const api = {
 
   listProjectGroups: (): Promise<ProjectGroup[]> =>
     ipcRenderer.invoke('spool:list-project-groups'),
+
+  listSessionsByIdentity: (identityKey: string, options?: ListSessionsByIdentityOptions): Promise<Session[]> =>
+    ipcRenderer.invoke('spool:list-sessions-by-identity', { identityKey, options }),
 
   getSession: (sessionUuid: string): Promise<{ session: Session; messages: Message[] } | null> =>
     ipcRenderer.invoke('spool:get-session', { sessionUuid }),

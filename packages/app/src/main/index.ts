@@ -5,9 +5,9 @@ import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
   starItem, unstarItem, listStarredItems, getStarredUuidsByType,
-  listProjectGroups,
+  listProjectGroups, listSessionsByIdentity,
 } from '@spool-lab/core'
-import type { FragmentResult, SessionSource, StarKind } from '@spool-lab/core'
+import type { FragmentResult, SessionSource, StarKind, ListSessionsByIdentityOptions } from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -279,6 +279,10 @@ ipcMain.handle('spool:list-sessions', (_e, { limit = 50 }: { limit?: number } = 
 
 ipcMain.handle('spool:list-project-groups', () => {
   return listProjectGroups(db)
+})
+
+ipcMain.handle('spool:list-sessions-by-identity', (_e, { identityKey, options }: { identityKey: string; options?: ListSessionsByIdentityOptions }) => {
+  return listSessionsByIdentity(db, identityKey, options)
 })
 
 ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string }) => {

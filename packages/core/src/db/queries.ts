@@ -159,7 +159,7 @@ export function insertMessages(
   }
 }
 
-const SESSION_SELECT = `
+export const SESSION_SELECT = `
   SELECT
     s.id, s.project_id AS projectId, s.source_id AS sourceId,
     s.session_uuid AS sessionUuid, s.file_path AS filePath,
@@ -944,7 +944,7 @@ export function getStatus(db: Database.Database): StatusInfo {
   }
 }
 
-function rowToSession(r: Record<string, unknown>): Session {
+export function rowToSession(r: Record<string, unknown>): Session {
   return {
     id: r['id'] as number,
     projectId: r['projectId'] as number,
