@@ -24,17 +24,12 @@ test('sidebar is visible at startup with project rows', async () => {
   expect(await rows.count()).toBeGreaterThanOrEqual(1)
 })
 
-test('clicking a sidebar project highlights it without changing main pane', async () => {
+test('clicking a sidebar project highlights the row', async () => {
   const { window } = ctx
 
   await waitForSync(window)
 
   const firstRow = window.locator('[data-testid="sidebar-project-row"]').first()
-  const homeBefore = await window.locator('h1').textContent()
-
   await firstRow.click()
   await expect(firstRow).toHaveClass(/bg-warm-surface2/)
-
-  const homeAfter = await window.locator('h1').textContent()
-  expect(homeAfter).toBe(homeBefore)
 })

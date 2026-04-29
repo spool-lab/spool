@@ -9,6 +9,7 @@ import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import Sidebar from './components/Sidebar.js'
+import ProjectView from './components/ProjectView.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
@@ -74,7 +75,8 @@ export default function App() {
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
   const [activeProjectKey, setActiveProjectKey] = useState<string | null>(null)
 
-  const isHomeMode = homeMode && view === 'search' && !selectedSession
+  const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
+  const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView
 
   useEffect(() => {
     loadThemeEditorState()
@@ -337,7 +339,25 @@ export default function App() {
 
   return (
     <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
-      <Sidebar activeIdentityKey={activeProjectKey} onSelectProject={setActiveProjectKey} />
+      <Sidebar
+        activeIdentityKey={activeProjectKey}
+        onSelectProject={(key) => {
+          setActiveProjectKey(key)
+          setHomeMode(false)
+          setSelectedSession(null)
+          setTargetMessageId(null)
+          setView('search')
+          setQuery('')
+        }}
+        onSelectHome={() => {
+          setActiveProjectKey(null)
+          setHomeMode(true)
+          setSelectedSession(null)
+          setTargetMessageId(null)
+          setView('search')
+          setQuery('')
+        }}
+      />
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
@@ -388,6 +408,12 @@ export default function App() {
                 <SessionDetail
                   sessionUuid={selectedSession}
                   targetMessageId={targetMessageId}
+                  onCopySessionId={handleCopySessionId}
+                />
+              ) : showProjectView && activeProjectKey ? (
+                <ProjectView
+                  identityKey={activeProjectKey}
+                  onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
                 />
               ) : (

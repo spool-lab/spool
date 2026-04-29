@@ -5,9 +5,10 @@ import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessi
 type Props = {
   activeIdentityKey: string | null
   onSelectProject: (identityKey: string) => void
+  onSelectHome?: () => void
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
 
   useEffect(() => {
@@ -27,9 +28,15 @@ export default function Sidebar({ activeIdentityKey, onSelectProject }: Props) {
       className="w-60 flex-none border-r border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
       <div className="px-4 pt-5 pb-4 flex-none">
-        <span className="text-xl font-bold tracking-[-0.04em] select-none">
+        <button
+          type="button"
+          data-testid="sidebar-home"
+          onClick={() => onSelectHome?.()}
+          className="text-xl font-bold tracking-[-0.04em] select-none cursor-pointer hover:opacity-80 transition-opacity"
+          aria-label="Spool home"
+        >
           Spool<span className="text-accent">.</span>
-        </span>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3">
