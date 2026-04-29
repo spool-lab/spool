@@ -21,6 +21,7 @@ test('session detail shows Pin, Copy ID, Copy command, Resume buttons', async ()
 
   await expect(window.locator('[data-testid="pin-button"]')).toBeVisible()
   await expect(window.locator('[data-testid="detail-copy-id"]')).toBeVisible()
+  await expect(window.locator('[data-testid="detail-copy-command"]')).toBeVisible()
   await expect(window.locator('[data-testid="detail-resume"]')).toBeVisible()
 })
 

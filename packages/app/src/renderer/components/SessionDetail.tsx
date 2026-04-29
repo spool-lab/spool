@@ -212,7 +212,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   async function handleCopyCommand() {
     if (!session) return
-    const command = getSessionResumeCommand(session.source, session.sessionUuid)
+    const command = getSessionResumeCommand(session.source, session.sessionUuid, session.cwd)
     if (!command) return
     await navigator.clipboard.writeText(command)
     setCommandCopied(true)
