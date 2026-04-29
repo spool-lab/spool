@@ -26,7 +26,7 @@ interface AgentInfo {
   name: string
   path: string
   status: 'ready' | 'not_found' | 'not_running'
-  acpMode: 'extension' | 'native' | 'websocket' | 'sdk'
+  acpMode: 'extension' | 'native' | 'websocket'
 }
 
 interface RuntimeInfo {
@@ -425,7 +425,6 @@ export default function App() {
 
   const activeAgentInfo = availableAgents.find(a => a.id === aiAgent) ?? availableAgents[0]
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
-  const activeAgentMode = activeAgentInfo?.acpMode
   const hasAgents = availableAgents.length > 0
   const fragmentSources = deferredResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
@@ -526,7 +525,6 @@ export default function App() {
                       answer={aiAnswer}
                       streaming={aiStreaming}
                       agentName={activeAgentName}
-                      {...(activeAgentMode ? { agentMode: activeAgentMode } : {})}
                       sources={fragmentSources}
                       error={aiError}
                       toolCalls={aiToolCalls}

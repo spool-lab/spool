@@ -21,7 +21,6 @@
     "@agentclientprotocol/sdk": "^0.17.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
-    "@shipany/open-agent-sdk": "link:/Users/claw/code/linkclaw/open-agent-sdk",
     "@spool-lab/core": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
@@ -57,7 +56,6 @@
       "node_modules/acp-extension-core/**",
       "node_modules/@agentclientprotocol/**",
       "node_modules/@anthropic-ai/claude-agent-sdk/**",
-      "node_modules/@shipany/open-agent-sdk/**",
       "node_modules/zod/**"
     ],
     "mac": {

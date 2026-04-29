@@ -11,7 +11,6 @@ interface Props {
   streaming: boolean
   agentName: string
   agentId?: string
-  agentMode?: string
   sources: FragmentResult[]
   error?: string | null
   onResume?: () => void
@@ -27,7 +26,7 @@ const TOOL_KIND_ICONS: Record<string, string> = {
   think: '*',
 }
 
-export default function AiAnswerCard({ answer, streaming, agentName, agentMode, sources, error, onResume, toolCalls }: Props) {
+export default function AiAnswerCard({ answer, streaming, agentName, sources, error, onResume, toolCalls }: Props) {
   if (!answer && !streaming && !error) return null
 
   const activeToolCalls = toolCalls ? [...toolCalls.values()].filter(tc => tc.status === 'in_progress' || tc.status === 'pending') : []
@@ -42,7 +41,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, agentMode, 
           {agentName} says
         </span>
         <span className="ml-auto text-[10px] font-mono bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border px-2 py-0.5 rounded text-warm-muted dark:text-dark-muted">
-          via {agentMode === 'sdk' ? 'API' : 'ACP'} · local · {agentName}
+          via ACP · local · {agentName}
         </span>
       </div>
 

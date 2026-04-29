@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react'
-import type { AgentInfo, AgentsConfig, SdkAgentConfig } from '../../preload/index.js'
+import type { AgentInfo, AgentsConfig } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
@@ -20,10 +20,6 @@ const TERMINAL_OPTIONS = [
   { value: 'WezTerm', label: 'WezTerm' },
 ] as const
 
-type SdkAgentPatch = Omit<Partial<SdkAgentConfig>, 'baseURL'> & {
-  baseURL?: string | null
-}
-
 interface Props {
   onClose: () => void
   initialTab?: SettingsTab
@@ -40,16 +36,7 @@ const MODE_LABELS: Record<string, string> = {
   extension: 'ACP Extension',
   native: 'ACP Native',
   websocket: 'WebSocket',
-  sdk: 'Built-in SDK',
 }
-
-const SDK_MODEL_OPTIONS = [
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
-  { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5' },
-  { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
-] as const
 
 // ── Sidebar tabs ───────────────────────────────────────────────────────────
 
@@ -347,17 +334,11 @@ function AgentTab() {
     ]).then(([a, c]) => { setAgents(a); setConfig(c) }).catch(console.error)
   }, [])
 
-  const sdkAgent = agents.find(a => a.acpMode === 'sdk')
-  const cliAgents = agents.filter(a => a.acpMode !== 'sdk')
-  const sdkConfigured = !!config.sdkAgent?.apiKey
-
-  const selectableIds = new Set([
-    ...(sdkAgent ? [sdkAgent.id] : []),
-    ...cliAgents.filter(a => a.status === 'ready').map(a => a.id),
-  ])
+  const cliAgents = agents
+  const selectableIds = new Set(cliAgents.filter(a => a.status === 'ready').map(a => a.id))
   const selectedId = config.defaultAgent && selectableIds.has(config.defaultAgent)
     ? config.defaultAgent
-    : (sdkConfigured && sdkAgent ? sdkAgent.id : cliAgents.find(a => a.status === 'ready')?.id ?? '')
+    : cliAgents.find(a => a.status === 'ready')?.id ?? ''
 
   const updateConfig = async (patch: Partial<AgentsConfig>) => {
     const next: AgentsConfig = { ...config, ...patch }
@@ -365,85 +346,8 @@ function AgentTab() {
     try { await window.spool.setAgentsConfig(next) } catch {}
   }
 
-  const updateSdkAgent = (patch: SdkAgentPatch) => {
-    const current = config.sdkAgent ?? {}
-    const { baseURL, ...restPatch } = patch
-    const nextSdkAgent: SdkAgentConfig = { ...current, ...restPatch }
-    if (baseURL) nextSdkAgent.baseURL = baseURL
-    else delete nextSdkAgent.baseURL
-    void updateConfig({ sdkAgent: nextSdkAgent })
-  }
-
   return (
     <div className="space-y-6">
-      {/* Built-in Agent */}
-      {sdkAgent && (
-        <Section title="Built-in Agent">
-          <button
-            onClick={() => updateConfig({ defaultAgent: sdkAgent.id })}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 border text-left transition-colors ${
-              selectedId === sdkAgent.id ? 'rounded-t-[8px] border-b-0 bg-accent-bg dark:bg-[#2A1800] border-accent/30 dark:border-accent-dark/30' : 'rounded-[8px] bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2'
-            }`}
-          >
-            <RadioDot selected={selectedId === sdkAgent.id} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-warm-text dark:text-dark-text">Built-in</span>
-                <span className="text-[9px] font-mono text-warm-faint dark:text-dark-muted px-1.5 py-0.5 bg-warm-surface2 dark:bg-dark-surface2 rounded">
-                  Requires API Key
-                </span>
-              </div>
-              <span className="block text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate">
-                {sdkConfigured ? `${config.sdkAgent?.model || 'claude-sonnet-4-6'} via API` : 'No CLI needed — just add your API key'}
-              </span>
-            </div>
-            <span className={`text-[10px] font-medium flex-none ${sdkConfigured ? 'text-green-500' : 'text-amber-500 dark:text-amber-400'}`}>
-              {sdkConfigured ? 'ready' : 'needs key'}
-            </span>
-          </button>
-
-          {selectedId === sdkAgent.id && (
-            <div className="px-3 py-3 bg-accent-bg dark:bg-[#2A1800] border border-t-0 border-accent/30 dark:border-accent-dark/30 rounded-b-[8px] space-y-2.5">
-              <ConfigRow label="API Key">
-                <input
-                  type="password"
-                  value={config.sdkAgent?.apiKey ?? ''}
-                  onChange={(e) => updateSdkAgent({ apiKey: e.target.value })}
-                  placeholder="sk-ant-..."
-                  className="flex-1 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2.5 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent placeholder:text-warm-faint/50 dark:placeholder:text-dark-muted/50"
-                />
-              </ConfigRow>
-              <ConfigRow label="Model">
-                <div className="relative flex-1">
-                  <select
-                    value={config.sdkAgent?.model ?? 'claude-sonnet-4-6'}
-                    onChange={(e) => updateSdkAgent({ model: e.target.value })}
-                    className="appearance-none w-full h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg pl-2.5 pr-7 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent"
-                  >
-                    {SDK_MODEL_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown />
-                </div>
-              </ConfigRow>
-              <ConfigRow label="Base URL">
-                <input
-                  type="text"
-                  value={config.sdkAgent?.baseURL ?? ''}
-                  onChange={(e) => updateSdkAgent({ baseURL: e.target.value || null })}
-                  placeholder="Default (Anthropic API)"
-                  className="flex-1 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2.5 text-[11px] font-mono text-warm-text dark:text-dark-text outline-none transition-colors focus:border-accent placeholder:text-warm-faint/50 dark:placeholder:text-dark-muted/50"
-                />
-              </ConfigRow>
-              <p className="text-[10px] text-warm-faint dark:text-dark-muted leading-relaxed">
-                Runs directly via API — no CLI install needed. Override Base URL for OpenRouter or other providers.
-              </p>
-            </div>
-          )}
-        </Section>
-      )}
-
       {/* Installed Agents */}
       <Section title="Installed Agents">
         <div className="space-y-1.5">
@@ -529,15 +433,6 @@ function RadioDot({ selected }: { selected: boolean }) {
     }`}>
       {selected && <span className="w-2 h-2 rounded-full bg-accent dark:bg-accent-dark" />}
     </span>
-  )
-}
-
-function ConfigRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-[11px] text-warm-muted dark:text-dark-muted w-16 flex-none">{label}</span>
-      {children}
-    </div>
   )
 }
 

@@ -8,19 +8,13 @@ export interface AgentInfo {
   name: string
   path: string
   status: 'ready' | 'not_found' | 'not_running'
-  acpMode: 'extension' | 'native' | 'websocket' | 'sdk'
+  acpMode: 'extension' | 'native' | 'websocket'
 }
 
 export interface BuiltinAgent {
   name: string
   bin: string
-  acpMode: 'extension' | 'native' | 'websocket' | 'sdk'
-}
-
-export interface SdkAgentConfig {
-  apiKey?: string | undefined
-  model?: string | undefined
-  baseURL?: string | undefined
+  acpMode: 'extension' | 'native' | 'websocket'
 }
 
 export interface AgentsConfig {
@@ -29,7 +23,6 @@ export interface AgentsConfig {
   terminal?: string
   sidebarShowSourceDots?: boolean
   sidebarShowSessionCount?: boolean
-  sdkAgent?: SdkAgentConfig
   customAgents?: Record<string, {
     name?: string
     bin: string
