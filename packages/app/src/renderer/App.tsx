@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef, startTransition, useDeferredV
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import SearchBar, { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
-import HomeView from './components/HomeView.js'
 import SessionDetail from './components/SessionDetail.js'
 import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
@@ -10,6 +9,8 @@ import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import Sidebar from './components/Sidebar.js'
 import ProjectView from './components/ProjectView.js'
+import LibraryLanding, { SearchTrigger } from './components/LibraryLanding.js'
+import SearchOverlay from './components/SearchOverlay.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
@@ -74,9 +75,13 @@ export default function App() {
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
   const [activeProjectKey, setActiveProjectKey] = useState<string | null>(null)
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null)
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
+  const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
 
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
-  const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView
+  const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
+  const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
 
   useEffect(() => {
     loadThemeEditorState()
@@ -322,6 +327,66 @@ export default function App() {
     setTargetMessageId(null)
   }, [])
 
+  // ⌘K opens overlay
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isMacLike = /mac/i.test(navigator.platform)
+      const modifier = isMacLike ? event.metaKey : event.ctrlKey
+      if (modifier && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSearchOverlayOpen(open => !open)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  // Default scope follows active project
+  useEffect(() => {
+    if (activeProjectKey) {
+      setSearchScope('project')
+    } else {
+      setSearchScope('all')
+    }
+  }, [activeProjectKey])
+
+  // Resolve active project name for scope chip label
+  useEffect(() => {
+    if (!activeProjectKey) {
+      setActiveProjectName(null)
+      return
+    }
+    let cancelled = false
+    window.spool.listProjectGroups()
+      .then(groups => {
+        if (cancelled) return
+        const match = groups.find(g => g.identityKey === activeProjectKey)
+        setActiveProjectName(match?.displayName ?? null)
+      })
+      .catch(() => { if (!cancelled) setActiveProjectName(null) })
+    return () => { cancelled = true }
+  }, [activeProjectKey])
+
+  const handleSearchOpen = useCallback(() => setSearchOverlayOpen(true), [])
+  const handleSearchClose = useCallback(() => setSearchOverlayOpen(false), [])
+  const handleSearchCommit = useCallback((q: string) => {
+    setSearchOverlayOpen(false)
+    setQuery(q)
+    setHomeMode(false)
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setView('search')
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    doSearch(q)
+  }, [doSearch])
+
+  const handleOpenResultFromOverlay = useCallback((uuid: string, messageId?: number) => {
+    setSearchOverlayOpen(false)
+    setSelectedSession(uuid)
+    setTargetMessageId(messageId ?? null)
+    setView('session')
+  }, [])
+
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
@@ -361,23 +426,17 @@ export default function App() {
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
-          <>
-            <HomeView
-              query={query}
-              onChange={handleQueryChange}
-              onSubmit={handleSubmit}
-              onSelectSuggestion={handleSelectSuggestion}
-              suggestions={fragmentPreview}
-              isSearching={isSearching}
-              hasSettledQuery={lastCompletedPreviewQuery === query}
-              isDev={Boolean(runtimeInfo?.isDev)}
-              claudeCount={status?.claudeSessions ?? null}
-              codexCount={status?.codexSessions ?? null}
-              geminiCount={status?.geminiSessions ?? null}
-              mode={searchMode}
-              {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-            />
-          </>
+          <LibraryLanding
+            onSelectProject={(key) => {
+              setActiveProjectKey(key)
+              setHomeMode(false)
+              setSelectedSession(null)
+              setTargetMessageId(null)
+              setView('search')
+              setQuery('')
+            }}
+            onOpenSearch={handleSearchOpen}
+          />
         ) : (
           <>
             <div className="flex items-center gap-3 px-4 h-10 flex-none mt-2">
@@ -415,6 +474,7 @@ export default function App() {
                   identityKey={activeProjectKey}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
+                  onOpenSearch={handleSearchOpen}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
@@ -487,6 +547,18 @@ export default function App() {
       {showDaemonNotice && (
         <DaemonNoticeModal onClose={() => setShowDaemonNotice(false)} />
       )}
+
+      <SearchOverlay
+        open={searchOverlayOpen}
+        initialQuery={query}
+        scope={searchScope}
+        scopeProjectName={activeProjectName}
+        defaultScope={activeProjectKey ? 'project' : 'all'}
+        onClose={handleSearchClose}
+        onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
+        onCommit={handleSearchCommit}
+        onOpenResult={handleOpenResultFromOverlay}
+      />
     </div>
   )
 }
