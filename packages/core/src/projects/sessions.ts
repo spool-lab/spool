@@ -18,7 +18,7 @@ export function listSessionsByIdentity(
 ): Session[] {
   const { sources, sortOrder = 'recent', limit = 500, excludePinned = false } = options
 
-  const conditions: string[] = ['p.identity_key = ?']
+  const conditions: string[] = ['p.identity_key = ?', 's.message_count > 0']
   const params: unknown[] = [identityKey]
 
   if (sources && sources.length > 0) {
@@ -51,7 +51,7 @@ export function listPinnedSessionsByIdentity(
   const rows = db.prepare(`
     ${SESSION_SELECT}
     JOIN pins ON pins.session_uuid = s.session_uuid
-    WHERE p.identity_key = ?
+    WHERE p.identity_key = ? AND s.message_count > 0
     ORDER BY pins.pinned_at DESC
   `).all(identityKey) as Array<Record<string, unknown>>
   return rows.map(rowToSession)

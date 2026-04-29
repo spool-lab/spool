@@ -23,4 +23,14 @@ describe('getSessionResumeCommand', () => {
   it('escapes embedded single quotes safely', () => {
     expect(getSessionResumeCommand('claude', "session'with'quotes")).toBe("claude --resume 'session'\\''with'\\''quotes'")
   })
+
+  it('prepends cd <cwd> && when cwd is provided', () => {
+    expect(getSessionResumeCommand('claude', 'abc', '/Users/me/repo'))
+      .toBe("cd '/Users/me/repo' && claude --resume 'abc'")
+  })
+
+  it('omits cd prefix when cwd is null or empty', () => {
+    expect(getSessionResumeCommand('claude', 'abc', null)).toBe("claude --resume 'abc'")
+    expect(getSessionResumeCommand('claude', 'abc', '')).toBe("claude --resume 'abc'")
+  })
 })

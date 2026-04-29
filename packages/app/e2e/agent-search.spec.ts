@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, search, type AppContext } from './helpers/launch'
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
+import type { Page } from '@playwright/test'
+
+async function searchInAgentMode(window: Page, query: string) {
+  const overlay = window.locator('[data-testid="search-overlay"]')
+  if (!(await overlay.isVisible().catch(() => false))) {
+    await window.locator('[data-testid="search-trigger"]').first().click()
+  }
+  const input = window.locator('[data-testid="search-overlay-input"]')
+  await expect(input).toBeVisible({ timeout: 3000 })
+  await window.locator('[data-testid="mode-agent"]').click()
+  await input.fill(query)
+  await input.press('Enter')
+  await expect(overlay).toBeHidden({ timeout: 2000 })
+}
 
 test.describe('Agent mode — success', () => {
   let ctx: AppContext
@@ -16,9 +30,7 @@ test.describe('Agent mode — success', () => {
     const { window } = ctx
 
     await waitForSync(window)
-    await search(window, 'XYLOPHONE_CANARY_42')
-    await window.locator('[data-testid="mode-agent"]').click()
-    await window.locator('[data-testid="search-input"]').press('Enter')
+    await searchInAgentMode(window, 'XYLOPHONE_CANARY_42')
 
     const card = window.locator('[data-testid="ai-answer-card"]')
     await expect(card).toBeVisible({ timeout: 15000 })
@@ -37,18 +49,9 @@ test.describe('Agent mode — success', () => {
     await expect(window.locator('text=Sources used')).toBeVisible({ timeout: 3000 })
   })
 
-  test('mode toggle preserves query text', async () => {
-    const { window } = ctx
-    await expect(window.locator('[data-testid="search-input"]')).toHaveValue('XYLOPHONE_CANARY_42')
-  })
-
   test('second query replaces previous answer', async () => {
     const { window } = ctx
-
-    const compactInput = window.locator('[data-testid="search-input"]')
-    await compactInput.fill('another question')
-    await compactInput.press('Enter')
-
+    await searchInAgentMode(window, 'another question')
     const answerText = window.locator('[data-testid="ai-answer-text"]')
     await expect(answerText).toContainText('MOCK_ACP_RESPONSE_42', { timeout: 10000 })
   })
@@ -69,9 +72,7 @@ test.describe('Agent mode — error', () => {
     const { window } = ctx
 
     await waitForSync(window)
-    await search(window, 'test query')
-    await window.locator('[data-testid="mode-agent"]').click()
-    await window.locator('[data-testid="search-input"]').press('Enter')
+    await searchInAgentMode(window, 'test query')
 
     const card = window.locator('[data-testid="ai-answer-card"]')
     await expect(card).toBeVisible({ timeout: 15000 })

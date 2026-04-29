@@ -1,9 +1,8 @@
 import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
-import SearchBar, { type SearchMode } from './components/SearchBar.js'
+import { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
 import SessionDetail from './components/SessionDetail.js'
-import StatusBar from './components/StatusBar.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
@@ -69,6 +68,8 @@ export default function App() {
   const [showDaemonNotice, setShowDaemonNotice] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
+  const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
+  const [sidebarShowSessionCount, setSidebarShowSessionCount] = useState(true)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
@@ -130,6 +131,8 @@ export default function App() {
       const ready = agents.filter(a => a.status === 'ready')
       setAvailableAgents(ready)
       setDefaultSearchSort(config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER)
+      setSidebarShowSourceDots(config.sidebarShowSourceDots ?? true)
+      setSidebarShowSessionCount(config.sidebarShowSessionCount ?? true)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -211,8 +214,9 @@ export default function App() {
     if (!q.trim()) { setResults([]); setIsSearching(false); return }
     const requestId = ++searchRequestSeq.current
     setIsSearching(true)
+    const scopedKey = searchScope === 'project' && activeProjectKey ? activeProjectKey : undefined
     try {
-      const res = window.spool ? await window.spool.search(q, 20) : []
+      const res = window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : []
       if (requestId !== searchRequestSeq.current) return
       startTransition(() => {
         setResults(res)
@@ -222,7 +226,7 @@ export default function App() {
         setIsSearching(false)
       }
     }
-  }, [])
+  }, [searchScope, activeProjectKey])
 
   const doPreviewSearch = useCallback(async (q: string) => {
     if (!q.trim() || !window.spool?.searchPreview) {
@@ -240,10 +244,12 @@ export default function App() {
     setLastCompletedPreviewQuery(q)
   }, [])
 
-  const doAiSearch = useCallback(async () => {
-    if (!query.trim() || !window.spool?.aiSearch) return
+  const doAiSearch = useCallback(async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? query).trim()
+    if (!q || !window.spool?.aiSearch) return
 
-    const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(query, 20) : [])
+    const scopedKey = searchScope === 'project' && activeProjectKey ? activeProjectKey : undefined
+    const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : [])
     if (ftsResults.length > 0 && results.length === 0) setResults(ftsResults)
     const fragmentContext = ftsResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
 
@@ -253,11 +259,11 @@ export default function App() {
     setAiStreaming(true)
     setAiToolCalls(new Map())
 
-    window.spool.aiSearch(query, aiAgent, fragmentContext).catch((err) => {
+    window.spool.aiSearch(q, aiAgent, fragmentContext).catch((err) => {
       setAiError(String(err))
       setAiStreaming(false)
     })
-  }, [query, aiAgent, results])
+  }, [query, aiAgent, results, searchScope, activeProjectKey])
 
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
@@ -327,6 +333,19 @@ export default function App() {
     setTargetMessageId(null)
   }, [])
 
+  const handleClearResults = useCallback(() => {
+    setQuery('')
+    setResults([])
+    setAiAnswer('')
+    setAiError(null)
+    setAiStreaming(false)
+    aiAnswerRef.current = ''
+    setSelectedSession(null)
+    setTargetMessageId(null)
+    setHomeMode(activeProjectKey === null)
+    setView('search')
+  }, [activeProjectKey])
+
   // ⌘K opens overlay
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -377,15 +396,24 @@ export default function App() {
     setTargetMessageId(null)
     setView('search')
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    doSearch(q)
-  }, [doSearch])
+    if (searchMode === 'ai') {
+      void doAiSearch(q)
+    } else {
+      void doSearch(q)
+    }
+  }, [doSearch, doAiSearch, searchMode])
 
-  const handleOpenResultFromOverlay = useCallback((uuid: string, messageId?: number) => {
+  const handleOpenResultFromOverlay = useCallback((uuid: string, messageId: number | undefined, q: string) => {
     setSearchOverlayOpen(false)
     setSelectedSession(uuid)
     setTargetMessageId(messageId ?? null)
     setView('session')
-  }, [])
+    if (q.trim() && q !== query) {
+      setQuery(q)
+      setHomeMode(false)
+      void doSearch(q)
+    }
+  }, [query, doSearch])
 
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
@@ -422,6 +450,11 @@ export default function App() {
           setView('search')
           setQuery('')
         }}
+        onOpenSearch={handleSearchOpen}
+        syncStatus={syncStatus}
+        showSourceDots={sidebarShowSourceDots}
+        showSessionCount={sidebarShowSessionCount}
+        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
@@ -435,32 +468,42 @@ export default function App() {
               setView('search')
               setQuery('')
             }}
-            onOpenSearch={handleSearchOpen}
+            onOpenSession={handleOpenSession}
+            onCopySessionId={handleCopySessionId}
           />
         ) : (
           <>
-            <div className="flex items-center gap-3 px-4 h-10 flex-none mt-2">
-              <span className="text-base font-bold tracking-[-0.04em] flex-none select-none">
-                S<span className="text-accent">.</span>
-              </span>
-              <SearchBar
-                query={query}
-                onChange={handleQueryChange}
-                onSubmit={handleSubmit}
-                {...(view === 'session' ? { onBack: handleBack } : {})}
-                isSearching={isSearching}
-                variant="compact"
-                mode={searchMode}
-                {...(hasAgents ? { onModeChange: handleModeChange } : {})}
-              />
-              {searchMode === 'ai' && availableAgents.length > 0 && (
-                <AgentSelector
-                  agents={availableAgents}
-                  activeAgent={aiAgent}
-                  onSelect={setAiAgent}
-                />
-              )}
-            </div>
+            {!showProjectView && view !== 'session' && !!query.trim() && (
+              <div className="flex items-center gap-3 px-6 pt-6 pb-3 flex-none">
+                <button
+                  type="button"
+                  onClick={handleClearResults}
+                  aria-label="Back"
+                  title="Back"
+                  className="flex-none flex items-center justify-center w-6 h-6 rounded-md text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <p className="text-xs text-warm-muted dark:text-dark-muted">
+                  Results for <span className="font-mono text-warm-text dark:text-dark-text">"{query}"</span>
+                  <span aria-hidden className="mx-1.5 text-warm-faint">·</span>
+                  <span data-testid="results-scope-chip" className="text-warm-faint dark:text-dark-muted">
+                    {searchScope === 'project' && activeProjectName
+                      ? <>in <span className="font-mono">{activeProjectName}</span></>
+                      : 'all projects'}
+                  </span>
+                </p>
+                {searchMode === 'ai' && availableAgents.length > 0 && (
+                  <AgentSelector
+                    agents={availableAgents}
+                    activeAgent={aiAgent}
+                    onSelect={setAiAgent}
+                  />
+                )}
+              </div>
+            )}
 
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === 'session' && selectedSession ? (
@@ -468,13 +511,13 @@ export default function App() {
                   sessionUuid={selectedSession}
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
+                  onBack={handleBack}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
                   identityKey={activeProjectKey}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
-                  onOpenSearch={handleSearchOpen}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
@@ -519,13 +562,6 @@ export default function App() {
         )}
       </div>
 
-      <StatusBar
-        syncStatus={syncStatus}
-        searchMode={searchMode}
-        aiAgent={activeAgentName}
-        {...(activeAgentMode ? { aiAgentMode: activeAgentMode } : {})}
-        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
-      />
       </div>
 
       {resumeToastCommand && (
@@ -553,7 +589,19 @@ export default function App() {
         initialQuery={query}
         scope={searchScope}
         scopeProjectName={activeProjectName}
+        scopeProjectKey={activeProjectKey}
         defaultScope={activeProjectKey ? 'project' : 'all'}
+        mode={searchMode}
+        {...(hasAgents ? { onModeChange: setSearchMode } : {})}
+        {...(hasAgents ? {
+          agentSelector: (
+            <AgentSelector
+              agents={availableAgents}
+              activeAgent={aiAgent}
+              onSelect={setAiAgent}
+            />
+          )
+        } : {})}
         onClose={handleSearchClose}
         onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
         onCommit={handleSearchCommit}
@@ -597,6 +645,7 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
   return (
     <div className="relative flex-none">
       <button
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen(!open)}
         className="text-[11px] text-warm-muted dark:text-dark-muted font-mono whitespace-nowrap hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
@@ -607,6 +656,7 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
           {agents.map(a => (
             <button
               key={a.id}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => { onSelect(a.id); setOpen(false) }}
               className={`block w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors ${
                 a.id === activeAgent

@@ -26,8 +26,8 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
     }
   }
 
-  const dim = size === 'md' ? 'w-8 h-8' : 'w-7 h-7'
-  const icon = size === 'md' ? 16 : 13
+  const dim = size === 'md' ? 'w-8 h-8' : 'w-6 h-6'
+  const icon = size === 'md' ? 16 : 11
 
   return (
     <button
@@ -54,16 +54,20 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
 }
 
 function PinIcon({ size, filled }: { size: number; filled: boolean }) {
-  if (filled) {
-    return (
-      <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
-        <path d="M9.6 1.5a1 1 0 011.7 0l3.2 3.2a1 1 0 010 1.4l-1.6 1.6-1.6-.4L8.6 9.5l1.5 1.5a1 1 0 010 1.4l-1.4 1.4a1 1 0 01-1.4 0L4.6 11l-2.4 2.4a.5.5 0 01-.7-.7L4 10.4 1.2 7.6a1 1 0 010-1.4L2.6 4.8a1 1 0 011.4 0l1.5 1.5 2.2-2.2-.4-1.6L9.6 1.5z"/>
-      </svg>
-    )
-  }
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-      <path d="M9.6 1.5a1 1 0 011.7 0l3.2 3.2a1 1 0 010 1.4l-1.6 1.6-1.6-.4L8.6 9.5l1.5 1.5a1 1 0 010 1.4l-1.4 1.4a1 1 0 01-1.4 0L4.6 11l-2.4 2.4a.5.5 0 01-.7-.7L4 10.4 1.2 7.6a1 1 0 010-1.4L2.6 4.8a1 1 0 011.4 0l1.5 1.5 2.2-2.2-.4-1.6L9.6 1.5z" strokeLinejoin="round"/>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={filled ? 1.5 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" />
+      <path d="M9 15l-4.5 4.5" />
+      <path d="M14.5 4l5.5 5.5" />
     </svg>
   )
 }

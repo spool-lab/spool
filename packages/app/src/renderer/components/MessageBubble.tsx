@@ -27,7 +27,7 @@ export default function MessageBubble({
 
   if (isSystem) {
     return (
-      <div className="px-4 py-2">
+      <div className="px-6 py-2">
         <div className="bg-neutral-100 dark:bg-neutral-800/60 rounded px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400 italic">
           {renderHighlightedText(contentText, findRanges, matchIndexOffset, activeMatchIndex, onActiveMatchRef)}
         </div>
@@ -36,7 +36,7 @@ export default function MessageBubble({
   }
 
   return (
-    <div className={`px-4 py-2 ${isUser ? '' : ''}`}>
+    <div className={`px-6 py-2 ${isUser ? '' : ''}`}>
       <div className="flex items-start gap-2">
         <div className={`flex-none w-5 h-5 rounded-full mt-0.5 flex items-center justify-center text-[9px] font-bold ${
           isUser

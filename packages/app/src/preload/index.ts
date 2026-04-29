@@ -27,6 +27,8 @@ export interface AgentsConfig {
   defaultAgent?: string
   defaultSearchSort?: SearchSortOrder
   terminal?: string
+  sidebarShowSourceDots?: boolean
+  sidebarShowSessionCount?: boolean
   sdkAgent?: SdkAgentConfig
   customAgents?: Record<string, {
     name?: string
@@ -41,8 +43,8 @@ export interface AgentsConfig {
 export type SpoolAPI = typeof api
 
 const api = {
-  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean): Promise<SearchResult[]> =>
-    ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned }),
+  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean, identityKey?: string): Promise<SearchResult[]> =>
+    ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned, identityKey }),
 
   searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search-preview', { query, limit, source }),
@@ -70,6 +72,9 @@ const api = {
 
   getPinnedUuids: (): Promise<string[]> =>
     ipcRenderer.invoke('spool:get-pinned-uuids'),
+
+  listPinnedSessions: (): Promise<Session[]> =>
+    ipcRenderer.invoke('spool:list-pinned-sessions'),
 
   listPinnedSessionsByIdentity: (identityKey: string): Promise<Session[]> =>
     ipcRenderer.invoke('spool:list-pinned-sessions-by-identity', { identityKey }),

@@ -6,6 +6,7 @@ interface SegmentedOption<T extends string> {
   icon?: ReactNode
   hideLabel?: boolean
   testId?: string
+  title?: string
 }
 
 interface Props<T extends string> {
@@ -25,28 +26,36 @@ export default function SegmentedPill<T extends string>({
 }: Props<T>) {
   return (
     <div
-      className="flex bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border rounded-[20px] p-[2px] gap-[1px]"
+      role="tablist"
+      className="flex bg-warm-surface dark:bg-dark-surface rounded-full p-[2px]"
       aria-label={ariaLabel}
     >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          data-testid={option.testId}
-          onClick={() => onChange(option.value)}
-          className={[
-            'flex items-center gap-1 rounded-[16px] text-[11px] font-medium cursor-pointer border-none transition-all duration-[120ms]',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0',
-            compact ? 'px-2 py-[3px]' : 'px-2.5 py-1',
-            value === option.value
-              ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-sm'
-              : 'bg-transparent text-warm-muted dark:text-dark-muted',
-          ].join(' ')}
-        >
-          {option.icon}
-          {!option.hideLabel && <span>{option.label}</span>}
-        </button>
-      ))}
+      {options.map((option) => {
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            data-testid={option.testId}
+            title={option.title ?? option.label}
+            aria-label={option.title ?? option.label}
+            onClick={() => onChange(option.value)}
+            className={[
+              'inline-flex items-center justify-center gap-1 rounded-full text-[11px] font-medium cursor-pointer transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0',
+              compact ? 'h-6 px-2' : 'h-7 px-2.5',
+              active
+                ? 'bg-accent/12 dark:bg-accent-dark/15 text-accent dark:text-accent-dark'
+                : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text',
+            ].join(' ')}
+          >
+            {option.icon}
+            {!option.hideLabel && <span>{option.label}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }
