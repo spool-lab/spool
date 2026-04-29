@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session, Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 import SessionFindBar from './SessionFindBar.js'
+import PinButton from './PinButton.js'
+import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 
 type Props = {
   sessionUuid: string
@@ -13,6 +15,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
+  const [pinned, setPinned] = useState(false)
+  const [resuming, setResuming] = useState(false)
+  const [commandCopied, setCommandCopied] = useState(false)
   const [showFindBar, setShowFindBar] = useState(false)
   const [showTargetHighlight, setShowTargetHighlight] = useState(false)
   const [findFocusNonce, setFindFocusNonce] = useState(0)
@@ -81,6 +86,14 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       }
       setLoading(false)
     }).catch(() => setLoading(false))
+  }, [sessionUuid])
+
+  useEffect(() => {
+    let cancelled = false
+    window.spool.getPinnedUuids()
+      .then(uuids => { if (!cancelled) setPinned(uuids.includes(sessionUuid)) })
+      .catch(() => { if (!cancelled) setPinned(false) })
+    return () => { cancelled = true }
   }, [sessionUuid])
 
   useEffect(() => {
@@ -197,6 +210,24 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     onCopySessionId(session.source)
   }
 
+  async function handleCopyCommand() {
+    if (!session) return
+    const command = getSessionResumeCommand(session.source, session.sessionUuid)
+    if (!command) return
+    await navigator.clipboard.writeText(command)
+    setCommandCopied(true)
+    setTimeout(() => setCommandCopied(false), 1500)
+  }
+
+  async function handleResume() {
+    if (!session) return
+    setResuming(true)
+    await window.spool.resumeCLI(session.sessionUuid, session.source, session.cwd ?? undefined)
+    setTimeout(() => setResuming(false), 1000)
+  }
+
+  const resumeCommandAvailable = Boolean(session && getSessionResumeCommand(session.source, session.sessionUuid))
+
   return (
     <div className="flex flex-col h-full" data-testid="session-detail">
       {/* Session header */}
@@ -211,16 +242,52 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         </div>
 
         <div className="flex items-center gap-1.5 flex-none self-end">
+          <PinButton
+            sessionUuid={session.sessionUuid}
+            pinned={pinned}
+            onChange={setPinned}
+            size="md"
+          />
+
           <button
+            data-testid="detail-copy-id"
             onClick={handleCopySessionId}
             title="Copy session ID for CLI resume"
-            className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded px-2.5 py-1 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text bg-warm-surface dark:bg-dark-surface hover:bg-warm-surface2 dark:hover:bg-dark-surface2 rounded-md px-2.5 py-1.5 transition-colors"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <rect x="4.5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2"/>
               <path d="M8.5 4.5V3C8.5 2.17 7.83 1.5 7 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7C1.5 7.83 2.17 8.5 3 8.5H4.5" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
-            Copy Session ID
+            Copy ID
+          </button>
+
+          {resumeCommandAvailable && (
+            <button
+              data-testid="detail-copy-command"
+              onClick={handleCopyCommand}
+              title="Copy full resume command"
+              className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text bg-warm-surface dark:bg-dark-surface hover:bg-warm-surface2 dark:hover:bg-dark-surface2 rounded-md px-2.5 py-1.5 transition-colors"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M3 5h7M3 8h7M3 11h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M3 2.5L1.5 4M3 2.5l1.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {commandCopied ? 'Copied' : 'Copy command'}
+            </button>
+          )}
+
+          <button
+            data-testid="detail-resume"
+            onClick={handleResume}
+            disabled={resuming}
+            title="Resume session in Terminal"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent/90 dark:bg-accent-dark dark:hover:bg-accent-dark/90 rounded-md px-3 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+              <path d="M3 2L9 5.5L3 9V2Z" />
+            </svg>
+            {resuming ? 'Opening…' : 'Resume in Terminal'}
           </button>
         </div>
       </div>
