@@ -3,38 +3,60 @@ title: CLI Commands
 description: Reference for the spool command-line interface.
 ---
 
-::: info Coming Soon
-The standalone `spool` CLI is under development. Currently, you can search your data through the Spool app or the `/spool` skill in Claude Code.
-:::
+The `spool` CLI gives you the same search engine as the app, from any terminal. Install it with:
 
-The `spool` CLI will let you search your indexed data directly from the terminal.
+```bash
+npm install -g @spool-lab/cli
+```
 
-## Planned commands
+The CLI reads from the same `~/.spool/spool.db` index the app maintains.
 
-### `spool search`
+## `spool search`
 
-Search across all indexed sources.
+Full-text search across all indexed sessions.
 
 ```bash
 spool search "auth middleware"
 spool search "auth middleware" --source claude
 spool search "auth middleware" --source gemini
-spool search '"auth middleware"'
+spool search "auth"  --json -n 10
+spool search "fix" --since 7d
+spool search '"auth middleware"'   # exact phrase
 ```
 
-By default, whitespace-separated terms are treated as a multi-keyword search, so `auth middleware` can match entries that contain both terms even when they are not adjacent. Natural multi-term searches prioritize exact phrase hits first, then broader all-terms matches. If you want an exact phrase match only, pass explicit FTS quotes inside the query, for example `spool search '"auth middleware"'`.
+By default, whitespace-separated terms are treated as a multi-keyword search, so `auth middleware` matches entries that contain both terms even when they aren't adjacent. Natural multi-term searches prioritize exact-phrase hits first, then broader all-terms matches. For an exact-phrase-only match, wrap in explicit FTS quotes inside the query string.
 
-### `spool index`
+## `spool list`
 
-Manually trigger re-indexing.
+List recent sessions across sources.
 
 ```bash
-spool index
+spool list                     # recent across all sources
+spool list -s claude -n 10     # filter by source
+spool list --json              # machine-readable
 ```
 
-### `spool status`
+## `spool show`
 
-Show indexing status and statistics.
+Print the full content of one session.
+
+```bash
+spool show <uuid>
+spool show <uuid> --json
+```
+
+## `spool sync`
+
+Trigger indexing of new sessions, or watch continuously.
+
+```bash
+spool sync
+spool sync --watch
+```
+
+## `spool status`
+
+Show index statistics (session count, DB size, last sync).
 
 ```bash
 spool status

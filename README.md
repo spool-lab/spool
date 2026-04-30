@@ -1,12 +1,12 @@
 # Spool
 
-The missing search engine for your own data.
+Your local AI session library.
 
 <p align="center">
   <img src="docs/spool-v0.png" alt="Spool" width="720">
 </p>
 
-Search your Claude Code sessions, Codex CLI history, and Gemini CLI chats — locally, instantly.
+Spool collects every Claude Code, Codex CLI, and Gemini CLI session you've ever had into a sidebar of projects you can browse, pin, and revisit. Press ⌘K to search across the whole archive.
 
 > **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
@@ -26,10 +26,13 @@ pnpm build
 
 ## What it does
 
-Spool indexes your AI conversations into a single local search box.
+Spool turns the pile of AI sessions sitting on your disk into a browsable library.
 
-- **AI sessions** — watches Claude/Codex/Gemini session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, and Gemini’s project temp dirs under `~/.gemini/tmp/*/chats`
-- **Agent search** — a `/spool` skill inside Claude Code feeds matching fragments back into your conversation
+- **Library shell** — sidebar of projects (derived from working-dir paths across agents) and a main pane that shows recent + pinned sessions for whatever you've selected
+- **Session indexing** — watches Claude/Codex/Gemini session dirs in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, and Gemini's project temp dirs under `~/.gemini/tmp/*/chats`
+- **Pin** — keep important sessions on top of their project and on the global Library Home
+- **⌘K search** — fast full-text search scoped to All or the current project; AI mode synthesizes answers across fragments
+- **Agent search** — a `/spool` skill inside Claude Code (and any ACP agent) feeds matching fragments back into your conversation
 
 Everything stays on your machine. Nothing leaves.
 
