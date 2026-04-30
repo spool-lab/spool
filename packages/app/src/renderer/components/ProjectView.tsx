@@ -212,7 +212,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
 
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {sessions === null ? (
           <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
             Loading sessions…

@@ -344,7 +344,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       />
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto divide-y divide-warm-border/50 dark:divide-dark-border/50">
+      <div className="flex-1 overflow-y-auto divide-y divide-warm-border/50 dark:divide-dark-border/50 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {messages.map((msg) => {
           const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
           const containsActive = matchState != null

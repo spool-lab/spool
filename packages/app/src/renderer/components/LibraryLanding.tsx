@@ -69,7 +69,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-12">
+      <div className="flex-1 overflow-y-auto pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {recentSessions === null ? (
           <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">Loading…</p>
         ) : totalSessions === 0 ? (

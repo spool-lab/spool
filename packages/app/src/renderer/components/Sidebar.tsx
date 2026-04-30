@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ProjectGroup, SessionSource, StatusInfo } from '@spool-lab/core'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
+import {
+  DEFAULT_SIDEBAR_SORT_ORDER,
+  SIDEBAR_SORT_OPTIONS,
+  type SidebarSortOrder,
+} from '../../shared/sidebarSort.js'
 import { SearchTrigger } from './LibraryLanding.js'
+import Menu from './Menu.js'
 
 type Props = {
   activeIdentityKey: string | null
@@ -13,9 +19,11 @@ type Props = {
   onSettingsClick?: () => void
   showSourceDots?: boolean
   showSessionCount?: boolean
+  sortOrder?: SidebarSortOrder
+  onSortOrderChange?: (next: SidebarSortOrder) => void
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
 
@@ -28,7 +36,10 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
   }, [status?.totalSessions])
 
   const visibleGroups = (groups ?? []).filter(g => g.sessionCount > 0)
-  const projectGroups = visibleGroups.filter(g => g.identityKind !== 'loose')
+  const projectGroups = useMemo(
+    () => sortProjectGroups(visibleGroups.filter(g => g.identityKind !== 'loose'), sortOrder),
+    [visibleGroups, sortOrder],
+  )
   const looseGroup = visibleGroups.find(g => g.identityKind === 'loose')
 
   return (
@@ -54,27 +65,58 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         </div>
       )}
 
-      <button
-        type="button"
-        data-testid="sidebar-projects-toggle"
-        aria-expanded={projectsOpen}
-        onClick={() => setProjectsOpen(open => !open)}
-        className="group mx-2 px-2 py-1 flex-none flex items-center gap-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
-      >
-        <span>PROJECTS</span>
-        <svg
-          width="9"
-          height="9"
-          viewBox="0 0 9 9"
-          fill="none"
-          aria-hidden="true"
-          className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
+      <div className="group mx-2 px-2 py-1 flex-none flex items-center gap-1">
+        <button
+          type="button"
+          data-testid="sidebar-projects-toggle"
+          aria-expanded={projectsOpen}
+          onClick={() => setProjectsOpen(open => !open)}
+          className="flex-1 flex items-center gap-1 text-left text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
         >
-          <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+          <span>PROJECTS</span>
+          <svg
+            width="9"
+            height="9"
+            viewBox="0 0 9 9"
+            fill="none"
+            aria-hidden="true"
+            className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
+          >
+            <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {onSortOrderChange && (
+          <Menu
+            align="right"
+            testId="sidebar-sort-menu"
+            trigger={({ open, toggle }) => (
+              <button
+                type="button"
+                data-testid="sidebar-sort-trigger"
+                onClick={toggle}
+                title="Sort projects"
+                aria-label="Sort projects"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
+                  open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
+                  <path d="M0.75 2.5h9.5M2 5.5h7M4 8.5h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+            items={SIDEBAR_SORT_OPTIONS.map(option => ({
+              label: option.label,
+              active: sortOrder === option.value,
+              onSelect: () => onSortOrderChange(option.value),
+            }))}
+          />
+        )}
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-none">
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)]">
         {projectsOpen && (
           groups === null ? (
             <SidebarSkeleton />
@@ -280,4 +322,30 @@ function SidebarSkeleton() {
       ))}
     </div>
   )
+}
+
+function sortProjectGroups(groups: ProjectGroup[], order: SidebarSortOrder): ProjectGroup[] {
+  const sorted = [...groups]
+  switch (order) {
+    case 'name':
+      sorted.sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }))
+      return sorted
+    case 'most_sessions':
+      sorted.sort((a, b) => {
+        if (b.sessionCount !== a.sessionCount) return b.sessionCount - a.sessionCount
+        return compareLastSessionAtDesc(a, b)
+      })
+      return sorted
+    case 'recent':
+    default:
+      sorted.sort(compareLastSessionAtDesc)
+      return sorted
+  }
+}
+
+function compareLastSessionAtDesc(a: ProjectGroup, b: ProjectGroup): number {
+  if (!a.lastSessionAt && !b.lastSessionAt) return 0
+  if (!a.lastSessionAt) return 1
+  if (!b.lastSessionAt) return -1
+  return b.lastSessionAt.localeCompare(a.lastSessionAt)
 }

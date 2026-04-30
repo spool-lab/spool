@@ -86,8 +86,8 @@ const searchCache = new SearchCache()
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     title: isDevMode ? 'Spool DEV' : 'Spool',
-    width: 1180,
-    height: 780,
+    width: 1080,
+    height: 740,
     minWidth: 800,
     minHeight: 520,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141410' : '#FAFAF8',
