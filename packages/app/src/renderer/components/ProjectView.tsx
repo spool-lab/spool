@@ -33,6 +33,10 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
   }, [identityKey])
 
   useEffect(() => {
+    setSessions(null)
+  }, [identityKey, sortOrder, activeSources])
+
+  useEffect(() => {
     let cancelled = false
     window.spool.listProjectGroups()
       .then(groups => {
@@ -45,7 +49,6 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
 
   useEffect(() => {
     let cancelled = false
-    setSessions(null)
     const sourcesArray = Array.from(activeSources)
     const sharedOptions = {
       ...(sourcesArray.length > 0 ? { sources: sourcesArray } : {}),

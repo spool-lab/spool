@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, startTransition, useDeferredValue } from 'react'
+import { useEffect, useState, useCallback, useRef, memo, startTransition, useDeferredValue } from 'react'
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
@@ -623,7 +623,7 @@ function ResumeToast({ command }: { command: string }) {
   )
 }
 
-function AgentSelector({ agents, activeAgent, onSelect }: {
+const AgentSelector = memo(function AgentSelector({ agents, activeAgent, onSelect }: {
   agents: AgentInfo[]
   activeAgent: string
   onSelect: (id: string) => void
@@ -669,5 +669,5 @@ function AgentSelector({ agents, activeAgent, onSelect }: {
       )}
     </div>
   )
-}
+})
 

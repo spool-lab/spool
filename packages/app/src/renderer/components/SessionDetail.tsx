@@ -40,12 +40,17 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     let offset = 0
     const rangesByMessage = new Map<number, { ranges: FindRange[]; offset: number }>()
 
-    for (const message of messages) {
-      const ranges = normalizedFindQuery
-        ? getFindRanges(message.contentText || (message.role === 'system' ? '(summary)' : ''), normalizedFindQuery)
-        : []
-      rangesByMessage.set(message.id, { ranges, offset })
-      offset += ranges.length
+    if (normalizedFindQuery) {
+      for (const message of messages) {
+        const ranges = getFindRanges(
+          message.contentText || (message.role === 'system' ? '(summary)' : ''),
+          normalizedFindQuery,
+        )
+        if (ranges.length > 0) {
+          rangesByMessage.set(message.id, { ranges, offset })
+          offset += ranges.length
+        }
+      }
     }
 
     return {
@@ -341,7 +346,10 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       {/* Messages */}
       <div className="flex-1 overflow-y-auto divide-y divide-warm-border/50 dark:divide-dark-border/50">
         {messages.map((msg) => {
-          const matchState = messageFindRanges.get(msg.id)
+          const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
+          const containsActive = matchState != null
+            && activeMatchIndex >= matchState.offset
+            && activeMatchIndex < matchState.offset + matchState.ranges.length
 
           return (
           <div
@@ -355,10 +363,10 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           >
             <MessageBubble
               message={msg}
-              findRanges={showFindBar ? matchState?.ranges : undefined}
+              findRanges={matchState?.ranges}
               matchIndexOffset={matchState?.offset}
-              activeMatchIndex={showFindBar ? activeMatchIndex : -1}
-              onActiveMatchRef={bindActiveFindMatch}
+              activeMatchIndex={containsActive ? activeMatchIndex : -1}
+              onActiveMatchRef={containsActive ? bindActiveFindMatch : undefined}
             />
           </div>
           )
