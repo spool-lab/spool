@@ -3,31 +3,37 @@ title: Agent Integration
 description: Use Spool as a search backend for your AI coding agents.
 ---
 
-::: info Coming Soon
-Agent integration is under active development. The `/spool` skill and standalone CLI are not yet functional — stay tuned.
-:::
+Spool ships a `/spool` skill that any ACP-compatible agent can call mid-conversation. The agent searches your local session library and pulls matching fragments back into its context — no copy-paste, no cloud round-trip.
 
-Spool is designed to work with AI coding agents. Once the integration is ready, your agent will be able to search your past sessions without leaving your workflow. Session indexing already supports Claude Code, Codex CLI, and Gemini CLI.
+## The `/spool` skill
 
-## Planned: Claude Code skill
+The skill lives in [`skills/spool/SKILL.md`](https://github.com/spool-lab/spool/blob/main/skills/spool/SKILL.md) in the repo. To use it from Claude Code, copy that file into your project's `.claude/skills/spool/SKILL.md` (or your global `~/.claude/skills/spool/SKILL.md`).
 
-A `/spool` skill for Claude Code is in progress. It will let your agent search past sessions and pull matching context directly into the current conversation.
+The skill requires the `spool` CLI to be on `PATH`. Install it once:
 
-### Example (planned)
-
-```
-> build on last month's caching discussion
+```bash
+npm install -g @spool-lab/cli
 ```
 
-Spool will return matching fragments with source attribution (which session, which platform), and your agent will use them as context.
+## Example
 
-## Planned: CLI integration
+Inside a Claude Code conversation:
 
-A standalone `spool` CLI is also under development, which will allow any agent or script to search the Spool index from the terminal.
+```
+> /spool auth middleware refresh token rotation
+```
 
-## How it will work
+Claude invokes the skill, runs `spool search` against your local index, and presents the top matches with source attribution (Claude / Codex / Gemini) and session UUIDs. You can ask Claude to load any of them with `spool show <uuid>` for full context.
 
-1. Your agent sends a search query to Spool
-2. Spool searches the local SQLite index (Claude sessions, Codex sessions, Gemini sessions)
-3. Matching fragments are returned with source metadata
-4. Your agent incorporates the context into its response
+## How it works
+
+1. The agent invokes `/spool <query>`.
+2. The skill shells out to `spool search "<query>" --json --limit 5`.
+3. Matching fragments come back with `source`, `project`, `startedAt`, `snippet`, and `uuid`.
+4. The agent presents the results and offers to load any session in full.
+
+Inference and search both happen on your machine. Spool's status bar always shows `via ACP · local` while AI mode runs — the same trust signal applies when an agent calls the skill.
+
+## Beyond Claude Code
+
+Any agent that can call a CLI tool can use Spool the same way. The CLI's `--json` flag gives you a stable shape to parse; see [CLI reference](/docs/reference/cli) for the full surface.

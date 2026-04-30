@@ -21,3 +21,13 @@ This downloads the latest `.dmg` from GitHub Releases, mounts it, and copies `Sp
 ## Verify installation
 
 After installation, launch Spool from `/Applications` or Spotlight. The app will start indexing your Claude Code, Codex, and Gemini CLI sessions automatically.
+
+## Optional: install the CLI
+
+The `spool` command-line interface is published separately on npm. Install it globally to search your library from any terminal:
+
+```bash
+npm install -g @spool-lab/cli
+```
+
+See the [CLI reference](/docs/reference/cli) for available commands.
