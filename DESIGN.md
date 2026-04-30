@@ -1,11 +1,11 @@
 # Design System — Spool
 
 ## Product Context
-- **What this is:** A local search engine for your thinking — an Electron macOS app that indexes your AI sessions (Claude Code, Codex, Gemini) and lets you search them instantly.
-- **Who it's for:** Developers who think with AI daily and have accumulated hundreds of sessions across multiple tools. The persona has re-explained the same context to AI agents dozens of times.
-- **Space/industry:** Developer productivity / local-first tooling. Peers: Raycast, Spotlight, Obsidian, Perplexity — but none of them do this.
-- **Project type:** macOS Electron app — compact utility window, not a document editor or dashboard.
-- **Core positioning:** "A local Google for your thinking." Search is the entire product. Everything else (session sources, AI mode) is in service of the search box.
+- **What this is:** A local AI session library — an Electron macOS app that collects, organizes, and lets you revisit every Claude Code, Codex, and Gemini session you've ever had.
+- **Who it's for:** Developers who think with AI daily and have accumulated hundreds of sessions across multiple tools. The persona is overwhelmed by the archive itself, not only by re-explaining context.
+- **Space/industry:** Developer productivity / local-first tooling. Peers: Raycast, Spotlight, Obsidian, DevonThink — but none of them treat AI sessions as first-class library items.
+- **Project type:** macOS Electron app — sidebar + main pane shell, the shape of a library client.
+- **Core positioning:** "Your AI session library." The shell (sidebar of projects, main pane of sessions) is the home; ⌘K search is one of several entry points, not the front door.
 
 ## Aesthetic Direction
 - **Direction:** Warm Index — library-warm, not terminal-cold. Function-first but with personality.
@@ -15,15 +15,17 @@
 
 ## Layout Philosophy
 - **Core principle:** Spool is an AI session library. The sidebar (projects) and main pane (sessions) are the home; search is one of several entry points, reachable via ⌘K.
-- **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and is always visible. Main pane is the active surface — currently the search-first home, transitioning to a project view in subsequent PRs.
-- **Sidebar:** Warm surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label, then project rows. A divider separates derived projects from the always-last `Loose` entry.
+- **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and is always visible across every main-pane state.
+- **Sidebar:** Warm surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label with a sort menu, then project rows. A divider separates derived projects from the always-last `Loose` entry.
 - **Project row:** Display name on the left, faint source-color dots in the middle, monospace count on the right. Active row uses `surface2` background. Hover lifts to the same `surface2`.
-- **Home state (transitional):** Google-homepage feel inside the main pane — large centered logo, large centered search box, source chips below. Empty space is intentional. This will be replaced by Project View in PR 4.
-- **Results state:** Search bar compresses to top of main pane (logo shrinks to `S.`), results fill the pane below. Sidebar remains visible.
-- **Approach:** Compact utility. Window width ~960px to fit sidebar + main pane comfortably. Not a document, not a dashboard.
-- **Alignment:** Left-aligned results. Centered only on the home/idle screen inside the main pane.
+- **Library home (default main pane):** Pinned section (collapsible, only when non-empty) above a recent-sessions feed bucketed by date. No centered hero, no global search box — entry to search is ⌘K or the top-right input on the results page.
+- **Project view:** Recent feed of one project with sort menu (Recent / Oldest / Most messages / Title) and source filter chips. A `PINNED` segment surfaces project-pinned sessions on top.
+- **Session detail:** Opens as a main-pane state (not a modal); sidebar stays. Action button row sits in the detail header.
+- **Search overlay (⌘K):** Floats above the current main pane on a dimmed backdrop, scoped to `All` or the current project. Same overlay surface for Fast and AI modes.
+- **Approach:** Library client. Window width ~960px to fit sidebar + main pane comfortably. Not a search utility, not a dashboard.
+- **Alignment:** Left-aligned everywhere. No centered hero state in the shell — the centered ⌘K overlay is the only exception.
 - **Max content width:** Main pane content stays at ~720px max for readability; sidebar fixed 240px.
-- **Border radius:** pill (9999px) for search bar / 10px for cards / 8px for inputs / 6px for sidebar rows and buttons / 4px for badges
+- **Border radius:** 10px for cards / 8px for inputs / 6px for sidebar rows and buttons / 4px for badges. Pill (9999px) reserved for the ⌘K overlay search input and mode toggle.
 
 ## Typography
 - **Logo/Display:** Geist Sans 700 — large, tight letter-spacing (−0.04em), the period after "Spool" in accent color.
@@ -35,10 +37,9 @@
 ### Type Scale
 | Role | Size | Weight | Font |
 |------|------|--------|------|
-| Logo (home) | 48px | 700 | Geist Sans |
-| Wordmark (results bar) | 16px | 700 | Geist Sans |
-| Search input (home) | 15px | 400 | Geist Sans |
-| Search input (results) | 13.5px | 400 | Geist Sans |
+| Sidebar wordmark | 16px | 700 | Geist Sans |
+| Search input (⌘K overlay) | 15px | 400 | Geist Sans |
+| Search input (results page) | 13.5px | 400 | Geist Sans |
 | Body / result actions | 13px | 400/500 | Geist Sans |
 | Fragment content | 12px | 400 | Geist Mono |
 | Secondary / meta | 11px | 400/500 | Geist Sans |
@@ -105,19 +106,21 @@ Each data source has a fixed color used consistently across badges, chips, and d
 
 ## Motion
 - **Approach:** Minimal-functional — only transitions that aid comprehension.
-- **Home → Results:** Search bar translates from center to top, logo shrinks from 48px wordmark to 16px `S.`. Duration 200ms, ease-in-out.
+- **⌘K overlay open/close:** Backdrop fades in (120ms), overlay card scales from 0.98 → 1 + fades in (140ms ease-out). Reverse on close.
+- **Main-pane state changes (Library Home ↔ Project View ↔ Session Detail):** Instant. No slide or crossfade — sidebar context already tells the user where they are.
 - **Results appear:** Fade + translate-y(4px) → 0. Duration 150ms, ease-out, staggered 20ms per item.
-- **Mode switch (Fast ↔ AI):** Content area crossfade 200ms.
+- **Mode switch (Fast ↔ AI):** Overlay content area crossfade 200ms.
 - **Hover states:** Background 80ms, border-color 80ms — fast enough to feel instant.
 - **Nothing else moves.** No scroll-driven animations, no decorative motion.
 
 ## UI States
 
-### Search Bar
-- **Idle (home):** Pill shape, 9999px radius, full-width up to 520px, centered. Subtle box-shadow. Placeholder `Search my thinking…`
-- **Focused (home):** Border changes to `--accent`, box-shadow brightens with accent tint.
-- **Results bar:** Same bar, compressed height, left-aligned beside `S.` wordmark.
-- **Mode toggle:** Pill-within-pill. Active mode gets white bg + shadow. `⚡ Fast` | `🤖 AI` — replace emoji with vector icons in implementation.
+### Search (⌘K overlay)
+- **Trigger:** Global ⌘K from any main-pane state. The top-right `Search…` button is the visual hint when a pointer user hasn't discovered the keystroke.
+- **Overlay:** Centered card on dimmed backdrop, ~640px wide. Pill input at top, scope toggle (`All` / `[Project name]`) on the left, mode toggle on the right.
+- **Mode toggle:** Pill-within-pill. Active mode gets `surface` bg + shadow. `⚡ Fast` | `🤖 AI` — replace emoji with vector icons in implementation.
+- **Inline preview:** Top results render inside the overlay; pressing Enter commits to the full results page.
+- **Results page (after commit):** Top-right input persists with the current query; results fill the main pane below. Sidebar remains visible.
 
 ### Result Items
 - **Default:** No background, left-padded 20px.
@@ -125,10 +128,19 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - **Selected (keyboard):** `--accent-bg` background.
 - **Action buttons:** Appear on hover/selection only (opacity 0 → 1). Primary action (Resume/Continue) uses accent border + color.
 
-### Source Chips (home screen)
-- Pill shape, `--surface` background, source dot + name + count.
-- One chip per agent source (Claude / Codex / Gemini).
-- Clicking a chip opens Settings → Sources tab filtered to that source.
+### Library Home (main pane default)
+- Two stacked sections: `PINNED` (collapsible, only when non-empty) and `RECENT` (date-bucketed: Today / Yesterday / This week / This month / Older).
+- Each row uses the same `SessionRow` component as Project View, so visual rhythm is consistent across surfaces.
+
+### Project View
+- Header: project display name + session count + sort menu + source filter chips.
+- Body: optional `PINNED` segment, then sessions list under the active sort.
+- Empty filter state: friendly message, not a 404.
+
+### Pin Button
+- Icon-only toggle on session rows and the detail header. Filled state uses `--accent`.
+- A pinned session appears in its owning project's `PINNED` segment **and** in the global Library Home `PINNED` section.
+- Replaces the older Star concept; star-prefixed code/UI was migrated wholesale.
 
 ### Sources Panel (Settings tab)
 - Lists the three built-in agent sources with their session counts.
@@ -156,10 +168,10 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - **Stroke width:** 1.5px at 16px, 1.5px at 14px. Never bold/filled for UI chrome.
 
 ## AI Search (ACP Integration)
-- Mode is toggled in the search bar — same box, different backend.
-- Agent selector lives in the results topbar (right side): `Claude Code ▾` — dropdown lists all ACP-connected agents.
+- Mode is toggled inside the ⌘K overlay — same input, different backend.
+- Agent selector lives in the overlay (right of the mode toggle): `Claude Code ▾` — dropdown lists all ACP-connected agents.
 - Status bar shows `🤖 ACP · [agent-name] · local` when AI mode is active. The word "local" is always present — it reinforces the trust proposition.
-- AI answer renders above source fragments. Sources are always shown — the AI answer without evidence would undermine trust.
+- AI answer renders above source fragments on the results page. Sources are always shown — the AI answer without evidence would undermine trust.
 - "Continue in Claude Code →" CTA uses outline button style, opens a new Claude Code session with the synthesized answer + fragments as context.
 
 ## First-Person Language
@@ -175,8 +187,8 @@ All result metadata uses first-person framing. The product is about YOUR thinkin
 ## Anti-patterns — Never Do
 - Purple/violet gradients as accent
 - 3-column feature grid with icons in colored circles
-- Centered everything in results state (only center on home)
-- Uniform bubbly border-radius on all elements (search bar is pill; buttons are 6px; badges are 4px)
+- Centered hero or search box anywhere in the shell — the library shell is left-aligned everywhere; the ⌘K overlay is the only centered surface
+- Uniform bubbly border-radius on all elements (overlay search input is pill; buttons are 6px; badges are 4px)
 - Gradient buttons
 - Cold grays (`#0A0A0A`, `#111111`) — always use warm near-blacks
 - Inter, Roboto, or system fonts as primary typeface
@@ -192,3 +204,6 @@ All result metadata uses first-person framing. The product is about YOUR thinkin
 | 2026-03-27 | First-person result language ("You discussed this") | Differentiates from a generic log viewer. Makes the product feel like it knows you. |
 | 2026-03-27 | "via ACP · local" label on AI answers | Trust signal — users need to see that inference is local, not routed to a cloud. Core to local-first positioning. |
 | 2026-03-27 | Emoji as placeholder icons only | Emojis are fast to prototype with but inconsistent across platforms. All production icons must be vector (Lucide or custom SVG). |
+| 2026-04-30 | Library-first shell replaces centered search home | Session counts grew into the hundreds across multiple agents. Users need to browse and organize, not only search. Sidebar/projects/sessions become the home; search retreats to ⌘K. Reverses the 2026-03-27 "search box is the product" decision. |
+| 2026-04-30 | Pin replaces Star | Per-project pin-to-top with a global Library Home `PINNED` segment. Star UI removed wholesale; underlying data migrated. Pin reads as a library verb (where Star reads as a feed verb) and matches the new framing. |
+| 2026-04-30 | ⌘K overlay for search | Overlay scopes to All or the current project and hosts both Fast and AI modes. Persistent top-right `Search…` button is the discoverability hint. |
