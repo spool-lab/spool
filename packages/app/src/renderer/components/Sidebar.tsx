@@ -164,7 +164,7 @@ function getSyncStatusText(
 ): string {
   if (syncStatus) {
     if (syncStatus.phase === 'scanning') return 'Scanning…'
-    if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total}`
+    if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total} files`
     if (syncStatus.phase === 'indexing') return 'Building index…'
     if (syncStatus.phase === 'done' && status) {
       return `${status.totalSessions} sessions · now`
