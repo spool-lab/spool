@@ -179,19 +179,29 @@ export default function App() {
 
   useEffect(() => {
     if (!window.spool) return
-    window.spool.getStatus().then(setStatus).catch(console.error)
     window.spool.getRuntimeInfo?.().then(setRuntimeInfo).catch(console.error)
-  }, [syncStatus])
+  }, [])
+
+  useEffect(() => {
+    if (!window.spool) return
+    if (syncStatus && syncStatus.phase !== 'done') return
+    window.spool.getStatus().then(setStatus).catch(console.error)
+  }, [syncStatus?.phase])
 
   useEffect(() => {
     if (!window.spool) return () => {}
+    const scheduleSearchRefresh = () => {
+      if (!query.trim() || searchMode !== 'fast') return
+      if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
+      syncRefreshTimer.current = setTimeout(() => {
+        syncRefreshTimer.current = null
+        doSearch(query)
+      }, 250)
+    }
     const offProgress = window.spool.onSyncProgress((e) => {
       setSyncStatus(e)
-      if (query.trim() && searchMode === 'fast' && (e.phase === 'syncing' || e.phase === 'indexing')) {
-        if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
-        syncRefreshTimer.current = setTimeout(() => {
-          doSearch(query)
-        }, 250)
+      if (e.phase === 'syncing' || e.phase === 'indexing') {
+        scheduleSearchRefresh()
       }
       if (e.phase === 'done') {
         if (syncRefreshTimer.current) {
@@ -199,13 +209,12 @@ export default function App() {
           syncRefreshTimer.current = null
         }
         setTimeout(() => setSyncStatus(null), 3000)
-        window.spool.getStatus().then(setStatus).catch(console.error)
         if (query.trim() && searchMode === 'fast') doSearch(query)
       }
     })
     const offNew = window.spool.onNewSessions(() => {
       window.spool.getStatus().then(setStatus).catch(console.error)
-      if (query.trim() && searchMode === 'fast') doSearch(query)
+      scheduleSearchRefresh()
     })
     return () => { offProgress(); offNew() }
   }, [query, searchMode])
@@ -451,6 +460,7 @@ export default function App() {
         }}
         onOpenSearch={handleSearchOpen}
         syncStatus={syncStatus}
+        status={status}
         showSourceDots={sidebarShowSourceDots}
         showSessionCount={sidebarShowSessionCount}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}

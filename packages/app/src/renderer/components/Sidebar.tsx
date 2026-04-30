@@ -9,12 +9,13 @@ type Props = {
   onSelectHome?: () => void
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
+  status?: StatusInfo | null
   onSettingsClick?: () => void
   showSourceDots?: boolean
   showSessionCount?: boolean
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, onSettingsClick, showSourceDots = true, showSessionCount = true }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
 
@@ -24,7 +25,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       .then(result => { if (!cancelled) setGroups(result) })
       .catch(() => { if (!cancelled) setGroups([]) })
     return () => { cancelled = true }
-  }, [syncStatus?.phase])
+  }, [status?.totalSessions])
 
   const visibleGroups = (groups ?? []).filter(g => g.sessionCount > 0)
   const projectGroups = visibleGroups.filter(g => g.identityKind !== 'loose')
@@ -113,6 +114,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
 
       <SidebarStatus
         syncStatus={syncStatus ?? null}
+        status={status ?? null}
         {...(onSettingsClick ? { onSettingsClick } : {})}
       />
     </aside>
@@ -121,18 +123,13 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
 
 function SidebarStatus({
   syncStatus,
+  status,
   onSettingsClick,
 }: {
   syncStatus: { phase: string; count: number; total: number } | null
+  status: StatusInfo | null
   onSettingsClick?: () => void
 }) {
-  const [status, setStatus] = useState<StatusInfo | null>(null)
-
-  useEffect(() => {
-    if (!window.spool) return
-    window.spool.getStatus().then(setStatus).catch(() => {})
-  }, [syncStatus])
-
   const text = getSyncStatusText(syncStatus, status)
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
