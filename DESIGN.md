@@ -98,10 +98,10 @@ Each data source has a fixed color used consistently across badges, chips, and d
 
 ## Spacing
 - **Base unit:** 4px
-- **Density:** Compact. This is a utility tool, not a document editor.
+- **Density:** Compact. This is a library client, not a document editor — rows should fit at scale.
 - **Scale:** 2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48
 - **Result item padding:** 10px 20px
-- **Search bar padding:** 12px 16px (home) / 7px 14px (results bar)
+- **Search input padding:** 12px 16px (⌘K overlay) / 7px 14px (results page top-right)
 - **Section padding:** 20px 24px (panels)
 
 ## Motion
@@ -181,7 +181,7 @@ All result metadata uses first-person framing. The product is about YOUR thinkin
 |----|-------|
 | "You discussed this · Mar 15" | "Claude Code · Mar 15" |
 | "You saved this" | "Twitter bookmark" |
-| "You starred this" | "GitHub · 3 days ago" |
+| "You pinned this" | "GitHub · 3 days ago" |
 | "You discussed this in ChatGPT" | "ChatGPT session" |
 
 ## Anti-patterns — Never Do
