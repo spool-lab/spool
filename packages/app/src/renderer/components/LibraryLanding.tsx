@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
 
@@ -20,7 +20,6 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   useEffect(() => {
     let cancelled = false
-    setRecentSessions(null)
     Promise.all([
       window.spool.listPinnedSessions(),
       window.spool.listSessions(200),
@@ -53,7 +52,10 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
     setReloadKey(k => k + 1)
   }
 
-  const buckets = recentSessions ? bucketByDate(recentSessions) : []
+  const buckets = useMemo(
+    () => (recentSessions ? bucketByDate(recentSessions) : []),
+    [recentSessions],
+  )
   const totalSessions = (pinnedSessions.length) + (recentSessions?.length ?? 0)
 
   return (

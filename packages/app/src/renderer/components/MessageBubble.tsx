@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import type { Message } from '@spool-lab/core'
 
 export type FindRange = {
@@ -14,7 +14,7 @@ interface Props {
   onActiveMatchRef?: ((node: HTMLElement | null) => void) | undefined
 }
 
-export default function MessageBubble({
+function MessageBubble({
   message,
   findRanges = [],
   matchIndexOffset = 0,
@@ -113,3 +113,5 @@ function renderHighlightedText(
 function formatTime(iso: string): string {
   try { return new Date(iso).toLocaleTimeString() } catch { return '' }
 }
+
+export default memo(MessageBubble)
