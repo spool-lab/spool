@@ -12,6 +12,7 @@ import LibraryLanding, { SearchTrigger } from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
+import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
@@ -70,6 +71,7 @@ export default function App() {
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
   const [sidebarShowSessionCount, setSidebarShowSessionCount] = useState(true)
+  const [sidebarSortOrder, setSidebarSortOrder] = useState<SidebarSortOrder>(DEFAULT_SIDEBAR_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
@@ -133,6 +135,7 @@ export default function App() {
       setDefaultSearchSort(config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER)
       setSidebarShowSourceDots(config.sidebarShowSourceDots ?? true)
       setSidebarShowSessionCount(config.sidebarShowSessionCount ?? true)
+      setSidebarSortOrder(config.sidebarSortOrder ?? DEFAULT_SIDEBAR_SORT_ORDER)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -142,6 +145,17 @@ export default function App() {
 
   // Detect available ACP agents on mount
   useEffect(() => { refreshAgents() }, [])
+
+  const handleSidebarSortChange = useCallback(async (next: SidebarSortOrder) => {
+    setSidebarSortOrder(next)
+    if (!window.spool?.setAgentsConfig) return
+    try {
+      const config = await window.spool.getAgentsConfig()
+      await window.spool.setAgentsConfig({ ...config, sidebarSortOrder: next })
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -463,6 +477,8 @@ export default function App() {
         status={status}
         showSourceDots={sidebarShowSourceDots}
         showSessionCount={sidebarShowSessionCount}
+        sortOrder={sidebarSortOrder}
+        onSortOrderChange={handleSidebarSortChange}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       <div className="relative flex flex-col flex-1 min-w-0">

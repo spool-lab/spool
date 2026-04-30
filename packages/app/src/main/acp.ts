@@ -43,6 +43,8 @@ export interface AgentsConfig {
   sidebarShowSourceDots?: boolean
   /** Show session count in sidebar project rows (default: true) */
   sidebarShowSessionCount?: boolean
+  /** Sort order for the sidebar project list (default: 'recent') */
+  sidebarSortOrder?: 'recent' | 'name' | 'most_sessions'
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string
