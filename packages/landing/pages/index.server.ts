@@ -4,9 +4,9 @@ export interface Props {}
 
 export const loader = defineHandler<Props>(() => ({}));
 
-const TITLE = "Spool — A local search engine for your thinking";
+const TITLE = "Spool — Your AI session library";
 const DESC =
-  "A local search engine for your thinking. Spool indexes every Claude, Codex and Gemini session — alongside your stars, bookmarks, and saves — into a single search box that lives on your machine. Your agents can search it too.";
+  "Every Claude, Codex, and Gemini session you've ever had, in one local library. Browse by project, pin what matters, and search across everything with ⌘K. Local-first; nothing leaves your machine.";
 
 export const head = defineHead(() => ({
   title: TITLE,
@@ -38,7 +38,7 @@ export const head = defineHead(() => ({
         "@type": "SoftwareApplication",
         name: "Spool",
         description:
-          "A local search engine for your thinking. Search your Claude Code sessions, Codex history, Gemini chats, GitHub stars, and 50+ sources — locally, instantly. Your AI agents can search too.",
+          "Your local AI session library. Browse, pin, and search every Claude Code, Codex, and Gemini session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
         url: "https://spool.pro",
         applicationCategory: "DeveloperApplication",
         operatingSystem: "macOS",
