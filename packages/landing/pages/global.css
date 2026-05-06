@@ -126,9 +126,11 @@ code, .mono {
 
 /* ── shared container ── */
 .wrap {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 40px;
+  box-sizing: border-box;
 }
 @media (max-width: 700px) { .wrap { padding: 0 20px; } }
 
