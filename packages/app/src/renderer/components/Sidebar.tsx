@@ -379,6 +379,7 @@ function DirTreeNode({ node, activeSlug, showSessionCount, onSelect, depth }: {
         >
           <FolderIcon active={isActive} />
           <span className="flex-1 truncate text-[12.5px] font-mono">{node.name}</span>
+          <SourceDots sources={node.sources} />
           {showSessionCount && (
             <span className="flex-none flex items-center gap-1">
               {/* 自身会话数（正常颜色），仅当自身有会话时显示 */}

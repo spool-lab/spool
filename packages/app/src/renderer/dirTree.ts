@@ -1,11 +1,12 @@
-import type { DirectoryGroup } from '@spool-lab/core'
+import type { DirectoryGroup, SessionSource } from '@spool-lab/core'
 
 export interface DirNode {
-  name: string        // segment label shown in UI
-  fullPath: string    // absolute path of this node
-  dir: DirectoryGroup | null  // non-null only for leaf nodes with sessions
+  name: string
+  fullPath: string
+  dir: DirectoryGroup | null
   children: DirNode[]
   totalSessions: number
+  sources: SessionSource[]  // aggregated from subtree
 }
 
 export function buildDirTree(dirs: DirectoryGroup[]): DirNode[] {
@@ -13,7 +14,7 @@ export function buildDirTree(dirs: DirectoryGroup[]): DirNode[] {
 
   const prefix = commonPrefix(dirs.map(d => d.displayPath))
 
-  const root: DirNode = { name: '', fullPath: prefix, dir: null, children: [], totalSessions: 0 }
+  const root: DirNode = { name: '', fullPath: prefix, dir: null, children: [], totalSessions: 0, sources: [] }
 
   for (const dir of dirs) {
     const relative = dir.displayPath.slice(prefix.length).replace(/^\//, '')
@@ -35,7 +36,7 @@ function insert(node: DirNode, segments: string[], dir: DirectoryGroup, parentPa
   const fullPath = parentPath ? `${parentPath}/${head}` : head
   let child = node.children.find(c => c.name === head)
   if (!child) {
-    child = { name: head, fullPath, dir: null, children: [], totalSessions: 0 }
+    child = { name: head, fullPath, dir: null, children: [], totalSessions: 0, sources: [] }
     node.children.push(child)
   }
   insert(child, rest, dir, fullPath)
@@ -45,6 +46,11 @@ function propagateCounts(node: DirNode): number {
   const own = node.dir?.sessionCount ?? 0
   const childSum = node.children.reduce((s, c) => s + propagateCounts(c), 0)
   node.totalSessions = own + childSum
+  const allSources = [
+    ...(node.dir?.sources ?? []),
+    ...node.children.flatMap(c => c.sources),
+  ]
+  node.sources = [...new Set(allSources)]
   return node.totalSessions
 }
 
