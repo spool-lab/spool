@@ -6,8 +6,9 @@ import {
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity,
+  listDirectoryGroups, listSessionsBySlug,
 } from '@spool-lab/core'
-import type { FragmentResult, SessionSource, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type { FragmentResult, SessionSource, ListSessionsByIdentityOptions, ProjectSessionSortOrder } from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -316,6 +317,14 @@ ipcMain.handle('spool:list-pinned-sessions', () => {
 
 ipcMain.handle('spool:list-pinned-sessions-by-identity', (_e, { identityKey }: { identityKey: string }) => {
   return listPinnedSessionsByIdentity(db, identityKey)
+})
+
+ipcMain.handle('spool:list-directory-groups', () => {
+  return listDirectoryGroups(db)
+})
+
+ipcMain.handle('spool:list-sessions-by-slug', (_e, { slug, options }: { slug: string; options?: { sortOrder?: ProjectSessionSortOrder; limit?: number } }) => {
+  return listSessionsBySlug(db, slug, options)
 })
 
 ipcMain.handle('spool:get-runtime-info', () => {

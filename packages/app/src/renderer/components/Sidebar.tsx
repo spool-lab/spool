@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ProjectGroup, SessionSource, StatusInfo } from '@spool-lab/core'
+import type { ProjectGroup, DirectoryGroup, SessionSource, StatusInfo } from '@spool-lab/core'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import {
   DEFAULT_SIDEBAR_SORT_ORDER,
@@ -8,10 +8,13 @@ import {
 } from '../../shared/sidebarSort.js'
 import { SearchTrigger } from './LibraryLanding.js'
 import Menu from './Menu.js'
+import { buildDirTree, type DirNode } from '../dirTree.js'
 
 type Props = {
   activeIdentityKey: string | null
+  activeDirectorySlug: string | null
   onSelectProject: (identityKey: string) => void
+  onSelectDirectory: (slug: string, displayPath: string) => void
   onSelectHome?: () => void
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
@@ -23,9 +26,11 @@ type Props = {
   onSortOrderChange?: (next: SidebarSortOrder) => void
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
+export default function Sidebar({ activeIdentityKey, activeDirectorySlug, onSelectProject, onSelectDirectory, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
+  const [dirGroups, setDirGroups] = useState<DirectoryGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
+  const [sidebarTab, setSidebarTab] = useState<'projects' | 'directories'>('projects')
 
   useEffect(() => {
     let cancelled = false
@@ -34,6 +39,15 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       .catch(() => { if (!cancelled) setGroups([]) })
     return () => { cancelled = true }
   }, [status?.totalSessions])
+
+  useEffect(() => {
+    if (sidebarTab !== 'directories') return
+    let cancelled = false
+    window.spool.listDirectoryGroups()
+      .then(result => { if (!cancelled) setDirGroups(result) })
+      .catch(() => { if (!cancelled) setDirGroups([]) })
+    return () => { cancelled = true }
+  }, [sidebarTab, status?.totalSessions])
 
   const visibleGroups = (groups ?? []).filter(g => g.sessionCount > 0)
   const projectGroups = useMemo(
@@ -65,27 +79,32 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         </div>
       )}
 
-      <div className="group mx-2 px-2 py-1 flex-none flex items-center gap-1">
-        <button
-          type="button"
-          data-testid="sidebar-projects-toggle"
-          aria-expanded={projectsOpen}
-          onClick={() => setProjectsOpen(open => !open)}
-          className="flex-1 flex items-center gap-1 text-left text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
-        >
-          <span>PROJECTS</span>
-          <svg
-            width="9"
-            height="9"
-            viewBox="0 0 9 9"
-            fill="none"
-            aria-hidden="true"
-            className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
+      <div className="mx-2 px-2 py-1 flex-none flex items-center gap-1">
+        <div className="flex-1 flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setSidebarTab('projects')}
+            className={`text-[10px] font-semibold tracking-[0.08em] px-1.5 py-0.5 rounded transition-colors select-none ${
+              sidebarTab === 'projects'
+                ? 'text-warm-text dark:text-dark-text'
+                : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+            }`}
           >
-            <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        {onSortOrderChange && (
+            PROJECTS
+          </button>
+          <button
+            type="button"
+            onClick={() => setSidebarTab('directories')}
+            className={`text-[10px] font-semibold tracking-[0.08em] px-1.5 py-0.5 rounded transition-colors select-none ${
+              sidebarTab === 'directories'
+                ? 'text-warm-text dark:text-dark-text'
+                : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+            }`}
+          >
+            DIRS
+          </button>
+        </div>
+        {sidebarTab === 'projects' && onSortOrderChange && (
           <Menu
             align="right"
             testId="sidebar-sort-menu"
@@ -99,7 +118,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                 aria-haspopup="menu"
                 aria-expanded={open}
                 className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
-                  open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  open ? 'opacity-100' : 'opacity-0'
                 }`}
               >
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
@@ -117,13 +136,11 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)]">
-        {projectsOpen && (
+        {sidebarTab === 'projects' ? (
           groups === null ? (
             <SidebarSkeleton />
           ) : projectGroups.length === 0 && !looseGroup ? (
-            <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">
-              No sessions yet
-            </p>
+            <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">No sessions yet</p>
           ) : (
             <>
               {projectGroups.map(group => (
@@ -136,7 +153,6 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                   onClick={() => onSelectProject(group.identityKey)}
                 />
               ))}
-
               {looseGroup && (
                 <>
                   <div className="my-2 mx-2 border-t border-warm-border dark:border-dark-border" />
@@ -150,6 +166,19 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                 </>
               )}
             </>
+          )
+        ) : (
+          dirGroups === null ? (
+            <SidebarSkeleton />
+          ) : dirGroups.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">No directories</p>
+          ) : (
+            <DirTree
+              nodes={buildDirTree(dirGroups)}
+              activeSlug={activeDirectorySlug}
+              showSessionCount={showSessionCount}
+              onSelect={onSelectDirectory}
+            />
           )
         )}
       </div>
@@ -272,6 +301,113 @@ function ProjectRow({
         </span>
       )}
     </button>
+  )
+}
+
+function DirTree({ nodes, activeSlug, showSessionCount, onSelect, depth = 0 }: {
+  nodes: DirNode[]
+  activeSlug: string | null
+  showSessionCount: boolean
+  onSelect: (slug: string, displayPath: string) => void
+  depth?: number
+}) {
+  return (
+    <>
+      {nodes.map(node => (
+        <DirTreeNode
+          key={node.fullPath}
+          node={node}
+          activeSlug={activeSlug}
+          showSessionCount={showSessionCount}
+          onSelect={onSelect}
+          depth={depth}
+        />
+      ))}
+    </>
+  )
+}
+
+function DirTreeNode({ node, activeSlug, showSessionCount, onSelect, depth }: {
+  node: DirNode
+  activeSlug: string | null
+  showSessionCount: boolean
+  onSelect: (slug: string, displayPath: string) => void
+  depth: number
+}) {
+  const hasChildren = node.children.length > 0
+  const hasSelf = node.dir !== null
+  const isActive = hasSelf && node.dir!.slug === activeSlug
+  const [open, setOpen] = useState(true)
+  const indent = depth * 10
+
+  return (
+    <>
+      <div
+        className={`flex items-center rounded-md transition-colors ${
+          isActive ? 'bg-warm-surface2 dark:bg-dark-surface2' : 'hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
+        }`}
+        style={{ paddingLeft: `${8 + indent}px` }}
+      >
+        {/* 展开/折叠箭头，无子节点时占位保持对齐 */}
+        <button
+          type="button"
+          onClick={() => hasChildren && setOpen(o => !o)}
+          className="flex-none w-4 h-full flex items-center justify-center"
+          tabIndex={hasChildren ? 0 : -1}
+          aria-hidden={!hasChildren}
+        >
+          {hasChildren && (
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden className={`transition-transform text-warm-faint/70 dark:text-dark-muted/70 ${open ? 'rotate-90' : ''}`}>
+              <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+
+        {/* 节点名称，有自身会话时可点击 */}
+        <button
+          type="button"
+          onClick={hasSelf ? () => onSelect(node.dir!.slug, node.dir!.displayPath) : undefined}
+          disabled={!hasSelf}
+          title={node.dir?.displayPath ?? node.fullPath}
+          className={`flex-1 min-w-0 flex items-center gap-1.5 py-1 pr-2 text-left ${
+            hasSelf
+              ? isActive
+                ? 'text-warm-text dark:text-dark-text cursor-pointer'
+                : 'text-warm-text/85 dark:text-dark-text/85 cursor-pointer'
+              : 'text-warm-text/60 dark:text-dark-text/60 cursor-default'
+          }`}
+        >
+          <FolderIcon active={isActive} />
+          <span className="flex-1 truncate text-[12.5px] font-mono">{node.name}</span>
+          {showSessionCount && (
+            <span className="flex-none flex items-center gap-1">
+              {/* 自身会话数（正常颜色），仅当自身有会话时显示 */}
+              {hasSelf && (
+                <span className="font-mono text-[10.5px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
+                  {node.dir!.sessionCount}
+                </span>
+              )}
+              {/* 子树总数（低透明度），仅当有子目录时显示 */}
+              {hasChildren && (
+                <span className="font-mono text-[10.5px] tabular-nums text-warm-faint/40 dark:text-dark-muted/40">
+                  {node.totalSessions}
+                </span>
+              )}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {open && hasChildren && (
+        <DirTree
+          nodes={node.children}
+          activeSlug={activeSlug}
+          showSessionCount={showSessionCount}
+          onSelect={onSelect}
+          depth={depth + 1}
+        />
+      )}
+    </>
   )
 }
 

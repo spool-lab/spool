@@ -8,6 +8,7 @@ import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import Sidebar from './components/Sidebar.js'
 import ProjectView from './components/ProjectView.js'
+import DirectoryView from './components/DirectoryView.js'
 import LibraryLanding, { SearchTrigger } from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
@@ -79,10 +80,13 @@ export default function App() {
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
   const [activeProjectKey, setActiveProjectKey] = useState<string | null>(null)
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null)
+  const [activeDirectorySlug, setActiveDirectorySlug] = useState<string | null>(null)
+  const [activeDirectoryPath, setActiveDirectoryPath] = useState<string | null>(null)
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
 
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
+  const showDirectoryView = activeDirectorySlug !== null && activeProjectKey === null && view === 'search' && !selectedSession && !query.trim()
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
 
@@ -365,9 +369,9 @@ export default function App() {
     aiAnswerRef.current = ''
     setSelectedSession(null)
     setTargetMessageId(null)
-    setHomeMode(activeProjectKey === null)
+    setHomeMode(activeProjectKey === null && activeDirectorySlug === null)
     setView('search')
-  }, [activeProjectKey])
+  }, [activeProjectKey, activeDirectorySlug])
 
   // ⌘K opens overlay
   useEffect(() => {
@@ -456,8 +460,21 @@ export default function App() {
     <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
       <Sidebar
         activeIdentityKey={activeProjectKey}
+        activeDirectorySlug={activeDirectorySlug}
         onSelectProject={(key) => {
           setActiveProjectKey(key)
+          setActiveDirectorySlug(null)
+          setActiveDirectoryPath(null)
+          setHomeMode(false)
+          setSelectedSession(null)
+          setTargetMessageId(null)
+          setView('search')
+          setQuery('')
+        }}
+        onSelectDirectory={(slug, displayPath) => {
+          setActiveDirectorySlug(slug)
+          setActiveDirectoryPath(displayPath)
+          setActiveProjectKey(null)
           setHomeMode(false)
           setSelectedSession(null)
           setTargetMessageId(null)
@@ -466,6 +483,8 @@ export default function App() {
         }}
         onSelectHome={() => {
           setActiveProjectKey(null)
+          setActiveDirectorySlug(null)
+          setActiveDirectoryPath(null)
           setHomeMode(true)
           setSelectedSession(null)
           setTargetMessageId(null)
@@ -541,6 +560,13 @@ export default function App() {
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
                   identityKey={activeProjectKey}
+                  onOpenSession={handleOpenSession}
+                  onCopySessionId={handleCopySessionId}
+                />
+              ) : showDirectoryView && activeDirectorySlug && activeDirectoryPath ? (
+                <DirectoryView
+                  slug={activeDirectorySlug}
+                  displayPath={activeDirectoryPath}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
                 />

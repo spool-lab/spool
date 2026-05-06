@@ -70,6 +70,14 @@ export interface ProjectGroup {
   lastSessionAt: string | null
 }
 
+export interface DirectoryGroup {
+  displayPath: string   // decoded path, e.g. /Users/long/workspace/foo
+  slug: string          // raw slug from ~/.claude/projects/{slug}
+  sources: SessionSource[]
+  sessionCount: number
+  lastSessionAt: string | null
+}
+
 export interface Message {
   id: number
   sessionId: number

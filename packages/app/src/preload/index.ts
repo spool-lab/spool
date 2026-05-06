@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions, DirectoryGroup, ProjectSessionSortOrder } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
@@ -73,6 +73,12 @@ const api = {
 
   listPinnedSessionsByIdentity: (identityKey: string): Promise<Session[]> =>
     ipcRenderer.invoke('spool:list-pinned-sessions-by-identity', { identityKey }),
+
+  listDirectoryGroups: (): Promise<DirectoryGroup[]> =>
+    ipcRenderer.invoke('spool:list-directory-groups'),
+
+  listSessionsBySlug: (slug: string, options?: { sortOrder?: ProjectSessionSortOrder; limit?: number }): Promise<Session[]> =>
+    ipcRenderer.invoke('spool:list-sessions-by-slug', { slug, options }),
 
   getRuntimeInfo: (): Promise<{ isDev: boolean; appPath: string; appName: string }> =>
     ipcRenderer.invoke('spool:get-runtime-info'),

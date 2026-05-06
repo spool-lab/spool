@@ -1,3 +1,36 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+pnpm dev                        # start all packages in dev mode
+pnpm build                      # build all packages
+pnpm test                       # run all tests
+pnpm test:core                  # run @spool-lab/core tests only
+pnpm test:e2e                   # run Electron e2e tests
+pnpm lint                       # lint all packages
+pnpm rebuild:native:node        # rebuild better-sqlite3 for Node (before unit tests)
+pnpm rebuild:native:electron    # rebuild better-sqlite3 for Electron (before app/e2e)
+pnpm --filter @spool/app build:mac  # local macOS build without cutting a release
+```
+
+Run `pnpm rebuild:native:node` before unit tests and `pnpm rebuild:native:electron` before running the app or e2e tests — `better-sqlite3` is a native module that must be rebuilt separately for each target.
+
+## Architecture
+
+Turborepo + pnpm monorepo with four packages:
+
+- **`packages/core`** (`@spool-lab/core`) — indexing engine: watches Claude/Codex/Gemini session dirs on disk, indexes into SQLite with FTS5 full-text search via `better-sqlite3`. This is the data layer everything else depends on.
+- **`packages/app`** (`@spool/app`) — Electron macOS app (React + Vite + Tailwind). Consumes `core` to render the session library, project sidebar, pinned sessions, and `⌘K` search overlay.
+- **`packages/cli`** (`@spool-lab/cli`) — `spool search ...` terminal command; also provides a `/spool` skill for Claude Code via ACP, feeding matching fragments back into conversations.
+- **`packages/landing`** (`@spool/landing`) — standalone marketing site, independent of the other packages.
+
+Data flow: `core` indexes sessions → `app` and `cli` query `core` → `cli` can surface results back into Claude Code via ACP.
+
+The app is Apple Silicon / macOS only.
+
 ## Design System
 
 Always read `DESIGN.md` before making any visual or UI decisions.
@@ -14,4 +47,3 @@ Key rules at a glance:
 - "via ACP · local" label always shown on AI-mode answers — non-negotiable trust signal
 
 In QA mode, flag any code that doesn't match DESIGN.md.
-
