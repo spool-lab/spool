@@ -45,6 +45,8 @@ export interface AgentsConfig {
   sidebarShowSessionCount?: boolean
   /** Sort order for the sidebar project list (default: 'recent') */
   sidebarSortOrder?: 'recent' | 'name' | 'most_sessions'
+  /** Sort order for the project view session list (default: 'recent') */
+  projectSortOrder?: 'recent' | 'oldest' | 'most_messages' | 'title'
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string
