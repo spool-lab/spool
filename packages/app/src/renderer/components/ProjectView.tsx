@@ -1,35 +1,40 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ArrowDownUp } from 'lucide-react'
 import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
 import Menu from './Menu.js'
 import { CollapsibleSection } from './LibraryLanding.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
+import { PROJECT_SORT_OPTIONS } from '../../shared/projectView.js'
 
 type Props = {
   identityKey: string
+  sortOrder: ProjectSessionSortOrder
+  onSortOrderChange: (next: ProjectSessionSortOrder) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
 }
 
-const SORT_OPTIONS: { value: ProjectSessionSortOrder; label: string }[] = [
-  { value: 'recent', label: 'Recent' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'most_messages', label: 'Most messages' },
-  { value: 'title', label: 'Title' },
-]
-
-export default function ProjectView({ identityKey, onOpenSession, onCopySessionId }: Props) {
+export default function ProjectView({
+  identityKey,
+  sortOrder,
+  onSortOrderChange,
+  onOpenSession,
+  onCopySessionId,
+}: Props) {
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
-  const [sortOrder, setSortOrder] = useState<ProjectSessionSortOrder>('recent')
   const [activeSources, setActiveSources] = useState<Set<SessionSource>>(new Set())
+  const [closedCwds, setClosedCwds] = useState<Set<string>>(new Set())
+  const [isolatedCwd, setIsolatedCwd] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     setActiveSources(new Set())
-    setSortOrder('recent')
+    setClosedCwds(new Set())
+    setIsolatedCwd(null)
   }, [identityKey])
 
   useEffect(() => {
@@ -95,6 +100,60 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
   const displayPath = useMemo(() => {
     return pinnedSessions[0]?.projectDisplayPath ?? sessions?.[0]?.projectDisplayPath ?? null
   }, [pinnedSessions, sessions])
+
+  // Chip-strip groups: include pinned so counts match the project total.
+  const directoryGroups = useMemo(() => {
+    if (!sessions) return null
+    const map = new Map<string, Session[]>()
+    for (const s of [...pinnedSessions, ...sessions]) {
+      const key = cwdOf(s)
+      const arr = map.get(key)
+      if (arr) arr.push(s)
+      else map.set(key, [s])
+    }
+    return Array.from(map.entries())
+      .map(([cwd, items]) => {
+        const lastAt = items.reduce((acc, s) => (s.startedAt > acc ? s.startedAt : acc), '')
+        return { cwd, sessions: items, lastAt }
+      })
+      .sort((a, b) => (b.lastAt > a.lastAt ? 1 : b.lastAt < a.lastAt ? -1 : 0))
+  }, [sessions, pinnedSessions])
+
+  useEffect(() => {
+    if (!directoryGroups || isolatedCwd === null) return
+    if (!directoryGroups.some(g => g.cwd === isolatedCwd)) setIsolatedCwd(null)
+  }, [directoryGroups, isolatedCwd])
+
+  // Render-side splits: PINNED section + grouped/isolated unpinned list.
+  const visiblePinned = useMemo(() => {
+    if (isolatedCwd === null) return pinnedSessions
+    return pinnedSessions.filter(s => cwdOf(s) === isolatedCwd)
+  }, [pinnedSessions, isolatedCwd])
+
+  const visibleUnpinned = useMemo<Session[]>(() => {
+    if (!sessions) return []
+    if (isolatedCwd === null) return sessions
+    return sessions.filter(s => cwdOf(s) === isolatedCwd)
+  }, [sessions, isolatedCwd])
+
+  const unpinnedGroups = useMemo(() => {
+    if (!sessions) return null
+    const map = new Map<string, Session[]>()
+    for (const s of sessions) {
+      const key = cwdOf(s)
+      const arr = map.get(key)
+      if (arr) arr.push(s)
+      else map.set(key, [s])
+    }
+    return Array.from(map.entries())
+      .map(([cwd, items]) => {
+        const lastAt = items.reduce((acc, s) => (s.startedAt > acc ? s.startedAt : acc), '')
+        return { cwd, sessions: items, lastAt }
+      })
+      .sort((a, b) => (b.lastAt > a.lastAt ? 1 : b.lastAt < a.lastAt ? -1 : 0))
+  }, [sessions])
+
+  const showGrouped = (unpinnedGroups?.length ?? 0) >= 2 && isolatedCwd === null
   const meta = useMemo(() => {
     if (!group) return null
     const lastActivity = group.lastSessionAt ? formatRelativeDate(group.lastSessionAt) : null
@@ -173,7 +232,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
               )}
             </p>
           )}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Menu
               align="right"
               testId="project-sort-menu"
@@ -186,30 +245,39 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
                   aria-haspopup="menu"
                   aria-expanded={open}
                   onClick={toggle}
-                  className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                  className="inline-flex items-center gap-1.5 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
                 >
-                  <span>Sort: {SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Recent'}</span>
-                  <svg
-                    aria-hidden="true"
-                    width="9"
-                    height="9"
-                    viewBox="0 0 12 12"
-                    className="text-warm-faint dark:text-dark-muted"
-                    fill="none"
-                  >
-                    <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <ArrowDownUp size={13} strokeWidth={1.5} aria-hidden />
+                  <span>Sort · {PROJECT_SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Recent'}</span>
                 </button>
               )}
-              items={SORT_OPTIONS.map(option => ({
+              items={PROJECT_SORT_OPTIONS.map(option => ({
                 label: option.label,
                 active: sortOrder === option.value,
-                onSelect: () => setSortOrder(option.value),
+                onSelect: () => onSortOrderChange(option.value),
               }))}
             />
           </div>
         </div>
 
+        {(directoryGroups?.length ?? 0) >= 2 && directoryGroups && (
+          <DirectoryChipStrip
+            groups={directoryGroups}
+            isolatedCwd={isolatedCwd}
+            projectDisplayPath={displayPath}
+            onSelect={setIsolatedCwd}
+          />
+        )}
+
+        {isolatedCwd && isolatedCwd !== '(unknown)' && (
+          <p
+            data-testid="project-isolated-cwd"
+            className="mt-1.5 font-mono text-[11px] text-warm-faint/80 dark:text-dark-muted/80 truncate"
+            title={isolatedCwd}
+          >
+            {isolatedCwd}
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
@@ -217,29 +285,40 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
           <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
             Loading sessions…
           </div>
-        ) : sessions.length === 0 && pinnedSessions.length === 0 ? (
+        ) : visibleUnpinned.length === 0 && visiblePinned.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <p className="text-sm text-warm-muted dark:text-dark-muted">No sessions match these filters.</p>
-            {activeSources.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveSources(new Set())}
-                className="mt-2 text-xs text-accent hover:underline"
-              >
-                Clear source filter
-              </button>
-            )}
+            <div className="mt-2 flex items-center justify-center gap-3 text-xs">
+              {activeSources.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSources(new Set())}
+                  className="text-accent hover:underline"
+                >
+                  Clear source filter
+                </button>
+              )}
+              {isolatedCwd !== null && (
+                <button
+                  type="button"
+                  onClick={() => setIsolatedCwd(null)}
+                  className="text-accent hover:underline"
+                >
+                  Clear directory filter
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <>
-            {pinnedSessions.length > 0 && (
+            {visiblePinned.length > 0 && (
               <CollapsibleSection
-                label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`}
+                label={`PINNED · ${visiblePinned.length} ${visiblePinned.length === 1 ? 'session' : 'sessions'}`}
                 accent
                 testId="project-view-pinned"
               >
                 <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
-                  {pinnedSessions.map(session => (
+                  {visiblePinned.map(session => (
                     <SessionRow
                       key={session.sessionUuid}
                       session={session}
@@ -252,9 +331,44 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
                 </div>
               </CollapsibleSection>
             )}
-            {pinnedSessions.length > 0 && sessions.length > 0 ? (
+            {showGrouped && unpinnedGroups ? (
+              <div data-testid="project-view-by-directory">
+                {unpinnedGroups.map(g => (
+                  <DirectoryGroupSection
+                    key={g.cwd}
+                    cwd={g.cwd}
+                    projectDisplayPath={displayPath}
+                    sessions={g.sessions}
+                    open={!closedCwds.has(g.cwd)}
+                    onToggleOpen={() => {
+                      setClosedCwds(prev => {
+                        const next = new Set(prev)
+                        if (next.has(g.cwd)) next.delete(g.cwd)
+                        else next.add(g.cwd)
+                        return next
+                      })
+                    }}
+                    onPinChange={handlePinChange}
+                    onOpenSession={onOpenSession}
+                    onCopySessionId={onCopySessionId}
+                  />
+                ))}
+              </div>
+            ) : isolatedCwd !== null ? (
+              <div data-testid="project-view-isolated" data-cwd={isolatedCwd}>
+                {visibleUnpinned.map(session => (
+                  <SessionRow
+                    key={session.sessionUuid}
+                    session={session}
+                    onPinChange={handlePinChange}
+                    onOpenSession={onOpenSession}
+                    onCopySessionId={onCopySessionId}
+                  />
+                ))}
+              </div>
+            ) : visiblePinned.length > 0 && visibleUnpinned.length > 0 ? (
               <CollapsibleSection label="RECENT" testId="project-view-recent">
-                {sessions.map(session => (
+                {visibleUnpinned.map(session => (
                   <SessionRow
                     key={session.sessionUuid}
                     session={session}
@@ -266,7 +380,7 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
               </CollapsibleSection>
             ) : (
               <div data-testid="project-view-recent">
-                {sessions.map(session => (
+                {visibleUnpinned.map(session => (
                   <SessionRow
                     key={session.sessionUuid}
                     session={session}
@@ -282,4 +396,214 @@ export default function ProjectView({ identityKey, onOpenSession, onCopySessionI
       </div>
     </div>
   )
+}
+
+function DirectoryGroupSection({
+  cwd,
+  projectDisplayPath,
+  sessions,
+  open,
+  onToggleOpen,
+  onPinChange,
+  onOpenSession,
+  onCopySessionId,
+}: {
+  cwd: string
+  projectDisplayPath: string | null
+  sessions: Session[]
+  open: boolean
+  onToggleOpen: () => void
+  onPinChange: (uuid: string, pinned: boolean) => void
+  onOpenSession: (uuid: string) => void
+  onCopySessionId: (source: Session['source']) => void
+}) {
+  const { name, tail } = formatCwdLabel(cwd, projectDisplayPath)
+  const count = sessions.length
+
+  return (
+    <div data-testid="project-view-directory-group" data-cwd={cwd}>
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        aria-expanded={open}
+        aria-label={open ? 'Collapse directory' : 'Expand directory'}
+        title={cwd === '(unknown)' ? undefined : cwd}
+        className="w-full flex items-baseline gap-2 px-6 py-1.5 text-left transition-colors hover:bg-warm-surface/60 dark:hover:bg-dark-surface/60"
+      >
+        <span className="text-[13px] font-medium text-warm-text dark:text-dark-text truncate">
+          {name}
+        </span>
+        {tail && (
+          <span className="font-mono text-[11px] text-warm-faint/80 dark:text-dark-muted/80 truncate">
+            {tail}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-2 flex-none self-center">
+          <span className="font-mono text-[10px] tabular-nums text-warm-faint dark:text-dark-muted">
+            {count}
+          </span>
+          <svg
+            width="9"
+            height="9"
+            viewBox="0 0 9 9"
+            fill="none"
+            aria-hidden
+            className={`transition-transform text-warm-faint dark:text-dark-muted ${open ? 'rotate-90' : ''}`}
+          >
+            <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </button>
+      {open && (
+        <div>
+          {sessions.map(session => (
+            <SessionRow
+              key={session.sessionUuid}
+              session={session}
+              onPinChange={onPinChange}
+              onOpenSession={onOpenSession}
+              onCopySessionId={onCopySessionId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const MAX_INLINE_CHIPS = 4
+
+function DirectoryChipStrip({
+  groups,
+  isolatedCwd,
+  projectDisplayPath,
+  onSelect,
+}: {
+  groups: Array<{ cwd: string; sessions: Session[] }>
+  isolatedCwd: string | null
+  projectDisplayPath: string | null
+  onSelect: (cwd: string | null) => void
+}) {
+  const totalSessions = groups.reduce((sum, g) => sum + g.sessions.length, 0)
+  const top = groups.slice(0, MAX_INLINE_CHIPS)
+  let inline = top
+  if (
+    isolatedCwd !== null
+    && !top.some(g => g.cwd === isolatedCwd)
+    && groups.some(g => g.cwd === isolatedCwd)
+  ) {
+    const active = groups.find(g => g.cwd === isolatedCwd)!
+    inline = [...top.slice(0, MAX_INLINE_CHIPS - 1), active]
+  }
+  const inlineSet = new Set(inline.map(g => g.cwd))
+  const overflow = groups.filter(g => !inlineSet.has(g.cwd))
+
+  return (
+    <div data-testid="project-directory-chips" className="mt-2 flex items-center gap-1 flex-wrap">
+      <DirectoryChip
+        active={isolatedCwd === null}
+        label="All"
+        count={totalSessions}
+        onClick={() => onSelect(null)}
+      />
+      {inline.map(g => {
+        const { name } = formatCwdLabel(g.cwd, projectDisplayPath)
+        return (
+          <DirectoryChip
+            key={g.cwd}
+            active={isolatedCwd === g.cwd}
+            label={name}
+            title={g.cwd === '(unknown)' ? undefined : g.cwd}
+            count={g.sessions.length}
+            onClick={() => onSelect(g.cwd)}
+          />
+        )
+      })}
+      {overflow.length > 0 && (
+        <Menu
+          align="left"
+          testId="project-directory-overflow"
+          trigger={({ open, toggle }) => (
+            <button
+              type="button"
+              data-testid="project-directory-overflow-trigger"
+              aria-haspopup="menu"
+              aria-expanded={open}
+              onClick={toggle}
+              className="inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface/60 dark:hover:bg-dark-surface/60 transition-colors"
+            >
+              <span>+{overflow.length} more</span>
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden className="text-warm-faint dark:text-dark-muted">
+                <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+          items={overflow.map(g => {
+            const { name } = formatCwdLabel(g.cwd, projectDisplayPath)
+            return {
+              label: `${name} · ${g.sessions.length}`,
+              active: isolatedCwd === g.cwd,
+              onSelect: () => onSelect(g.cwd),
+            }
+          })}
+        />
+      )}
+    </div>
+  )
+}
+
+function DirectoryChip({
+  active,
+  label,
+  count,
+  title,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  count: number
+  title?: string | undefined
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="project-directory-chip"
+      data-active={active ? 'true' : undefined}
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      className={`inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors ${
+        active
+          ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
+          : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface/60 dark:hover:bg-dark-surface/60'
+      }`}
+    >
+      <span className="truncate max-w-[120px]">{label}</span>
+      <span className="font-mono tabular-nums text-[10px] text-warm-faint dark:text-dark-muted">
+        {count}
+      </span>
+    </button>
+  )
+}
+
+function cwdOf(s: Session): string {
+  return s.cwd && s.cwd.length > 0 ? s.cwd : '(unknown)'
+}
+
+function formatCwdLabel(cwd: string, projectDisplayPath: string | null): { name: string; tail: string } {
+  if (cwd === '(unknown)') return { name: 'no cwd', tail: '' }
+  const parts = cwd.split('/').filter(Boolean)
+  if (parts.length === 0) return { name: cwd, tail: '' }
+  const name = parts[parts.length - 1]!
+  if (projectDisplayPath && cwd === projectDisplayPath) {
+    return { name, tail: 'project root' }
+  }
+  if (projectDisplayPath && cwd.startsWith(projectDisplayPath + '/')) {
+    const rel = cwd.slice(projectDisplayPath.length + 1).split('/').filter(Boolean)
+    const parent = rel.slice(0, -1).join('/')
+    return { name, tail: parent }
+  }
+  const parent = parts.slice(0, -1).join('/')
+  return { name, tail: parent ? '/' + parent : '' }
 }

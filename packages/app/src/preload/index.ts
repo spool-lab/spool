@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions, ProjectSessionSortOrder } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
@@ -25,6 +25,7 @@ export interface AgentsConfig {
   sidebarShowSourceDots?: boolean
   sidebarShowSessionCount?: boolean
   sidebarSortOrder?: SidebarSortOrder
+  projectSortOrder?: ProjectSessionSortOrder
   customAgents?: Record<string, {
     name?: string
     bin: string

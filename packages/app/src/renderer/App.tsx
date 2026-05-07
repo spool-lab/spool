@@ -13,6 +13,8 @@ import SearchOverlay from './components/SearchOverlay.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
+import { DEFAULT_PROJECT_SORT_ORDER } from '../shared/projectView.js'
+import type { ProjectSessionSortOrder } from '@spool-lab/core'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
@@ -72,6 +74,7 @@ export default function App() {
   const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
   const [sidebarShowSessionCount, setSidebarShowSessionCount] = useState(true)
   const [sidebarSortOrder, setSidebarSortOrder] = useState<SidebarSortOrder>(DEFAULT_SIDEBAR_SORT_ORDER)
+  const [projectSortOrder, setProjectSortOrder] = useState<ProjectSessionSortOrder>(DEFAULT_PROJECT_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
@@ -136,6 +139,7 @@ export default function App() {
       setSidebarShowSourceDots(config.sidebarShowSourceDots ?? true)
       setSidebarShowSessionCount(config.sidebarShowSessionCount ?? true)
       setSidebarSortOrder(config.sidebarSortOrder ?? DEFAULT_SIDEBAR_SORT_ORDER)
+      setProjectSortOrder(config.projectSortOrder ?? DEFAULT_PROJECT_SORT_ORDER)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -152,6 +156,17 @@ export default function App() {
     try {
       const config = await window.spool.getAgentsConfig()
       await window.spool.setAgentsConfig({ ...config, sidebarSortOrder: next })
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  const handleProjectSortChange = useCallback(async (next: ProjectSessionSortOrder) => {
+    setProjectSortOrder(next)
+    if (!window.spool?.setAgentsConfig) return
+    try {
+      const config = await window.spool.getAgentsConfig()
+      await window.spool.setAgentsConfig({ ...config, projectSortOrder: next })
     } catch (err) {
       console.error(err)
     }
@@ -541,6 +556,8 @@ export default function App() {
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
                   identityKey={activeProjectKey}
+                  sortOrder={projectSortOrder}
+                  onSortOrderChange={handleProjectSortChange}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
                 />
