@@ -100,6 +100,8 @@ function CodeBlock({ code, lang, isDark }: Props) {
   }, [code, lang, isDark])
 
   if (html) {
+    // The placeholder→highlighted swap changes row height. MessageList's per-row
+    // measureElement uses ResizeObserver, so the virtual list re-measures automatically.
     return (
       <div
         className="my-2 text-[12.5px] leading-snug rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface [&_pre]:!bg-transparent [&_pre]:p-3"
