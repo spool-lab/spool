@@ -37,14 +37,17 @@
 ### Type Scale
 | Role | Size | Weight | Font |
 |------|------|--------|------|
-| Sidebar wordmark | 16px | 700 | Geist Sans |
+| Page title (Library Home, Settings) | 20px | 600 | Geist Sans, letter-spacing −0.01em |
+| Sidebar wordmark | 18px | 700 | Geist Sans, letter-spacing −0.04em |
 | Search input (⌘K overlay) | 15px | 400 | Geist Sans |
-| Search input (results page) | 13.5px | 400 | Geist Sans |
+| Search input (results page) | 13px | 400 | Geist Sans |
 | Body / result actions | 13px | 400/500 | Geist Sans |
 | Fragment content | 12px | 400 | Geist Mono |
 | Secondary / meta | 11px | 400/500 | Geist Sans |
 | Labels / caps | 11px | 500 | Geist Sans, letter-spacing 0.06em |
-| Badges / paths | 10–11px | 500/600 | Geist Mono |
+| Badges / paths | 11px | 500/600 | Geist Mono |
+
+**Floor:** 11px. No 10px or half-pixel (12.5, 13.5) sizes — they fight sub-pixel rendering.
 
 ## Color
 - **Approach:** Restrained — one amber accent, warm neutrals, color is rare and meaningful.
@@ -78,31 +81,56 @@
 | `--accent-bg` | `#2A1800` | Accent backgrounds on dark |
 
 ### Source Badge Colors
-Each data source has a fixed color used consistently across badges, chips, and dots.
+Each agent source has a fixed color used consistently across badges, chips, and dots.
+Only currently-supported agent sources are listed. New sources arrive via the daemon — add a row when shipped, never preemptively.
 
 | Source | Light | Dark |
 |--------|-------|------|
 | Claude Code | `#6B5B8A` | `#9B8BBF` |
-| Twitter / X | `#3A3A3A` | `#888880` |
-| GitHub | `#555555` | `#999990` |
-| YouTube | `#B22222` | `#D44444` |
-| ChatGPT | `#10A37F` | `#20C38F` |
 | Codex CLI | `#1A6B3C` | `#40C87A` |
+| Gemini | `#3B6FB0` | `#7AA8E0` |
 
 ### Semantic States
+Status colors are warm-tuned to match the rest of the palette — never use Tailwind defaults (`green-500`, `red-500`).
+
 | State | Light | Dark |
 |-------|-------|------|
-| Success / synced | `#4ADE80` (dot) | same |
-| Warning / stale | `#FBBF24` (dot) | same |
-| Error / disconnected | `#F87171` (dot) | same |
+| Success / synced | `#6BAF6B` (warm green) | `#7DC07D` |
+| Warning / stale | `#E4A640` (warm amber) | `#F0B854` |
+| Error / disconnected | `#C95A4F` (terracotta) | `#D67259` |
 
 ## Spacing
-- **Base unit:** 4px
+
+### Base
+- **Unit:** 4px
 - **Density:** Compact. This is a library client, not a document editor — rows should fit at scale.
-- **Scale:** 2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48
-- **Result item padding:** 10px 20px
-- **Search input padding:** 12px 16px (⌘K overlay) / 7px 14px (results page top-right)
-- **Section padding:** 20px 24px (panels)
+- **Scale:** `2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 48`. 6 is allowed only for icon dots and tight inline gaps. **Off-scale is a bug** — never use 10, 14, 18, 28, 36, 40, or any half-pixel (`py-0.5`, `py-2.5`, `px-3.5`).
+
+### Component padding (canonical)
+| Component | Padding | Inner gap |
+|-----------|---------|-----------|
+| Sidebar column | `px-3 py-3` (12 / 12) | — |
+| Sidebar wordmark block | `px-4 pt-3 pb-3` (16 / 12) | — |
+| Sidebar section label (PROJECTS) | `px-2 py-1` (8 / 4) | gap-1.5 (6) |
+| Sidebar project row | `px-2 py-1` (8 / 4) | gap-2 (8) |
+| Sidebar status bar | `h-[30px] px-3` | gap-2 (8) |
+| Search trigger (sidebar / top-right) | `h-8 px-2` (32 / 8) | gap-2 (8) |
+| Library Home header (h1 + subtitle) | `px-6 pt-4 pb-3` (24 / 16 / 12) | — |
+| Library section label (PINNED / TODAY …) | `px-6 py-2` (24 / 8) | gap-1.5 (6) |
+| Session row | `px-5 py-3` (20 / 12) | gap-3 (12) |
+| Icon button (kebab, pin, gear, sort) | `w-6 h-6` hit-area, inner icon centered | — |
+| Search input (⌘K overlay) | `h-12 px-4` (48 / 16) | gap-3 (12) |
+| Search input (results page top-right) | `h-9 px-3` (36 / 12) | gap-2 (8) |
+| AI answer card | `p-4` (16) | gap-3 (12) |
+
+### Vertical rhythm
+- Section label and its rows: zero margin between — the label's own `py-2` is the buffer
+- Consecutive sections (PINNED → TODAY → YESTERDAY): zero margin between — each section's header padding provides the separation
+- Sidebar groups (projects vs. Loose): single 1px divider with `my-2 mx-2` margins
+- Bucket labels: non-sticky on scroll; content moves as one
+
+### Border radius
+10 cards / 8 inputs / 6 sidebar rows + buttons / 4 badges. Pill (9999) reserved for ⌘K input + mode toggle. **No 12, no 14.**
 
 ## Motion
 - **Approach:** Minimal-functional — only transitions that aid comprehension.
@@ -129,7 +157,13 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - **Action buttons:** Appear on hover/selection only (opacity 0 → 1). Primary action (Resume/Continue) uses accent border + color.
 
 ### Library Home (main pane default)
-- Two stacked sections: `PINNED` (collapsible, only when non-empty) and `RECENT` (date-bucketed: Today / Yesterday / This week / This month / Older).
+- Two stacked sections: `PINNED` (collapsible, only when non-empty) and `RECENT`, date-bucketed into:
+  - `TODAY`
+  - `YESTERDAY`
+  - `EARLIER THIS WEEK` (last 7 days, excluding today/yesterday)
+  - `EARLIER THIS MONTH` (last ~30 days, excluding the above)
+  - `OLDER`
+- Bucket labels render in the Labels / caps style (11px, 0.06em tracking, weight 500). Empty buckets are hidden.
 - Each row uses the same `SessionRow` component as Project View, so visual rhythm is consistent across surfaces.
 
 ### Project View
@@ -159,13 +193,43 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - Dot is green when sync is healthy; yellow during active sync; red only on filesystem watcher errors.
 
 ## Icons
-- **Library:** Lucide React (`lucide-react`) — consistent stroke weight, MIT licensed.
-- **Search:** `Search` icon (Lucide)
-- **Source indicators:** Replace all emoji placeholder icons with purpose-drawn SVGs or Lucide equivalents. Emoji are placeholders only in mockups.
-- **Mode toggle:** Custom SVG — lightning bolt (⚡ Fast) and a minimal "brain" or sparkle (AI mode).
-- **Settings:** `Settings2` (Lucide)
-- **Status dots:** No icon — pure colored circle via CSS.
-- **Stroke width:** 1.5px at 16px, 1.5px at 14px. Never bold/filled for UI chrome.
+
+### Library
+Lucide React (`lucide-react`) — consistent stroke weight, MIT licensed. Custom SVGs only when Lucide doesn't fit (mode toggle marks, source-specific glyphs).
+
+### Size scale (only these — no in-betweens)
+| Size | Role | Examples |
+|------|------|----------|
+| 12px | Micro chrome | Status-bar gear, inline meta accessory |
+| 14px | Default UI | Sidebar folder, search trigger, kebab dots, copy/resume action, source badge icons, chevron (open/close) |
+| 16px | Page-level | ⌘K search-overlay icon, settings tab icons, mode toggle marks |
+| 20px | Hero / empty-state | Illustration-tier accents only — rare |
+
+**No 9 / 10 / 11 / 13 / 15 / 18px icons.** Existing 9px chevrons and 13px kebab dots are drift — align to 12 or 14.
+
+### Stroke
+- 1.5px at all sizes for outline icons
+- Filled state allowed only for active toggles (Pin filled = accent)
+- No 1px or 2px strokes — stroke is part of the system identity
+
+### Icon-text gap
+- `gap-2` (8px) — default for icon + label pairs (sidebar row, button with icon, AI answer header)
+- `gap-1.5` (6px) — tight inline groups (section label + chevron, source dots cluster)
+
+### Status dot
+6px circle (`w-1.5 h-1.5`). Never resize; no other circle reuses this size.
+
+### Hit target
+Icon-only buttons (kebab, pin, settings gear, sort menu): minimum **24×24px** (`w-6 h-6`) tap area, regardless of inner icon size — pad with transparent space if needed.
+
+### Specific assignments
+- **Search (sidebar trigger):** `Search` (Lucide), 14px
+- **Settings (sidebar status bar):** `Settings2` (Lucide), 12px
+- **Folder (project row):** custom SVG, 14px
+- **Kebab (session row "more"):** custom three-dot SVG, 14px viewBox 14×14
+- **Resume (session row primary action):** `SquareTerminal` (Lucide), 14px
+- **Pin:** custom SVG, 14px (filled in active state)
+- **Source indicators:** purpose-drawn SVGs or Lucide equivalents — emoji are placeholders only
 
 ## AI Search (ACP Integration)
 - Mode is toggled inside the ⌘K overlay — same input, different backend.
@@ -175,14 +239,17 @@ Each data source has a fixed color used consistently across badges, chips, and d
 - "Continue in Claude Code →" CTA uses outline button style, opens a new Claude Code session with the synthesized answer + fragments as context.
 
 ## First-Person Language
-All result metadata uses first-person framing. The product is about YOUR thinking.
+The library is yours by definition — leverage that, but **don't prefix every list row** with "You discussed this". Repeating the frame on hundreds of rows clutters more than it warms.
 
-| Do | Don't |
-|----|-------|
-| "You discussed this · Mar 15" | "Claude Code · Mar 15" |
-| "You saved this" | "Twitter bookmark" |
-| "You pinned this" | "GitHub · 3 days ago" |
-| "You discussed this in ChatGPT" | "ChatGPT session" |
+Use first-person framing **where it adds signal**:
+- Empty states ("Nothing here yet — your first session will land here.")
+- Single-session detail header ("You discussed this on Mar 15 in Claude Code.")
+- Action confirmations ("Pinned by you", "You saved this in October")
+- Settings-level copy that addresses the user
+
+In list contexts (Library Home, Project View, search results), trust the surrounding chrome (sidebar, project name, source badge) to convey ownership; render metadata as compact facts:
+- ✅ `spool · today · 12 messages · sonnet-4`
+- ❌ `You discussed this in spool · today · 12 messages · sonnet-4`
 
 ## Anti-patterns — Never Do
 - Purple/violet gradients as accent
@@ -207,3 +274,8 @@ All result metadata uses first-person framing. The product is about YOUR thinkin
 | 2026-04-30 | Library-first shell replaces centered search home | Session counts grew into the hundreds across multiple agents. Users need to browse and organize, not only search. Sidebar/projects/sessions become the home; search retreats to ⌘K. Reverses the 2026-03-27 "search box is the product" decision. |
 | 2026-04-30 | Pin replaces Star | Per-project pin-to-top with a global Library Home `PINNED` segment. Star UI removed wholesale; underlying data migrated. Pin reads as a library verb (where Star reads as a feed verb) and matches the new framing. |
 | 2026-04-30 | ⌘K overlay for search | Overlay scopes to All or the current project and hosts both Fast and AI modes. Persistent top-right `Search…` button is the discoverability hint. |
+| 2026-05-08 | Locked icon scale (12 / 14 / 16 / 20) and component padding lookup table | Audit found six icon sizes (9/11/12/13/14/16) and seven off-scale paddings in use. Without per-component spec, the system was self-inconsistent. Fixed scale + canonical padding table makes drift detectable. |
+| 2026-05-08 | Warm-tuned status colors replace Tailwind defaults | `green-400 / amber-400 / red-400` were the only un-tuned colors in the system. Replaced with warm green `#6BAF6B`, warm amber `#E4A640`, terracotta `#C95A4F` so status reads as part of the same palette. |
+| 2026-05-08 | Page title type added (20px) | Library Home and Settings need a real h1 — previous scale topped at sidebar wordmark 16px, leaving the home pane labelless. |
+| 2026-05-08 | First-person rule softened from "all metadata" to "where it adds signal" | Literal "You discussed this · Mar 15" prefix on every row was repetitive once a user had hundreds of sessions. Library context already conveys ownership; reserve first-person for empty states, detail headers, and confirmations. |
+| 2026-05-08 | Source badge list trimmed to active agents only | Twitter / GitHub / YouTube / ChatGPT were carryover from the connector era. Spool ships only Claude Code / Codex CLI / Gemini today; new sources arrive via the daemon and get a row when shipped, not preemptively. |
