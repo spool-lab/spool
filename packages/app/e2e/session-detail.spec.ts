@@ -145,7 +145,7 @@ test('handles 1500-message session: virtualization + deep find', async () => {
   const isMac = process.platform === 'darwin'
   await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
   await window.locator('[data-testid="session-find-input"]').fill('SPOOLDEEPMARKER')
-  await expect(window.locator('[data-testid="session-find-status"]')).toContainText('1 / 1', {
+  await expect(window.locator('[data-testid="session-find-status"]')).toContainText('1 of 1', {
     timeout: 5000,
   })
   await expect(window.locator('[data-testid="session-find-active-match"]')).toHaveCount(1)
