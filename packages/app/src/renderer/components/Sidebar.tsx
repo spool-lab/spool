@@ -71,7 +71,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
           data-testid="sidebar-projects-toggle"
           aria-expanded={projectsOpen}
           onClick={() => setProjectsOpen(open => !open)}
-          className="flex-1 flex items-center gap-1.5 text-left text-[11px] font-medium tracking-[0.06em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
+          className="flex-1 flex items-center gap-1.5 text-left text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
         >
           <span>PROJECTS</span>
           <svg
@@ -176,7 +176,7 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none h-[30px] px-3 flex items-center gap-2">
+    <div className="flex-none h-[30px] pl-4 pr-2 flex items-center gap-2">
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`} />
         <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>

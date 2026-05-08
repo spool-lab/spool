@@ -44,10 +44,10 @@
 | Body / result actions | 13px | 400/500 | Geist Sans |
 | Fragment content | 12px | 400 | Geist Mono |
 | Secondary / meta | 11px | 400/500 | Geist Sans |
-| Labels / caps | 11px | 500 | Geist Sans, letter-spacing 0.06em |
+| Labels / caps | 10px | 600 | Geist Sans, letter-spacing 0.08em |
 | Badges / paths | 11px | 500/600 | Geist Mono |
 
-**Floor:** 11px. No 10px or half-pixel (12.5, 13.5) sizes — they fight sub-pixel rendering.
+**Floor:** 11px for body / UI / meta text. Labels-and-caps may use 10px (small uppercase reads cleanly even below the body floor). No half-pixel sizes (12.5, 13.5) — they fight sub-pixel rendering.
 
 ## Color
 - **Approach:** Restrained — one amber accent, warm neutrals, color is rare and meaningful.
@@ -113,10 +113,10 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 | Sidebar wordmark block | `px-4 pt-3 pb-3` (16 / 12) | — |
 | Sidebar section label (PROJECTS) | `px-2 py-1` (8 / 4) | gap-1.5 (6) |
 | Sidebar project row | `px-2 py-1` (8 / 4) | gap-2 (8) |
-| Sidebar status bar | `h-[30px] px-3` | gap-2 (8) |
+| Sidebar status bar | `h-[30px] pl-4 pr-2` (16 left so the status dot lines up with the project-row folder icon column; 8 right so the 24×24 settings button sits visually centered in the count column above) | gap-2 (8) |
 | Search trigger (sidebar / top-right) | `h-8 px-2` (32 / 8) | gap-2 (8) |
-| Library Home header (h1 + subtitle) | `px-6 pt-4 pb-3` (24 / 16 / 12) | — |
-| Library section label (PINNED / TODAY …) | `px-6 py-2` (24 / 8) | gap-1.5 (6) |
+| Library Home header (h1 + subtitle) | `px-6 pt-3 pb-3` (24 / 12) — top padding matches sidebar wordmark block so titles align | — |
+| Library section label (PINNED / TODAY …) | `px-6 pt-3 pb-1` (24 horizontal; 12 above for clear section break, 4 below so the label hugs its rows — combined with row's own `py-3`, label-text-to-row-content is 16px and prior-row-to-label-text is 24px) | gap-1.5 (6) |
 | Session row | `px-5 py-3` (20 / 12) | gap-3 (12) |
 | Icon button (kebab, pin, gear, sort) | `w-6 h-6` hit-area, inner icon centered | — |
 | Search input (⌘K overlay) | `h-12 px-4` (48 / 16) | gap-3 (12) |

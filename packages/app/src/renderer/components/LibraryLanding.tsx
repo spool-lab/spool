@@ -60,8 +60,8 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 pt-4 pb-3 flex-none">
-        <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text">
+      <div className="px-6 pt-3 pb-3 flex-none">
+        <h1 className="text-xl font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text">
           AI Session Library
         </h1>
         <p className="mt-0.5 text-xs text-warm-muted dark:text-dark-muted">
@@ -148,7 +148,7 @@ export function CollapsibleSection({
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className={`group w-full flex items-center gap-1.5 px-6 py-2 text-[11px] font-medium tracking-[0.06em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none ${
+        className={`group w-full flex items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none ${
           accent ? 'bg-accent/[0.04] dark:bg-accent-dark/[0.04]' : ''
         }`}
       >
