@@ -71,7 +71,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
       <div className="flex-1 overflow-y-auto pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {recentSessions === null ? (
-          <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">Loading…</p>
+          <SessionRowsSkeleton count={6} />
         ) : totalSessions === 0 ? (
           <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">
             No sessions yet. Run <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code> to index your AI sessions.
@@ -159,12 +159,30 @@ export function CollapsibleSection({
           viewBox="0 0 12 12"
           fill="none"
           aria-hidden
-          className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+          className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
         >
           <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && children}
+    </div>
+  )
+}
+
+function SessionRowsSkeleton({ count }: { count: number }) {
+  return (
+    <div aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-start gap-3 px-5 py-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="h-4 w-12 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
+              <div className="h-4 w-1/2 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
+            </div>
+            <div className="h-3 w-1/3 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

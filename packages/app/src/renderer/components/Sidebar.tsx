@@ -80,7 +80,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
             viewBox="0 0 12 12"
             fill="none"
             aria-hidden="true"
-            className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
+            className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
           >
             <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -99,7 +99,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                 aria-haspopup="menu"
                 aria-expanded={open}
                 className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
-                  open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
                 }`}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
