@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SquareTerminal } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 
@@ -85,10 +86,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
             </>
           ) : (
             <>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M2.5 2.5L6.5 6.5L2.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7.5 10.5H10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
+              <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
               Resume in CLI
             </>
           )}

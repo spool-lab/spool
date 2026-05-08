@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SquareTerminal } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
@@ -89,9 +90,9 @@ export default function SessionRow({ session, pinned = false, showProject = fals
                 onClick={toggle}
                 title="More actions"
                 aria-label="More actions"
-                className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
+                className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="3" cy="7" r="1.2" />
                   <circle cx="7" cy="7" r="1.2" />
                   <circle cx="11" cy="7" r="1.2" />
@@ -124,11 +125,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
 }
 
 function PlayIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor">
-      <path d="M3.5 2.5L10 6.5L3.5 10.5V2.5Z" />
-    </svg>
-  )
+  return <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
 }
 
 function TerminalIcon() {

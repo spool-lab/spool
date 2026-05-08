@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { SquareTerminal } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 import SessionFindBar from './SessionFindBar.js'
@@ -278,7 +279,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           </p>
         </div>
 
-        <div className="flex-none self-end flex items-center gap-1.5">
+        <div className="flex-none self-end flex items-center gap-0.5">
           <PinButton
             sessionUuid={session.sessionUuid}
             pinned={pinned}
@@ -289,13 +290,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             data-testid="detail-resume"
             onClick={handleResume}
             disabled={resuming}
-            title="Resume session in Terminal"
-            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent/90 dark:bg-accent-dark dark:hover:bg-accent-dark/90 rounded-md px-3 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            title={resuming ? 'Opening…' : 'Resume in Terminal'}
+            aria-label={resuming ? 'Opening…' : 'Resume in Terminal'}
+            className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
-              <path d="M3 2L9 5.5L3 9V2Z" />
-            </svg>
-            {resuming ? 'Opening…' : 'Resume in Terminal'}
+            <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
           </button>
 
           <Menu
@@ -307,9 +306,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 onClick={toggle}
                 title="More actions"
                 aria-label="More actions"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="3" cy="7" r="1.2" />
                   <circle cx="7" cy="7" r="1.2" />
                   <circle cx="11" cy="7" r="1.2" />
