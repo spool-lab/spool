@@ -21,12 +21,21 @@
   --color-dark-surface: #1C1C18;
   --color-dark-surface2: #242420;
   --color-dark-border: #2E2E28;
+  --color-dark-border2: #3A3A34;
   --color-dark-text: #F2F2EC;
   --color-dark-muted: #9A9A8E;
   --color-dark-faint: #505048;
   --color-accent-dark: #F07020;
   /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
   --color-accent-bg-dark: #2a1800;
+
+  /* Status — warm-tuned, never Tailwind defaults (see DESIGN.md) */
+  --color-status-success: #6BAF6B;
+  --color-status-warning: #E4A640;
+  --color-status-error:   #C95A4F;
+  --color-status-success-dark: #7DC07D;
+  --color-status-warning-dark: #F0B854;
+  --color-status-error-dark:   #D67259;
 
   /* Source badges */
   --color-src-claude: #6B5B8A;

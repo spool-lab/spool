@@ -52,7 +52,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
           type="button"
           data-testid="sidebar-home"
           onClick={() => onSelectHome?.()}
-          className="text-xl font-bold tracking-[-0.04em] select-none cursor-pointer hover:opacity-80 transition-opacity"
+          className="text-lg font-bold tracking-[-0.04em] select-none cursor-pointer hover:opacity-80 transition-opacity"
           aria-label="Spool home"
         >
           Spool<span className="text-accent">.</span>
@@ -71,18 +71,18 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
           data-testid="sidebar-projects-toggle"
           aria-expanded={projectsOpen}
           onClick={() => setProjectsOpen(open => !open)}
-          className="flex-1 flex items-center gap-1 text-left text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
+          className="flex-1 flex items-center gap-1.5 text-left text-[11px] font-medium tracking-[0.06em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
         >
           <span>PROJECTS</span>
           <svg
-            width="9"
-            height="9"
-            viewBox="0 0 9 9"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
             fill="none"
             aria-hidden="true"
             className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${projectsOpen ? 'rotate-90' : ''}`}
           >
-            <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {onSortOrderChange && (
@@ -102,8 +102,8 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
                   open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                 }`}
               >
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
-                  <path d="M0.75 2.5h9.5M2 5.5h7M4 8.5h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M1 3.5h12M2.5 7h9M5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
               </button>
             )}
@@ -176,9 +176,9 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none pl-2 pr-1.5 pt-1 pb-2 flex items-center gap-2">
-      <div className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1">
-        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
+    <div className="flex-none h-[30px] px-3 flex items-center gap-2">
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`} />
         <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
           {text}
         </span>
@@ -189,7 +189,7 @@ function SidebarStatus({
           onClick={onSettingsClick}
           title="Settings"
           aria-label="Settings"
-          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -255,19 +255,19 @@ function ProjectRow({
       data-identity-key={group.identityKey}
       aria-label={ariaLabel}
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${
+      className={`w-full text-left flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 ${
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
       <FolderIcon active={active} />
-      <span className="flex-1 truncate text-[12.5px]">
+      <span className="flex-1 truncate text-[13px]">
         {group.displayName}
       </span>
       {showSourceDots && <SourceDots sources={group.sources} />}
       {showSessionCount && (
-        <span className="flex-none font-mono text-[10.5px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
+        <span className="flex-none font-mono text-[11px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
           {group.sessionCount}
         </span>
       )}
@@ -278,8 +278,8 @@ function ProjectRow({
 function FolderIcon({ active }: { active: boolean }) {
   return (
     <svg
-      width="13"
-      height="13"
+      width="14"
+      height="14"
       viewBox="0 0 14 14"
       fill="none"
       aria-hidden="true"
@@ -288,7 +288,7 @@ function FolderIcon({ active }: { active: boolean }) {
       <path
         d="M1.5 4.2c0-.55.45-1 1-1h3l1.2 1.3h4.8c.55 0 1 .45 1 1v5.3c0 .55-.45 1-1 1H2.5c-.55 0-1-.45-1-1V4.2z"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="1.5"
         strokeLinejoin="round"
       />
     </svg>

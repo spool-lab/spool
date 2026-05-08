@@ -60,8 +60,8 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 pt-3 pb-3 flex-none">
-        <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
+      <div className="px-6 pt-4 pb-3 flex-none">
+        <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text">
           AI Session Library
         </h1>
         <p className="mt-0.5 text-xs text-warm-muted dark:text-dark-muted">
@@ -148,20 +148,20 @@ export function CollapsibleSection({
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className={`group w-full flex items-center gap-1.5 px-6 py-2 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors select-none ${
+        className={`group w-full flex items-center gap-1.5 px-6 py-2 text-[11px] font-medium tracking-[0.06em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none ${
           accent ? 'bg-accent/[0.04] dark:bg-accent-dark/[0.04]' : ''
         }`}
       >
         <span>{label}</span>
         <svg
-          width="9"
-          height="9"
-          viewBox="0 0 9 9"
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
           fill="none"
           aria-hidden
           className={`flex-none transition-all opacity-0 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
         >
-          <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && children}
@@ -178,29 +178,33 @@ function bucketByDate(sessions: Session[]): DateBucket[] {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const startOfYesterday = startOfToday - 86400000
   const startOfWeek = startOfToday - 6 * 86400000
+  const startOfMonth = startOfToday - 30 * 86400000
 
   const today: Session[] = []
   const yesterday: Session[] = []
   const earlierWeek: Session[] = []
-  const earlier: Session[] = []
+  const earlierMonth: Session[] = []
+  const older: Session[] = []
 
   for (const session of sessions) {
     const t = Date.parse(session.startedAt)
     if (Number.isNaN(t)) {
-      earlier.push(session)
+      older.push(session)
       continue
     }
     if (t >= startOfToday) today.push(session)
     else if (t >= startOfYesterday) yesterday.push(session)
     else if (t >= startOfWeek) earlierWeek.push(session)
-    else earlier.push(session)
+    else if (t >= startOfMonth) earlierMonth.push(session)
+    else older.push(session)
   }
 
   const buckets: DateBucket[] = []
   if (today.length > 0) buckets.push({ label: 'TODAY', sessions: today })
   if (yesterday.length > 0) buckets.push({ label: 'YESTERDAY', sessions: yesterday })
   if (earlierWeek.length > 0) buckets.push({ label: 'EARLIER THIS WEEK', sessions: earlierWeek })
-  if (earlier.length > 0) buckets.push({ label: 'EARLIER', sessions: earlier })
+  if (earlierMonth.length > 0) buckets.push({ label: 'EARLIER THIS MONTH', sessions: earlierMonth })
+  if (older.length > 0) buckets.push({ label: 'OLDER', sessions: older })
   return buckets
 }
 
@@ -218,9 +222,9 @@ export function SearchTrigger({
       type="button"
       data-testid="search-trigger"
       onClick={onClick}
-      className={`flex items-center gap-2 h-8 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2.5 text-xs text-warm-muted dark:text-dark-muted hover:border-accent/50 hover:text-warm-text dark:hover:text-dark-text transition-colors ${fullWidth ? 'w-full' : ''}`}
+      className={`flex items-center gap-2 h-8 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2 text-xs text-warm-muted dark:text-dark-muted hover:border-accent/50 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 ${fullWidth ? 'w-full' : ''}`}
     >
-      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="flex-none">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-none">
         <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.5" />
         <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>

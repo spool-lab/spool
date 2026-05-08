@@ -56,7 +56,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
           handleOpen()
         }
       }}
-      className="group flex items-start gap-3 px-6 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors border-b border-warm-border dark:border-dark-border cursor-pointer focus:outline-none focus:bg-warm-surface dark:focus:bg-dark-surface"
+      className="group flex items-start gap-3 px-5 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75 border-b border-warm-border dark:border-dark-border cursor-pointer focus:outline-none focus:bg-warm-surface dark:focus:bg-dark-surface"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-0.5">
@@ -92,7 +92,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
                 aria-label="More actions"
                 className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
               >
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="3" cy="7" r="1.2" />
                   <circle cx="7" cy="7" r="1.2" />
                   <circle cx="11" cy="7" r="1.2" />
@@ -125,32 +125,32 @@ export default function SessionRow({ session, pinned = false, showProject = fals
 }
 
 function PlayIcon() {
-  return <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
+  return <SquareTerminal size={14} strokeWidth={1.5} aria-hidden />
 }
 
 function TerminalIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 4L4.5 6.5L2.5 9" />
-      <path d="M6 9.5H10.5" />
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4.5L5 7L3 9.5" />
+      <path d="M6.5 10H11.5" />
     </svg>
   )
 }
 
 function CopyIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-      <rect x="4.5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M8.5 4.5V3C8.5 2.17 7.83 1.5 7 1.5H3C2.17 1.5 1.5 2.17 1.5 3V7C1.5 7.83 2.17 8.5 3 8.5H4.5" stroke="currentColor" strokeWidth="1.2" />
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="5" y="5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 5V3.5C9 2.67 8.33 2 7.5 2H3.5C2.67 2 2 2.67 2 3.5V7.5C2 8.33 2.67 9 3.5 9H5" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   )
 }
 
 function SpinnerIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 13 13" className="animate-spin">
-      <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeOpacity="0.3" />
-      <path d="M6.5 1.5A5 5 0 0111.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+    <svg width="14" height="14" viewBox="0 0 14 14" className="animate-spin">
+      <circle cx="7" cy="7" r="5.25" stroke="currentColor" strokeWidth="1.5" fill="none" strokeOpacity="0.3" />
+      <path d="M7 1.75A5.25 5.25 0 0112.25 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   )
 }
