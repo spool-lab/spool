@@ -64,12 +64,6 @@ body {
   user-select: none;
 }
 
-mark {
-  background: transparent;
-  color: inherit;
-  font-weight: 600;
-}
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }

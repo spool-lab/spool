@@ -204,7 +204,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         // then nudge the active mark itself into view.
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            activeFindMatchRef.current?.scrollIntoView({ block: 'nearest' })
+            activeFindMatchRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' })
           })
         })
         break

@@ -37,10 +37,13 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
 
   const estimateSize = useCallback((index: number) => {
     const m = messages[index]
-    if (!m) return 80
+    if (!m) return 120
     if (m.role === 'system') return 44
     const len = m.contentText?.length ?? 0
-    return Math.min(800, Math.max(80, Math.ceil(len / 60) * 22 + 64))
+    // Markdown adds ~30% height vs plain text; code blocks/lists/headings push
+    // further. Err on the over-estimate side — gaps close on measure, but
+    // under-estimates cause rows to land at colliding translateY values.
+    return Math.min(2400, Math.max(120, Math.ceil(len / 50) * 26 + 96))
   }, [messages])
 
   const virtualizer = useVirtualizer({

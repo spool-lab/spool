@@ -5,7 +5,11 @@ export interface FindMatchNode {
   value: string
   matchIndex: number
   isActive: boolean
-  data?: { hName: 'mark'; hProperties: { 'data-active': 'true' | 'false' } }
+  data?: {
+    hName: 'mark'
+    hProperties: { 'data-active': 'true' | 'false' }
+    hChildren: Array<{ type: 'text'; value: string }>
+  }
 }
 
 interface Options {
@@ -33,7 +37,11 @@ export const findHighlightPlugin = (options: Options): Transformer => {
         value,
         matchIndex: globalIndex,
         isActive,
-        data: { hName: 'mark', hProperties: { 'data-active': isActive ? 'true' : 'false' } },
+        data: {
+          hName: 'mark',
+          hProperties: { 'data-active': isActive ? 'true' : 'false' },
+          hChildren: [{ type: 'text', value }],
+        },
       }
     }
 

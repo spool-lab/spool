@@ -121,4 +121,21 @@ describe('findHighlightPlugin', () => {
     const matches = collectMatches(tree)
     expect(matches.map(m => m.value)).toEqual(['hello'])
   })
+
+  it('emits hChildren so <mark> renders with visible text after hast conversion', () => {
+    // Without data.hChildren, mdast-util-to-hast produces an empty <mark></mark>
+    // and the matched characters disappear from the rendered DOM.
+    const tree = buildTree('hello world', [{ start: 6, end: 11 }])
+    const findMatch = (node: any): any => {
+      if (node.type === 'findMatch') return node
+      if (node.children) for (const c of node.children) {
+        const found = findMatch(c)
+        if (found) return found
+      }
+      return null
+    }
+    const node = findMatch(tree)
+    expect(node).not.toBeNull()
+    expect(node.data?.hChildren).toEqual([{ type: 'text', value: 'world' }])
+  })
 })
