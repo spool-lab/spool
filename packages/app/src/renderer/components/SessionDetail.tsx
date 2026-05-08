@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SquareTerminal } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
-import MessageBubble, { type FindRange } from './MessageBubble.js'
+import { type FindRange } from './MessageBubble.js'
+import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
+import { useIsDark } from '../hooks/useIsDark.js'
+import { extractRenderedText } from '../markdown/extractRenderedText.js'
 
 type Props = {
   sessionUuid: string
@@ -29,11 +32,13 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [findResultNonce, setFindResultNonce] = useState(0)
   const [findQuery, setFindQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
-  const targetRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
   const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  const isDark = useIsDark()
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
+
   const {
     messageFindRanges,
     totalFindMatches,
@@ -41,12 +46,13 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     let offset = 0
     const rangesByMessage = new Map<number, { ranges: FindRange[]; offset: number }>()
 
+    // Only project markdown → rendered text when a query is active. For a 1500-message
+    // session this saves ~1500 remark.parse calls on session open.
     if (normalizedFindQuery) {
       for (const message of messages) {
-        const ranges = getFindRanges(
-          message.contentText || (message.role === 'system' ? '(summary)' : ''),
-          normalizedFindQuery,
-        )
+        const source = message.contentText || (message.role === 'system' ? '(summary)' : '')
+        const text = extractRenderedText(source)
+        const ranges = getFindRanges(text, normalizedFindQuery)
         if (ranges.length > 0) {
           rangesByMessage.set(message.id, { ranges, offset })
           offset += ranges.length
@@ -107,8 +113,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   }, [sessionUuid])
 
   useEffect(() => {
-    if (!loading && targetMessageId && targetRef.current) {
-      targetRef.current.scrollIntoView({ behavior: 'instant', block: 'center' })
+    if (!loading && targetMessageId) {
+      listRef.current?.scrollToMessageId(targetMessageId)
       setShowTargetHighlight(true)
       const timer = setTimeout(() => setShowTargetHighlight(false), 2000)
       return () => clearTimeout(timer)
@@ -191,8 +197,20 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   useEffect(() => {
     if (!showFindBar || totalFindMatches === 0) return
-    activeFindMatchRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' })
-  }, [showFindBar, activeMatchIndex, totalFindMatches])
+    for (const [messageId, state] of messageFindRanges) {
+      if (activeMatchIndex >= state.offset && activeMatchIndex < state.offset + state.ranges.length) {
+        listRef.current?.scrollToMessageId(messageId)
+        // Tall messages: row centering isn't enough — wait for the row to mount,
+        // then nudge the active mark itself into view.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            activeFindMatchRef.current?.scrollIntoView({ block: 'center', behavior: 'auto' })
+          })
+        })
+        break
+      }
+    }
+  }, [showFindBar, activeMatchIndex, totalFindMatches, messageFindRanges])
 
   const bindActiveFindMatch = useCallback((node: HTMLElement | null) => {
     activeFindMatchRef.current = node
@@ -343,45 +361,19 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       />
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto divide-y divide-warm-border/50 dark:divide-dark-border/50 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
-        {messages.map((msg) => {
-          const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
-          const containsActive = matchState != null
-            && activeMatchIndex >= matchState.offset
-            && activeMatchIndex < matchState.offset + matchState.ranges.length
-
-          return (
-          <div
-            key={msg.id}
-            ref={msg.id === targetMessageId ? targetRef : undefined}
-            {...(msg.id === targetMessageId ? { 'data-testid': 'target-message' } : {})}
-            {...(msg.id === targetMessageId && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
-            className={msg.id === targetMessageId
-              ? `transition-colors duration-700 ${showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''}`
-              : undefined}
-          >
-            <MessageBubble
-              message={msg}
-              findRanges={matchState?.ranges}
-              matchIndexOffset={matchState?.offset}
-              activeMatchIndex={containsActive ? activeMatchIndex : -1}
-              onActiveMatchRef={containsActive ? bindActiveFindMatch : undefined}
-            />
-          </div>
-          )
-        })}
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-warm-faint dark:text-dark-muted">
-            <p className="text-sm">No messages to display.</p>
-          </div>
-        )}
-      </div>
+      <MessageList
+        ref={listRef}
+        messages={messages}
+        isDark={isDark}
+        showFindBar={showFindBar}
+        messageFindRanges={messageFindRanges}
+        activeMatchIndex={activeMatchIndex}
+        onActiveMatchRef={bindActiveFindMatch}
+        targetMessageId={targetMessageId ?? null}
+        showTargetHighlight={showTargetHighlight}
+      />
     </div>
   )
-}
-
-function formatDate(iso: string): string {
-  try { return new Date(iso).toLocaleString() } catch { return iso }
 }
 
 function getFindRanges(text: string, normalizedQuery: string): FindRange[] {
