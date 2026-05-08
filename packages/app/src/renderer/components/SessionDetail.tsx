@@ -9,6 +9,7 @@ import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { useIsDark } from '../hooks/useIsDark.js'
+import { extractRenderedText } from '../markdown/extractRenderedText.js'
 
 type Props = {
   sessionUuid: string
@@ -36,6 +37,15 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const isDark = useIsDark()
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
+  const renderedTextByMessage = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const m of messages) {
+      const source = m.contentText || (m.role === 'system' ? '(summary)' : '')
+      map.set(m.id, extractRenderedText(source))
+    }
+    return map
+  }, [messages])
+
   const {
     messageFindRanges,
     totalFindMatches,
@@ -45,10 +55,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
     if (normalizedFindQuery) {
       for (const message of messages) {
-        const ranges = getFindRanges(
-          message.contentText || (message.role === 'system' ? '(summary)' : ''),
-          normalizedFindQuery,
-        )
+        const text = renderedTextByMessage.get(message.id) ?? ''
+        const ranges = getFindRanges(text, normalizedFindQuery)
         if (ranges.length > 0) {
           rangesByMessage.set(message.id, { ranges, offset })
           offset += ranges.length
@@ -60,7 +68,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       messageFindRanges: rangesByMessage,
       totalFindMatches: offset,
     }
-  }, [messages, normalizedFindQuery])
+  }, [messages, normalizedFindQuery, renderedTextByMessage])
 
   const activeMatchOrdinal = totalFindMatches > 0 ? activeMatchIndex + 1 : 0
 
