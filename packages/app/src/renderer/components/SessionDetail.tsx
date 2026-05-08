@@ -257,7 +257,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const resumeCommandAvailable = Boolean(session && getSessionResumeCommand(session.source, session.sessionUuid))
 
   return (
-    <div className="flex flex-col h-full" data-testid="session-detail">
+    <div className="relative flex flex-col h-full" data-testid="session-detail">
       {/* Session header */}
       <div className="flex-none flex items-start gap-3 px-6 pt-3 pb-3 border-b border-warm-border dark:border-dark-border">
         {onBack && (

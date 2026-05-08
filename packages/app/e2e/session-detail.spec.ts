@@ -117,7 +117,7 @@ test('find-in-page matches rendered text, not markdown source', async () => {
   await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
 
   await window.locator('[data-testid="session-find-input"]').fill('XYZMARKDOWN')
-  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/^\d+ \/ \d+$/)
+  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/^\d+ of \d+$/)
   await expect(window.locator('[data-testid="session-find-active-match"]')).toHaveCount(1)
 
   await window.locator('[data-testid="session-find-input"]').fill('**XYZMARKDOWN**')
@@ -145,7 +145,7 @@ test('handles 1500-message session: virtualization + deep find', async () => {
   const isMac = process.platform === 'darwin'
   await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
   await window.locator('[data-testid="session-find-input"]').fill('SPOOLDEEPMARKER')
-  await expect(window.locator('[data-testid="session-find-status"]')).toContainText('1 / 1', {
+  await expect(window.locator('[data-testid="session-find-status"]')).toContainText('1 of 1', {
     timeout: 5000,
   })
   await expect(window.locator('[data-testid="session-find-active-match"]')).toHaveCount(1)

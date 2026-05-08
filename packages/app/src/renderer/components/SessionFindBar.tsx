@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
 type Props = {
   visible: boolean
@@ -27,8 +28,9 @@ export default function SessionFindBar({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
-  const previousShortcutLabel = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘←' : 'Ctrl+←'
-  const nextShortcutLabel = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘→' : 'Ctrl+→'
+  const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  const previousShortcutLabel = isMacLike ? '⌘←' : 'Ctrl+←'
+  const nextShortcutLabel = isMacLike ? '⌘→' : 'Ctrl+→'
 
   const rememberSelection = useCallback((input: HTMLInputElement) => {
     const start = input.selectionStart ?? input.value.length
@@ -75,13 +77,16 @@ export default function SessionFindBar({
   const hasQuery = query.trim().length > 0
   const hasMatches = matches > 0
   const statusLabel = !hasQuery
-    ? 'Type to find in this session'
+    ? ''
     : hasMatches
-      ? `${activeMatchOrdinal} / ${matches}`
+      ? `${activeMatchOrdinal} of ${matches}`
       : 'No matches'
 
   return (
-    <div className="flex items-center gap-2 border-b border-warm-border dark:border-dark-border px-4 py-2 bg-warm-surface/70 dark:bg-dark-surface/70 backdrop-blur-sm">
+    <div
+      className="absolute top-8 right-4 z-20 flex items-center gap-0.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] pl-2 pr-1 py-0.5 w-[320px] animate-in fade-in transition-[border-color,box-shadow] focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 focus-within:shadow-[0_0_0_3px_rgba(200,90,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:focus-within:shadow-[0_0_0_3px_rgba(240,112,32,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
+      role="search"
+    >
       <input
         ref={inputRef}
         type="text"
@@ -108,44 +113,46 @@ export default function SessionFindBar({
           }
         }}
         placeholder="Find in session…"
-        className="min-w-0 flex-1 rounded-full border border-warm-border dark:border-dark-border bg-warm-bg/90 dark:bg-dark-bg px-3 py-1.5 text-sm text-warm-text dark:text-dark-text outline-none placeholder:text-warm-faint dark:placeholder:text-dark-muted transition-[border-color,box-shadow,background-color] focus:border-accent/45 dark:focus:border-accent-dark/55 focus:bg-white dark:focus:bg-dark-surface2 focus:shadow-[0_0_0_3px_rgba(200,90,0,0.08)] dark:focus:shadow-[0_0_0_3px_rgba(240,112,32,0.12)]"
+        className="flex-1 min-w-0 bg-transparent text-[13px] text-warm-text dark:text-dark-text outline-none placeholder:text-warm-faint dark:placeholder:text-dark-muted"
         autoComplete="off"
         spellCheck={false}
         data-testid="session-find-input"
       />
       <span
-        className="min-w-24 text-right text-xs text-warm-muted dark:text-dark-muted"
+        className="flex-none font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted whitespace-nowrap pl-1"
         data-testid="session-find-status"
       >
         {statusLabel}
       </span>
+      <div className="flex-none w-px h-4 bg-warm-border dark:bg-dark-border mx-0.5" />
       <button
         type="button"
         onClick={onPrevious}
         disabled={!hasQuery || !hasMatches}
-        className="rounded-full border border-warm-border dark:border-dark-border px-2 py-1 text-xs text-warm-muted dark:text-dark-muted transition-colors enabled:hover:text-warm-text enabled:hover:border-accent enabled:dark:hover:text-dark-text disabled:opacity-40"
+        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`Previous match (${previousShortcutLabel})`}
         title={`Previous match (${previousShortcutLabel})`}
       >
-        Prev
+        <ChevronUp size={12} strokeWidth={1.8} aria-hidden />
       </button>
       <button
         type="button"
         onClick={onNext}
         disabled={!hasQuery || !hasMatches}
-        className="rounded-full border border-warm-border dark:border-dark-border px-2 py-1 text-xs text-warm-muted dark:text-dark-muted transition-colors enabled:hover:text-warm-text enabled:hover:border-accent enabled:dark:hover:text-dark-text disabled:opacity-40"
+        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`Next match (${nextShortcutLabel})`}
         title={`Next match (${nextShortcutLabel})`}
       >
-        Next
+        <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
       </button>
       <button
         type="button"
         onClick={onClose}
-        className="rounded-full border border-warm-border dark:border-dark-border px-2 py-1 text-xs text-warm-muted dark:text-dark-muted transition-colors hover:text-warm-text hover:border-accent dark:hover:text-dark-text"
+        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors hover:bg-warm-surface hover:text-warm-text dark:hover:bg-dark-surface dark:hover:text-dark-text"
         aria-label="Close find in session"
+        title="Close (Esc)"
       >
-        Close
+        <X size={12} strokeWidth={1.8} aria-hidden />
       </button>
     </div>
   )

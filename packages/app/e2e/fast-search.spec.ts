@@ -172,7 +172,7 @@ test('session page supports cmd or ctrl + f find-in-page', async () => {
   await expect(findInput).toBeFocused()
   await findInput.type('_CANARY_42')
   await expect(findInput).toHaveValue('XYLOPHONE_CANARY_42')
-  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/\d+\s*\/\s*\d+/, { timeout: 5000 })
+  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/\d+\s+of\s+\d+/, { timeout: 5000 })
   await expect(window.locator('[data-testid="session-find-active-match"]').first()).toContainText('XYLOPHONE_CANARY_42')
 })
 
@@ -189,11 +189,11 @@ test('session find supports cmd or ctrl + arrow navigation', async () => {
   const status = window.locator('[data-testid="session-find-status"]')
 
   await findInput.fill('the')
-  await expect(status).toContainText(/1\s*\/\s*[2-9]\d*/, { timeout: 5000 })
+  await expect(status).toContainText(/1\s+of\s+[2-9]\d*/, { timeout: 5000 })
 
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowRight' : 'Control+ArrowRight')
-  await expect(status).toContainText(/2\s*\/\s*[2-9]\d*/, { timeout: 5000 })
+  await expect(status).toContainText(/2\s+of\s+[2-9]\d*/, { timeout: 5000 })
 
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowLeft' : 'Control+ArrowLeft')
-  await expect(status).toContainText(/1\s*\/\s*[2-9]\d*/, { timeout: 5000 })
+  await expect(status).toContainText(/1\s+of\s+[2-9]\d*/, { timeout: 5000 })
 })
