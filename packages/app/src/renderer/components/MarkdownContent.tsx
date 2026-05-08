@@ -65,7 +65,7 @@ function MarkdownContent({
       // Find-highlight has split the code block into mixed text + <mark> nodes.
       // Render plainly so the highlights survive; sacrifice shiki for this one block.
       return (
-        <pre className="my-2 p-3 rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface text-[12.5px] leading-snug font-mono">
+        <pre className="my-2 p-3 rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface text-[13px] leading-snug font-mono">
           <code>{codeChildren}</code>
         </pre>
       )
@@ -86,8 +86,7 @@ function MarkdownContent({
         <mark
           ref={isActive ? onActiveMatchRef : undefined}
           data-testid={isActive ? 'session-find-active-match' : undefined}
-          className="font-semibold bg-transparent"
-          style={{ color: 'var(--color-accent)' }}
+          className="font-semibold bg-transparent text-accent dark:text-accent-dark"
         >
           {children}
         </mark>

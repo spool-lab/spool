@@ -104,7 +104,7 @@ function CodeBlock({ code, lang, isDark }: Props) {
     // measureElement uses ResizeObserver, so the virtual list re-measures automatically.
     return (
       <div
-        className="my-2 text-[12.5px] leading-snug rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface [&_pre]:!bg-transparent [&_pre]:p-3"
+        className="my-2 text-[13px] leading-snug rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface [&_pre]:!bg-transparent [&_pre]:p-3"
         // shiki output is generated from a known string; not user HTML.
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: html }}
@@ -114,7 +114,7 @@ function CodeBlock({ code, lang, isDark }: Props) {
 
   return (
     <pre
-      className="my-2 p-3 rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface text-[12.5px] leading-snug font-mono"
+      className="my-2 p-3 rounded-md overflow-x-auto bg-warm-surface dark:bg-dark-surface text-[13px] leading-snug font-mono"
       style={{ minHeight: `${reservedLines * 1.4}em` }}
     >
       <code>{code}</code>

@@ -38,14 +38,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const isDark = useIsDark()
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
-  const renderedTextByMessage = useMemo(() => {
-    const map = new Map<number, string>()
-    for (const m of messages) {
-      const source = m.contentText || (m.role === 'system' ? '(summary)' : '')
-      map.set(m.id, extractRenderedText(source))
-    }
-    return map
-  }, [messages])
 
   const {
     messageFindRanges,
@@ -54,9 +46,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     let offset = 0
     const rangesByMessage = new Map<number, { ranges: FindRange[]; offset: number }>()
 
+    // Only project markdown → rendered text when a query is active. For a 1500-message
+    // session this saves ~1500 remark.parse calls on session open.
     if (normalizedFindQuery) {
       for (const message of messages) {
-        const text = renderedTextByMessage.get(message.id) ?? ''
+        const source = message.contentText || (message.role === 'system' ? '(summary)' : '')
+        const text = extractRenderedText(source)
         const ranges = getFindRanges(text, normalizedFindQuery)
         if (ranges.length > 0) {
           rangesByMessage.set(message.id, { ranges, offset })
@@ -69,7 +64,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       messageFindRanges: rangesByMessage,
       totalFindMatches: offset,
     }
-  }, [messages, normalizedFindQuery, renderedTextByMessage])
+  }, [messages, normalizedFindQuery])
 
   const activeMatchOrdinal = totalFindMatches > 0 ? activeMatchIndex + 1 : 0
 
