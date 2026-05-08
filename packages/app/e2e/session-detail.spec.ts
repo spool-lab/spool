@@ -117,7 +117,7 @@ test('find-in-page matches rendered text, not markdown source', async () => {
   await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
 
   await window.locator('[data-testid="session-find-input"]').fill('XYZMARKDOWN')
-  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/^\d+ \/ \d+$/)
+  await expect(window.locator('[data-testid="session-find-status"]')).toContainText(/^\d+ of \d+$/)
   await expect(window.locator('[data-testid="session-find-active-match"]')).toHaveCount(1)
 
   await window.locator('[data-testid="session-find-input"]').fill('**XYZMARKDOWN**')
