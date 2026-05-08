@@ -8,6 +8,7 @@ import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
+import { useIsDark } from '../hooks/useIsDark.js'
 
 type Props = {
   sessionUuid: string
@@ -32,6 +33,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const targetRef = useRef<HTMLDivElement | null>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
   const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  const isDark = useIsDark()
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
   const {
@@ -362,10 +364,10 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           >
             <MessageBubble
               message={msg}
-              findRanges={matchState?.ranges}
-              matchIndexOffset={matchState?.offset}
+              isDark={isDark}
+              {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
               activeMatchIndex={containsActive ? activeMatchIndex : -1}
-              onActiveMatchRef={containsActive ? bindActiveFindMatch : undefined}
+              {...(containsActive ? { onActiveMatchRef: bindActiveFindMatch } : {})}
             />
           </div>
           )
@@ -378,10 +380,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       </div>
     </div>
   )
-}
-
-function formatDate(iso: string): string {
-  try { return new Date(iso).toLocaleString() } catch { return iso }
 }
 
 function getFindRanges(text: string, normalizedQuery: string): FindRange[] {
