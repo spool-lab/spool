@@ -133,13 +133,20 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
   }
 }
 
+// Slash-command records in Claude Code JSONL come as a triplet:
+//   <command-name>/X</command-name>
+//   <command-message>X</command-message>
+//   <command-args>Y</command-args>
+// Strip the whole record as one unit so bare <command-args> appearing in
+// legitimate user content (e.g. a user pasting log output that contains
+// these tags) is preserved.
+const SLASH_COMMAND_RECORD = /<command-name>[\s\S]*?<\/command-name>(?:\s*<command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?<\/command-args>)?/g
+
 function extractText(content: unknown): string {
   if (typeof content === 'string') {
     return content
       .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
-      .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
-      .replace(/<command-name>[\s\S]*?<\/command-name>/g, '')
-      .replace(/<command-args>[\s\S]*?<\/command-args>/g, '')
+      .replace(SLASH_COMMAND_RECORD, '')
       .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
       .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
       .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')

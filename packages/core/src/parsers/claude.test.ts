@@ -70,6 +70,18 @@ describe('parseClaudeSession', () => {
     }
   })
 
+  it('preserves bare <command-args> content when not part of a slash-command triplet', () => {
+    // If a user pastes log/code containing <command-args> outside the slash-
+    // command triplet, the inner content must survive. Only the triplet form
+    // (starting with <command-name>) gets stripped wholesale.
+    const fp = writeTmpSession([
+      baseRecord({ type: 'user', uuid: 'u1', message: { role: 'user', content: 'I saw <command-args>weird-payload</command-args> in the logs, what does it mean?' } }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'It means...', model: 'claude-opus-4-6' } }),
+    ])
+    const result = parseClaudeSession(fp)
+    expect(result?.title).toBe('I saw weird-payload in the logs, what does it mean?')
+  })
+
   it('strips spool-system-prelude marker from user message and uses what follows as title', () => {
     // Reproduces what acp.ts buildPrompt sends: a prelude block wrapping the
     // system instructions, with the user's bare query at the end.
