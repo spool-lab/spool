@@ -38,23 +38,16 @@ export function getSourceId(db: Database.Database, name: SessionSource): number 
  * Get/create the virtual "Asks" project that holds Spool-authored agent-search
  * sessions. One per source so each agent's sessions stay grouped under their
  * own row in project_groups_v (joined by identity for cross-source grouping).
- *
- * Self-healing on display_name: getOrCreateProject only inserts new rows and
- * never updates existing ones, so any DB that already has the project from a
- * prior release with a stale display_name (e.g. "Ask" from a pre-rename
- * snapshot) gets its label refreshed here.
  */
 export function getOrCreateAskProject(db: Database.Database, source: SessionSource): number {
   const sourceId = getSourceId(db, source)
-  const id = getOrCreateProject(
+  return getOrCreateProject(
     db, sourceId,
     '__spool_ask__',
     '<spool:ask>',
     'Asks',
     { identityKind: 'spool_internal', identityKey: 'ask' },
   )
-  db.prepare(`UPDATE projects SET display_name = 'Asks' WHERE id = ? AND display_name != 'Asks'`).run(id)
-  return id
 }
 
 /**

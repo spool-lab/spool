@@ -131,18 +131,6 @@ describe('getOrCreateAskProject', () => {
     expect(claudeAsk).not.toBe(codexAsk)
   })
 
-  it('refreshes a stale display_name on existing rows (self-healing rename)', () => {
-    // Simulates a DB that has the project from an earlier snapshot with a
-    // pre-rename label.
-    db.prepare(`
-      INSERT INTO projects (source_id, slug, display_path, display_name, identity_kind, identity_key)
-      VALUES (1, '__spool_ask__', '<spool:ask>', 'Ask', 'spool_internal', 'ask')
-    `).run()
-    const id = getOrCreateAskProject(db, 'claude')
-    const row = db.prepare(`SELECT display_name FROM projects WHERE id = ?`).get(id) as { display_name: string }
-    expect(row.display_name).toBe('Asks')
-  })
-
   it('groups all per-source Ask projects under one identity in project_groups_v', () => {
     getOrCreateAskProject(db, 'claude')
     getOrCreateAskProject(db, 'codex')
