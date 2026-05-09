@@ -117,6 +117,32 @@ describe('migration v8 (title_source column)', () => {
     db.close()
   })
 
+  it('repairs DBs where user_version was bumped to 8 but title_source column is missing', async () => {
+    // Simulates a DB that ran experimental code which bumped user_version to 8
+    // but never ran the column-add (or crashed mid-migration). The version
+    // guard alone would skip the ALTER and leave the schema broken; the
+    // unconditional schema-sanity check at the end of runMigrations repairs it.
+    const spoolDir = makeTempDir('spool-v8-repair-')
+    const dbPath = join(spoolDir, 'spool.db')
+    seedV7(dbPath)
+    const seed = new Database(dbPath)
+    seed.pragma('user_version = 8')  // bump but don't add the column
+    seed.close()
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
+    vi.resetModules()
+    const dbModule = await import('./db.js')
+    const db = dbModule.getDB()
+
+    const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>
+    expect(cols.map(c => c.name)).toContain('title_source')
+
+    const row = db.prepare('SELECT title_source FROM sessions WHERE session_uuid = ?').get('sess-a') as { title_source: string }
+    expect(row.title_source).toBe('derived')
+
+    db.close()
+  })
+
   it('fresh install creates sessions table with title_source column', async () => {
     const spoolDir = makeTempDir('spool-v8-fresh-')
     vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
