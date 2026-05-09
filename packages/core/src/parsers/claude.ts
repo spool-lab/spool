@@ -136,9 +136,12 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
 function extractText(content: unknown): string {
   if (typeof content === 'string') {
     return content
+      .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
       .replace(/<command-message>[\s\S]*?<\/command-message>/g, '')
       .replace(/<command-name>[\s\S]*?<\/command-name>/g, '')
+      .replace(/<command-args>[\s\S]*?<\/command-args>/g, '')
       .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
+      .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
       .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
       .replace(/<[^>]+>/g, '')
       .trim()

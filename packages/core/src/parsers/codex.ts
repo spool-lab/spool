@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import type { ParseSessionResult, ParsedSession, ParsedMessage } from '../types.js'
+import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
 interface CodexRecord {
   timestamp: string
@@ -65,7 +66,7 @@ export function loadCodexSession(filePath: string): ParseSessionResult {
     if (type === 'event_msg' && payload) {
       const msgType = payload['type'] as string | undefined
       if (msgType === 'user_message' && payload['message']) {
-        const text = String(payload['message']).trim()
+        const text = stripSpoolSystemPrelude(String(payload['message']))
         if (looksLikeInternalCodexAssessment(text)) {
           isInternalAssessmentSession = true
           continue
