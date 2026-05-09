@@ -47,6 +47,7 @@ export default function SearchOverlay({
   const [activeIndex, setActiveIndex] = useState(0)
   const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const seqRef = useRef(0)
 
   const showRecents = !query.trim()
@@ -54,6 +55,11 @@ export default function SearchOverlay({
   const flatRecents = useMemo(() => buckets.flatMap(b => b.sessions), [buckets])
 
   useEffect(() => { setActiveIndex(0) }, [showRecents, scope])
+
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, showRecents, results.length, flatRecents.length])
 
   useEffect(() => {
     if (open) {
@@ -212,7 +218,7 @@ export default function SearchOverlay({
           )}
         </div>
 
-        <div className="min-h-[220px] max-h-[min(420px,55vh)] overflow-y-auto">
+        <div ref={listRef} className="min-h-[220px] max-h-[min(420px,55vh)] overflow-y-auto">
           {showRecents ? (
             flatRecents.length === 0 ? (
               <div className="min-h-[220px] flex items-center justify-center px-4 text-center text-sm text-warm-faint dark:text-dark-muted">
@@ -298,31 +304,52 @@ export default function SearchOverlay({
           )}
         </div>
 
-        {showRecents && flatRecents.length > 0 ? (
-          <div className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-end text-warm-faint dark:text-dark-muted">
-            <span>{flatRecents.length} recent {flatRecents.length === 1 ? 'session' : 'sessions'}</span>
+        <div className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-between text-warm-faint dark:text-dark-muted gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {(showRecents ? flatRecents.length > 0 : results.length > 0) && (
+              <>
+                <Hint keys={['↑', '↓']} label="navigate" />
+                <Hint keys={['↵']} label={mode === 'ai' ? 'ask' : 'open'} />
+              </>
+            )}
+            {!showRecents && results.length > 0 && mode !== 'ai' && (
+              <Hint keys={['⇧', '↵']} label="view all" />
+            )}
+            <Hint keys={['esc']} label="close" />
           </div>
-        ) : results.length > 0 && (
-          <button
-            type="button"
-            data-testid="search-overlay-view-all"
-            onClick={() => { if (query.trim()) onCommit(query) }}
-            className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-between text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-          >
-            <span className="flex items-center gap-1.5">
-              <span>View all results</span>
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden>
-                <path d="M3 2.5L6 5L3 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <span className="flex items-center gap-2">
-              <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">⇧↵</kbd>
-              <span className="text-warm-faint">{results.length} results</span>
-            </span>
-          </button>
-        )}
+          <div className="flex-none">
+            {showRecents && flatRecents.length > 0 ? (
+              <span>{flatRecents.length} recent {flatRecents.length === 1 ? 'session' : 'sessions'}</span>
+            ) : results.length > 0 ? (
+              <button
+                type="button"
+                data-testid="search-overlay-view-all"
+                onClick={() => { if (query.trim()) onCommit(query) }}
+                className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              >
+                {results.length} results →
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
+  )
+}
+
+function Hint({ keys, label }: { keys: string[]; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      {keys.map((k, i) => (
+        <kbd
+          key={i}
+          className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted"
+        >
+          {k}
+        </kbd>
+      ))}
+      <span>{label}</span>
+    </span>
   )
 }
 
