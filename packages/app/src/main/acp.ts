@@ -168,11 +168,11 @@ const AGENTS_CONFIG_PATH = join(homedir(), '.spool', 'agents.json')
  * each agent writes downstream in a known, recognizable location and prevents
  * polluting unrelated projects in the library.
  */
-const SPOOL_AGENT_CWD = join(homedir(), '.spool', 'agent-sessions')
+const SPOOL_AGENT_SEARCH_CWD = join(homedir(), '.spool', 'agent-search-sessions')
 
-function ensureSpoolAgentCwd(): string {
-  mkdirSync(SPOOL_AGENT_CWD, { recursive: true })
-  return SPOOL_AGENT_CWD
+function ensureAgentSearchCwd(): string {
+  mkdirSync(SPOOL_AGENT_SEARCH_CWD, { recursive: true })
+  return SPOOL_AGENT_SEARCH_CWD
 }
 
 /**
@@ -550,9 +550,9 @@ export class AcpManager {
       // Step 2: New session
       // Use a stable, dedicated cwd so JSONL output from each agent lands in
       // a recognizable downstream slug (e.g. ~/.claude/projects/-Users-...-
-      // spool-agent-sessions/) rather than scattering across whatever directory
-      // Electron happens to be running from.
-      const stableCwd = ensureSpoolAgentCwd()
+      // spool-agent-search-sessions/) rather than scattering across whatever
+      // directory Electron happens to be running from.
+      const stableCwd = ensureAgentSearchCwd()
       const sessionResp = await conn.newSession({
         cwd: stableCwd,
         mcpServers: [],

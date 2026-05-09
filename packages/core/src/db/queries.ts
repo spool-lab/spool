@@ -35,7 +35,7 @@ export function getSourceId(db: Database.Database, name: SessionSource): number 
 }
 
 /**
- * Get/create the virtual "Ask" project that holds Spool-authored agent-search
+ * Get/create the virtual "Asks" project that holds Spool-authored agent-search
  * sessions. One per source so each agent's sessions stay grouped under their
  * own row in project_groups_v (joined by identity for cross-source grouping).
  */
@@ -45,7 +45,7 @@ export function getOrCreateAskProject(db: Database.Database, source: SessionSour
     db, sourceId,
     '__spool_ask__',
     '<spool:ask>',
-    'Ask',
+    'Asks',
     { identityKind: 'spool_internal', identityKey: 'ask' },
   )
 }
