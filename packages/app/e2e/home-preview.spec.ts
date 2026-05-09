@@ -59,3 +59,58 @@ test('clicking an overlay result jumps to message with flash highlight', async (
   await expect(target).toBeVisible({ timeout: 5000 })
   await expect(target).toHaveAttribute('data-highlighted', '1')
 })
+
+test('overlay footer shows keyboard hints', async () => {
+  const overlay = ctx.window.locator('[data-testid="search-overlay"]')
+  if (!(await overlay.isVisible().catch(() => false))) {
+    await ctx.window.locator('[data-testid="search-trigger"]').first().click()
+  }
+  await expect(overlay).toBeVisible({ timeout: 3000 })
+
+  // Recents state: navigate + open + close hints
+  await expect(overlay.getByText('navigate')).toBeVisible()
+  await expect(overlay.getByText('open', { exact: true })).toBeVisible()
+  await expect(overlay.getByText('close')).toBeVisible()
+
+  // Typing a query that yields results adds the "view all" hint
+  await ctx.window.locator('[data-testid="search-overlay-input"]').fill('XYLOPHONE_CANARY_42')
+  await expect(overlay.locator('[role="option"]').first()).toBeVisible({ timeout: 5000 })
+  await expect(overlay.getByText('view all')).toBeVisible()
+
+  await closeOverlay(ctx)
+})
+
+test('arrow-down navigation keeps the active item in view at the bottom', async () => {
+  const overlay = ctx.window.locator('[data-testid="search-overlay"]')
+  if (!(await overlay.isVisible().catch(() => false))) {
+    await ctx.window.locator('[data-testid="search-trigger"]').first().click()
+  }
+  await expect(overlay).toBeVisible({ timeout: 3000 })
+
+  const input = ctx.window.locator('[data-testid="search-overlay-input"]')
+  await expect(input).toBeFocused()
+
+  // Recents list — press Down to the last option, then verify it is in viewport
+  // (i.e. the scroll container scrolled to follow the active item).
+  const options = overlay.locator('[role="option"]')
+  const count = await options.count()
+  expect(count).toBeGreaterThan(0)
+
+  for (let i = 0; i < count + 5; i++) {
+    await ctx.window.keyboard.press('ArrowDown')
+  }
+
+  const last = options.nth(count - 1)
+  await expect(last).toHaveAttribute('aria-selected', 'true')
+  await expect(last).toBeInViewport()
+
+  // ArrowUp back to the top should also keep the active item in view.
+  for (let i = 0; i < count + 5; i++) {
+    await ctx.window.keyboard.press('ArrowUp')
+  }
+  const first = options.first()
+  await expect(first).toHaveAttribute('aria-selected', 'true')
+  await expect(first).toBeInViewport()
+
+  await closeOverlay(ctx)
+})
