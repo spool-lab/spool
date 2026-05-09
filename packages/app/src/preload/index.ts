@@ -124,6 +124,12 @@ const api = {
     return () => ipcRenderer.removeListener('spool:ai-tool-call', handler)
   },
 
+  onAiSessionStarted: (cb: (data: { sessionUuid: string; source: string; cwd: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { sessionUuid: string; source: string; cwd: string })
+    ipcRenderer.on('spool:ai-session-started', handler)
+    return () => ipcRenderer.removeListener('spool:ai-session-started', handler)
+  },
+
   onSyncProgress: (cb: (e: { phase: string; count: number; total: number }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { phase: string; count: number; total: number })
     ipcRenderer.on('spool:sync-progress', handler)

@@ -281,6 +281,7 @@ export class AcpManager {
     _context: FragmentResult[],
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
+    onSessionStarted?: (info: { sessionUuid: string; source: SessionSource; cwd: string }) => void,
   ): Promise<string> {
     const agents = await this.detectAgents()
     const agent = agents.find(a => a.id === agentId)
@@ -298,7 +299,7 @@ export class AcpManager {
     if (config.acpMode === 'websocket') {
       return this.queryViaWebSocket(config, prompt, onChunk, onToolCall)
     }
-    return this.queryViaAcp(agentId, config, prompt, onChunk, onToolCall, userQuery)
+    return this.queryViaAcp(agentId, config, prompt, onChunk, onToolCall, userQuery, onSessionStarted)
   }
 
   /**
@@ -315,6 +316,7 @@ export class AcpManager {
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
     userQuery?: string,
+    onSessionStarted?: (info: { sessionUuid: string; source: SessionSource; cwd: string }) => void,
   ): Promise<string> {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
@@ -578,6 +580,7 @@ export class AcpManager {
             title: userQuery,
             cwd: stableCwd,
           })
+          onSessionStarted?.({ sessionUuid: sessionId, source, cwd: stableCwd })
         } catch (e) {
           console.error('[acp] failed to record Spool-authored session:', e)
         }

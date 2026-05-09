@@ -64,6 +64,7 @@ export default function App() {
   const [aiAgent, setAiAgent] = useState('claude')
   const [availableAgents, setAvailableAgents] = useState<AgentInfo[]>([])
   const [aiToolCalls, setAiToolCalls] = useState<Map<string, { title: string; status: string; kind?: string | undefined }>>(new Map())
+  const [aiSession, setAiSession] = useState<{ sessionUuid: string; source: string; cwd: string } | null>(null)
   const aiAnswerRef = useRef('')
 
   // Settings & modals
@@ -203,7 +204,10 @@ export default function App() {
         return next
       })
     })
-    return () => { offChunk(); offDone(); offToolCall?.() }
+    const offSession = window.spool.onAiSessionStarted?.((info) => {
+      setAiSession(info)
+    })
+    return () => { offChunk(); offDone(); offToolCall?.(); offSession?.() }
   }, [])
 
   useEffect(() => {
@@ -296,6 +300,7 @@ export default function App() {
     setAiError(null)
     setAiStreaming(true)
     setAiToolCalls(new Map())
+    setAiSession(null)
 
     window.spool.aiSearch(q, aiAgent, fragmentContext).catch((err) => {
       setAiError(String(err))
@@ -571,6 +576,11 @@ export default function App() {
                       sources={fragmentSources}
                       error={aiError}
                       toolCalls={aiToolCalls}
+                      {...(aiSession ? {
+                        onResume: () => {
+                          void window.spool.resumeCLI(aiSession.sessionUuid, aiSession.source, aiSession.cwd)
+                        },
+                      } : {})}
                     />
                   )}
                   {searchMode === 'ai' && fragmentSources.length > 0 && (aiAnswer || aiStreaming) && (
