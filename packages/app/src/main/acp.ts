@@ -10,6 +10,7 @@ import {
   getOrCreateAskProject,
   getSourceId,
   insertSpoolAuthoredSession,
+  wrapSpoolSystemPrelude,
   type FragmentResult,
   type SessionSource,
 } from '@spool-lab/core'
@@ -820,7 +821,12 @@ export class AcpManager {
    * and lets it decide how to query the knowledge base.
    */
   private buildPrompt(userQuery: string): string {
-    return [
+    // System instructions are wrapped in a <spool-system-prelude> marker so
+    // the parsers (claude/codex/gemini) can strip them when indexing the
+    // on-disk JSONL. The user's actual query is sent OUTSIDE the marker, so
+    // after stripping the prelude only the bare query remains as the first
+    // user message — clean derived title, clean FTS, clean session detail.
+    const systemBody = [
       'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI).',
       '',
       'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
@@ -852,7 +858,8 @@ export class AcpManager {
       '- If only some requested sources matched, say which sources matched and which did not.',
       '- ALWAYS reply in the same language as the user\'s query.',
       '',
-      `User query: "${userQuery}"`,
+      'The text following this block (outside the prelude marker) is the user\'s actual query — respond to it directly.',
     ].join('\n')
+    return wrapSpoolSystemPrelude(systemBody, userQuery)
   }
 }

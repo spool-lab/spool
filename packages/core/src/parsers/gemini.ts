@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
+import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
 interface GeminiToolCall {
   name?: string
@@ -104,14 +105,14 @@ function toParsedRole(type: string): ParsedMessage['role'] {
 }
 
 function extractText(content: unknown): string {
-  if (typeof content === 'string') return content.trim()
+  if (typeof content === 'string') return stripSpoolSystemPrelude(content)
   if (content && typeof content === 'object' && !Array.isArray(content)) {
     const text = (content as Record<string, unknown>)['text']
-    return typeof text === 'string' ? text.trim() : ''
+    return typeof text === 'string' ? stripSpoolSystemPrelude(text) : ''
   }
   if (!Array.isArray(content)) return ''
 
-  return content
+  return stripSpoolSystemPrelude(content
     .map(item => {
       if (typeof item === 'string') return item
       if (!item || typeof item !== 'object') return ''
@@ -119,8 +120,7 @@ function extractText(content: unknown): string {
       return typeof text === 'string' ? text : ''
     })
     .filter(Boolean)
-    .join('\n')
-    .trim()
+    .join('\n'))
 }
 
 function extractToolNames(toolCalls: unknown): string[] {
