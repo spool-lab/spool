@@ -23,7 +23,6 @@
     "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
     "test": "pnpm run rebuild:native && vitest run",
-    "migrate:agent-search-cleanup": "pnpm run rebuild:native:node && pnpm run build && node ./dist/migrations/agent-search-cleanup-cli.js",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"
   },

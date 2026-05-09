@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { computeIdentity, type IdentityFs } from '../projects/identity.js'
 import { realFs } from '../projects/fs.js'
+import { runAgentSearchCleanup } from '../migrations/agent-search-cleanup.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -391,12 +392,26 @@ export function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 8')
   }
 
-  // Schema sanity: re-check critical columns that should be present at the
-  // current schema version, regardless of user_version. Repairs DBs where a
-  // version pragma was bumped (by experimental code, a manual upgrade, or a
-  // half-finished migration) without the corresponding column being added.
-  // Each check is a fast no-op when the column already exists.
+  // Schema sanity runs BEFORE any data migration that depends on these
+  // columns. Repairs DBs where a version pragma was bumped (by experimental
+  // code, a manual upgrade, or a half-finished migration) without the
+  // corresponding column being added. Each check is a fast no-op when the
+  // column already exists.
   ensureSchemaSanity(db)
+
+  if (version < 9) {
+    // v9: one-time data cleanup of historical agent-search sessions indexed
+    // before #150-#153. Detection is gated on the Spool buildPrompt blob in
+    // a user message (Spool-unique signal) so it can never sweep up real
+    // coding sessions whose first message happened to be Claude Code's
+    // injected <local-command-caveat>. See migrations/agent-search-cleanup.ts
+    // for the full rationale.
+    backupBeforeDestructive(db, 8)
+    db.transaction(() => {
+      runAgentSearchCleanup(db)
+    })()
+    db.pragma('user_version = 9')
+  }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
@@ -434,9 +449,15 @@ function columnExists(db: Database.Database, table: string, column: string): boo
 }
 
 function ensureSchemaSanity(db: Database.Database): void {
-  if (!columnExists(db, 'sessions', 'title_source')) {
-    db.exec(`ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'derived'`)
+  // Backfill columns the head schema requires but historical DBs (or test
+  // fixtures that seed an intentionally-minimal table) may be missing.
+  // Each ALTER is a fast no-op when the column already exists.
+  const ensureCol = (col: string, ddl: string): void => {
+    if (!columnExists(db, 'sessions', col)) db.exec(`ALTER TABLE sessions ADD COLUMN ${col} ${ddl}`)
   }
+  ensureCol('title', 'TEXT')
+  ensureCol('title_source', `TEXT NOT NULL DEFAULT 'derived'`)
+  ensureCol('message_count', 'INTEGER NOT NULL DEFAULT 0')
 }
 
 /**
