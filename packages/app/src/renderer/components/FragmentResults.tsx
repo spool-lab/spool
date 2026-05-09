@@ -136,38 +136,36 @@ function FragmentRow({
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatRelativeDate(result.startedAt)
   const project = result.project.split('/').pop() ?? result.project
+  const title = result.sessionTitle?.trim() || '(untitled session)'
 
   return (
     <div
       data-testid="fragment-row"
-      className="px-6 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className="group relative px-6 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors cursor-pointer"
+      onClick={() => onOpenSession(result.sessionUuid, result.messageId)}
     >
-      <div
-        className="cursor-pointer"
-        onClick={() => onOpenSession(result.sessionUuid, result.messageId)}
-      >
-        <div className="flex items-center gap-2 mb-1.5">
-          <SourceBadge source={result.source} />
-          <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-            You discussed this · {project}
-            {result.profileLabel && <span> · {result.profileLabel}</span>}
-            {result.matchCount > 1 && <span data-testid="match-count"> · {result.matchCount} matches</span>}
-          </span>
-          <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        </div>
-
-        <p
-          className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
-          onClick={(e) => e.stopPropagation()}
-          dangerouslySetInnerHTML={{ __html: snippet }}
-        />
-
-        <p className="text-xs text-warm-faint dark:text-dark-muted mt-1 truncate">
-          {result.sessionTitle}
-        </p>
+      <div className="flex items-center gap-2 mb-1">
+        <SourceBadge source={result.source} />
+        <h3 className="text-sm font-medium text-warm-text dark:text-dark-text truncate flex-1 min-w-0">
+          {title}
+        </h3>
+        <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
+        <ContinueActions result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
       </div>
 
-      <ContinueActions result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
+      <div className="text-xs text-warm-muted dark:text-dark-muted mb-1.5 truncate">
+        {project}
+        {result.profileLabel && <span> · {result.profileLabel}</span>}
+        {result.matchCount > 1 && (
+          <span data-testid="match-count"> · {result.matchCount} matches</span>
+        )}
+      </div>
+
+      <p
+        className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
+        onClick={(e) => e.stopPropagation()}
+        dangerouslySetInnerHTML={{ __html: snippet }}
+      />
     </div>
   )
 }

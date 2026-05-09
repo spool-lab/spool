@@ -42,8 +42,9 @@ test('search result shows session metadata', async () => {
   const { window } = ctx
 
   const row = window.locator('[data-testid="fragment-row"]').first()
-  await expect(row).toContainText('You discussed this')
-  await expect(row.locator('text=claude')).toBeVisible()
+  await expect(row.locator('[data-testid="source-badge"]')).toBeVisible()
+  await row.hover()
+  await expect(row.getByRole('button', { name: 'More actions' })).toBeVisible()
 })
 
 test('search for different canary finds separate session', async () => {
@@ -74,11 +75,11 @@ test('codex search results expose resume-related actions', async () => {
   await expect(row).toBeVisible({ timeout: 5000 })
   await expect(row.locator('[data-testid="source-badge"][data-source="codex"]')).toBeVisible()
 
-  const copyCommand = row.getByRole('button', { name: 'Copy Command' })
-  await expect(copyCommand).toBeVisible()
-
-  const resumeInCli = row.getByRole('button', { name: 'Resume in CLI' })
-  await expect(resumeInCli).toBeVisible()
+  await row.hover()
+  await row.getByRole('button', { name: 'More actions' }).click()
+  await expect(window.getByRole('menuitem', { name: 'Open in Terminal' })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: 'Copy resume command' })).toBeVisible()
+  await window.keyboard.press('Escape')
 })
 
 test('gemini search results expose resume-related actions', async () => {
@@ -90,11 +91,11 @@ test('gemini search results expose resume-related actions', async () => {
   await expect(row).toBeVisible({ timeout: 5000 })
   await expect(row.locator('[data-testid="source-badge"][data-source="gemini"]')).toBeVisible()
 
-  const copyCommand = row.getByRole('button', { name: 'Copy Command' })
-  await expect(copyCommand).toBeVisible()
-
-  const resumeInCli = row.getByRole('button', { name: 'Resume in CLI' })
-  await expect(resumeInCli).toBeVisible()
+  await row.hover()
+  await row.getByRole('button', { name: 'More actions' }).click()
+  await expect(window.getByRole('menuitem', { name: 'Open in Terminal' })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: 'Copy resume command' })).toBeVisible()
+  await window.keyboard.press('Escape')
 })
 
 test('whitespace-separated terms narrow shared PR number matches', async () => {
