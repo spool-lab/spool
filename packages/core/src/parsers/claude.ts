@@ -143,21 +143,24 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
 const SLASH_COMMAND_RECORD = /<command-name>[\s\S]*?<\/command-name>(?:\s*<command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?<\/command-args>)?/g
 
 function extractText(content: unknown): string {
+  let raw: string
   if (typeof content === 'string') {
-    return content
-      .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
-      .replace(SLASH_COMMAND_RECORD, '')
-      .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
-      .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
-      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
-      .replace(/<[^>]+>/g, '')
-      .trim()
+    raw = content
+  } else if (Array.isArray(content)) {
+    raw = (content as ContentItem[])
+      .filter(item => item.type === 'text')
+      .map(item => item.text ?? '')
+      .join('\n')
+  } else {
+    return ''
   }
-  if (!Array.isArray(content)) return ''
-  return (content as ContentItem[])
-    .filter(item => item.type === 'text')
-    .map(item => item.text ?? '')
-    .join('\n')
+  return raw
+    .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
+    .replace(SLASH_COMMAND_RECORD, '')
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .replace(/<[^>]+>/g, '')
     .trim()
 }
 

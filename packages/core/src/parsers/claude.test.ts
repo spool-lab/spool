@@ -92,4 +92,19 @@ describe('parseClaudeSession', () => {
     const result = parseClaudeSession(fp)
     expect(result?.title).toBe('what did I do today?')
   })
+
+  it('strips marker tags when content is array-of-text-blocks (the actual ACP wire format)', () => {
+    // Claude Code persists ACP prompt input as an array of content blocks:
+    //   message.content = [{ type: 'text', text: '<spool-system-prelude>...' }]
+    // The strip rules must apply to this shape, not just bare strings — this
+    // is the form actually written to JSONL when Spool spawns Claude via ACP.
+    const fp = writeTmpSession([
+      baseRecord({ type: 'user', uuid: 'u1', message: { role: 'user', content: [
+        { type: 'text', text: '<spool-system-prelude>\nlong system body\n</spool-system-prelude>\n\nwhat did I do today?' },
+      ] } }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+    ])
+    const result = parseClaudeSession(fp)
+    expect(result?.title).toBe('what did I do today?')
+  })
 })
