@@ -75,6 +75,7 @@ export function runMigrations(db: Database.Database): void {
       session_uuid   TEXT NOT NULL UNIQUE,
       file_path      TEXT NOT NULL UNIQUE,
       title          TEXT,
+      title_source   TEXT NOT NULL DEFAULT 'derived',
       started_at     TEXT NOT NULL,
       ended_at       TEXT NOT NULL,
       message_count  INTEGER NOT NULL DEFAULT 0,
@@ -379,6 +380,17 @@ export function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 7')
   }
 
+  if (version < 8) {
+    // v8: title_source column distinguishes title authority. 'derived' = parsed
+    // from source JSONL (default; sync may overwrite). 'spool' = written by
+    // Spool itself (e.g. agent-search session created in-app). 'user' = user
+    // edited in Spool. Sync only overwrites 'derived' rows.
+    if (!columnExists(db, 'sessions', 'title_source')) {
+      db.exec(`ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'derived'`)
+    }
+    db.pragma('user_version = 8')
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
@@ -407,6 +419,11 @@ function tableExists(db: Database.Database, name: string): boolean {
     `SELECT name FROM sqlite_master WHERE type IN ('table','virtual') AND name = ?`,
   ).get(name) as { name: string } | undefined
   return row !== undefined
+}
+
+function columnExists(db: Database.Database, table: string, column: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  return rows.some(r => r.name === column)
 }
 
 /**

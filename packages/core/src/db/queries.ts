@@ -78,7 +78,8 @@ export function upsertSession(
     db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id)
     db.prepare(`
       UPDATE sessions SET
-        title = ?, started_at = ?, ended_at = ?, message_count = ?,
+        title = CASE WHEN title_source = 'derived' THEN ? ELSE title END,
+        started_at = ?, ended_at = ?, message_count = ?,
         has_tool_use = ?, cwd = ?, model = ?, raw_file_mtime = ?
       WHERE id = ?
     `).run(
