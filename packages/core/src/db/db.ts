@@ -391,6 +391,13 @@ export function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 8')
   }
 
+  // Schema sanity: re-check critical columns that should be present at the
+  // current schema version, regardless of user_version. Repairs DBs where a
+  // version pragma was bumped (by experimental code, a manual upgrade, or a
+  // half-finished migration) without the corresponding column being added.
+  // Each check is a fast no-op when the column already exists.
+  ensureSchemaSanity(db)
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
@@ -424,6 +431,12 @@ function tableExists(db: Database.Database, name: string): boolean {
 function columnExists(db: Database.Database, table: string, column: string): boolean {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
   return rows.some(r => r.name === column)
+}
+
+function ensureSchemaSanity(db: Database.Database): void {
+  if (!columnExists(db, 'sessions', 'title_source')) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN title_source TEXT NOT NULL DEFAULT 'derived'`)
+  }
 }
 
 /**
