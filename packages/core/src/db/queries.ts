@@ -34,6 +34,59 @@ export function getSourceId(db: Database.Database, name: SessionSource): number 
   return row.id
 }
 
+/**
+ * Get/create the virtual "Asks" project that holds Spool-authored agent-search
+ * sessions. One per source so each agent's sessions stay grouped under their
+ * own row in project_groups_v (joined by identity for cross-source grouping).
+ */
+export function getOrCreateAskProject(db: Database.Database, source: SessionSource): number {
+  const sourceId = getSourceId(db, source)
+  return getOrCreateProject(
+    db, sourceId,
+    '__spool_ask__',
+    '<spool:ask>',
+    'Asks',
+    { identityKind: 'spool_internal', identityKey: 'ask' },
+  )
+}
+
+/**
+ * Insert a session row authored by Spool itself (e.g. agent search). Title is
+ * locked via title_source='spool' so subsequent sync of the source-side JSONL
+ * won't overwrite it. file_path uses a sentinel ('spool:pending:<uuid>') that
+ * upsertSession rebinds to the real path when sync first sees the JSONL.
+ *
+ * Idempotent: if a row with the same session_uuid already exists, returns its
+ * id without modifying anything.
+ */
+export function insertSpoolAuthoredSession(
+  db: Database.Database,
+  opts: {
+    projectId: number
+    sourceId: number
+    sessionUuid: string
+    title: string
+    cwd: string
+  },
+): number {
+  const existing = db.prepare('SELECT id FROM sessions WHERE session_uuid = ?')
+    .get(opts.sessionUuid) as { id: number } | undefined
+  if (existing) return existing.id
+
+  const now = new Date().toISOString()
+  const sentinel = `spool:pending:${opts.sessionUuid}`
+  const result = db.prepare(`
+    INSERT INTO sessions
+      (project_id, source_id, session_uuid, file_path, title, title_source,
+       started_at, ended_at, message_count, has_tool_use, cwd, model, raw_file_mtime)
+    VALUES (?, ?, ?, ?, ?, 'spool', ?, ?, 0, 0, ?, '', '')
+  `).run(
+    opts.projectId, opts.sourceId, opts.sessionUuid, sentinel, opts.title,
+    now, now, opts.cwd,
+  )
+  return Number(result.lastInsertRowid)
+}
+
 export function getSessionMtime(db: Database.Database, filePath: string): string | null {
   const row = db
     .prepare('SELECT raw_file_mtime FROM sessions WHERE file_path = ?')
@@ -76,14 +129,18 @@ export function upsertSession(
 
   if (existing) {
     db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id)
+    // file_path is updated too: Spool-authored sessions start with a sentinel
+    // ('spool:pending:<uuid>') and get rebound to the real JSONL path here on
+    // first sync. For normal sessions this is a no-op (same path).
     db.prepare(`
       UPDATE sessions SET
         title = CASE WHEN title_source = 'derived' THEN ? ELSE title END,
+        file_path = ?,
         started_at = ?, ended_at = ?, message_count = ?,
         has_tool_use = ?, cwd = ?, model = ?, raw_file_mtime = ?
       WHERE id = ?
     `).run(
-      opts.title, opts.startedAt, opts.endedAt, opts.messageCount,
+      opts.title, opts.filePath, opts.startedAt, opts.endedAt, opts.messageCount,
       opts.hasToolUse ? 1 : 0, opts.cwd, opts.model, opts.rawFileMtime,
       existing.id,
     )

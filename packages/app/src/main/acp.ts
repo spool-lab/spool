@@ -4,7 +4,15 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import WebSocketImpl from 'ws'
-import { cachedResolve, type FragmentResult } from '@spool-lab/core'
+import {
+  cachedResolve,
+  getDB,
+  getOrCreateAskProject,
+  getSourceId,
+  insertSpoolAuthoredSession,
+  type FragmentResult,
+  type SessionSource,
+} from '@spool-lab/core'
 import type {
   Client as AcpClient,
   CreateTerminalRequest,
@@ -153,6 +161,31 @@ const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 const AGENTS_CONFIG_PATH = join(homedir(), '.spool', 'agents.json')
 
+/**
+ * Stable cwd for ACP agent subprocesses spawned by agent search. Using a
+ * dedicated path (instead of process.cwd(), which is the Electron working dir
+ * and varies between dev = packages/app and prod = '/') keeps the JSONL files
+ * each agent writes downstream in a known, recognizable location and prevents
+ * polluting unrelated projects in the library.
+ */
+const SPOOL_AGENT_SEARCH_CWD = join(homedir(), '.spool', 'agent-search-sessions')
+
+function ensureAgentSearchCwd(): string {
+  mkdirSync(SPOOL_AGENT_SEARCH_CWD, { recursive: true })
+  return SPOOL_AGENT_SEARCH_CWD
+}
+
+/**
+ * Map an agentId from BUILTIN_AGENT_CONFIGS / custom config to a SessionSource.
+ * Only agents whose JSONL output is indexable (Claude Code, Codex, Gemini)
+ * have a source — others (kimi, opencode, alma, custom) return null and skip
+ * the Spool-authored session write.
+ */
+function agentIdToSource(agentId: string): SessionSource | null {
+  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini') return agentId
+  return null
+}
+
 function loadAgentsConfig(): AgentsConfig | null {
   try {
     return JSON.parse(readFileSync(AGENTS_CONFIG_PATH, 'utf8'))
@@ -264,7 +297,7 @@ export class AcpManager {
     if (config.acpMode === 'websocket') {
       return this.queryViaWebSocket(config, prompt, onChunk, onToolCall)
     }
-    return this.queryViaAcp(agentId, config, prompt, onChunk, onToolCall)
+    return this.queryViaAcp(agentId, config, prompt, onChunk, onToolCall, userQuery)
   }
 
   /**
@@ -280,6 +313,7 @@ export class AcpManager {
     prompt: string,
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
+    userQuery?: string,
   ): Promise<string> {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
@@ -514,12 +548,39 @@ export class AcpManager {
       })
 
       // Step 2: New session
+      // Use a stable, dedicated cwd so JSONL output from each agent lands in
+      // a recognizable downstream slug (e.g. ~/.claude/projects/-Users-...-
+      // spool-agent-search-sessions/) rather than scattering across whatever
+      // directory Electron happens to be running from.
+      const stableCwd = ensureAgentSearchCwd()
       const sessionResp = await conn.newSession({
-        cwd: process.cwd(),
+        cwd: stableCwd,
         mcpServers: [],
       })
       const sessionId = sessionResp.sessionId
       this.activeSession.sessionId = sessionId
+
+      // Record an authoritative session row in the Spool DB so the agent-search
+      // session shows up immediately under the dedicated "Ask" project with
+      // the user's real query as the title — instead of waiting for the next
+      // sync to derive a garbage title from the ACP preamble. Best-effort:
+      // any DB error is logged but doesn't block the answer.
+      const source = agentIdToSource(agentId)
+      if (source && userQuery) {
+        try {
+          const db = getDB()
+          const sourceId = getSourceId(db, source)
+          const projectId = getOrCreateAskProject(db, source)
+          insertSpoolAuthoredSession(db, {
+            projectId, sourceId,
+            sessionUuid: sessionId,
+            title: userQuery,
+            cwd: stableCwd,
+          })
+        } catch (e) {
+          console.error('[acp] failed to record Spool-authored session:', e)
+        }
+      }
 
       // Step 3: Prompt (this blocks until the agent finishes)
       // ACP PromptRequest takes `prompt: ContentBlock[]`, not `messages`
