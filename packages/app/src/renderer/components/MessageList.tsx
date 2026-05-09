@@ -1,5 +1,5 @@
-import { forwardRef, useImperativeHandle, useRef, useEffect, useMemo, useCallback } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import type { Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 
@@ -27,7 +27,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   { messages, isDark, showFindBar, messageFindRanges, activeMatchIndex, onActiveMatchRef, targetMessageId, showTargetHighlight },
   ref,
 ) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null)
 
   const idToIndex = useMemo(() => {
     const map = new Map<number, number>()
@@ -35,92 +35,71 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
     return map
   }, [messages])
 
-  const estimateSize = useCallback((index: number) => {
-    const m = messages[index]
-    if (!m) return 120
-    if (m.role === 'system') return 44
-    const len = m.contentText?.length ?? 0
-    // Markdown adds ~30% height vs plain text; code blocks/lists/headings push
-    // further. Err on the over-estimate side — gaps close on measure, but
-    // under-estimates cause rows to land at colliding translateY values.
-    return Math.min(2400, Math.max(120, Math.ceil(len / 50) * 26 + 96))
-  }, [messages])
-
-  const virtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize,
-    overscan: 6,
-    getItemKey: (index) => messages[index]?.id ?? index,
-  })
+  // Captured once at mount: Virtuoso reads this before its first paint, so the
+  // target row is already centered when the user sees the list. Subsequent
+  // target changes (same session, different match) flow through the imperative
+  // scrollToMessageId handle. Cross-session navigation is expected to remount
+  // this component (parent should pass `key={sessionUuid}`), which re-engages
+  // initialTopMostItemIndex with the fresh target.
+  const initialIndex = useMemo(() => {
+    if (targetMessageId == null) return undefined
+    const idx = idToIndex.get(targetMessageId)
+    return idx == null ? undefined : { index: idx, align: 'center' as const }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useImperativeHandle(ref, () => ({
     scrollToMessageId(id) {
       const idx = idToIndex.get(id)
       if (idx == null) return
-      virtualizer.scrollToIndex(idx, { align: 'center' })
+      virtuosoRef.current?.scrollToIndex({ index: idx, align: 'center' })
     },
-  }), [virtualizer, idToIndex])
+  }), [idToIndex])
 
-  // When the message set changes (e.g., session swap), reset scroll to top and re-measure.
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0
-    virtualizer.measure()
-  }, [messages, virtualizer])
-
-  const items = virtualizer.getVirtualItems()
+  if (messages.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-warm-faint dark:text-dark-muted">
+        <p className="text-sm">No messages to display.</p>
+      </div>
+    )
+  }
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]"
+    <Virtuoso
+      ref={virtuosoRef}
+      data={messages}
+      computeItemKey={(_index, msg) => msg.id}
+      {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
+      increaseViewportBy={400}
       data-testid="message-list-scroll"
-    >
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
-        {items.map((virtualRow) => {
-          const msg = messages[virtualRow.index]
-          if (!msg) return null
-          const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
-          const containsActive = matchState != null
-            && activeMatchIndex >= matchState.offset
-            && activeMatchIndex < matchState.offset + matchState.ranges.length
-          const isTarget = msg.id === targetMessageId
+      className="flex-1 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]"
+      itemContent={(index, msg) => {
+        const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
+        const containsActive = matchState != null
+          && activeMatchIndex >= matchState.offset
+          && activeMatchIndex < matchState.offset + matchState.ranges.length
+        const isTarget = msg.id === targetMessageId
 
-          return (
-            <div
-              key={virtualRow.key}
-              data-index={virtualRow.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                transform: `translateY(${virtualRow.start}px)`,
-                width: '100%',
-              }}
-              {...(isTarget ? { 'data-testid': 'target-message' } : {})}
-              {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
-              className={`border-b border-warm-border/50 dark:border-dark-border/50 transition-colors duration-700 ${
-                isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
-              }`}
-            >
-              <MessageBubble
-                message={msg}
-                isDark={isDark}
-                {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
-                activeMatchIndex={containsActive ? activeMatchIndex : -1}
-                {...(containsActive ? { onActiveMatchRef } : {})}
-              />
-            </div>
-          )
-        })}
-      </div>
-      {messages.length === 0 && (
-        <div className="flex items-center justify-center h-32 text-warm-faint dark:text-dark-muted">
-          <p className="text-sm">No messages to display.</p>
-        </div>
-      )}
-    </div>
+        return (
+          <div
+            data-index={index}
+            {...(isTarget ? { 'data-testid': 'target-message' } : {})}
+            {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
+            className={`border-b border-warm-border/50 dark:border-dark-border/50 transition-colors duration-700 ${
+              isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
+            }`}
+          >
+            <MessageBubble
+              message={msg}
+              isDark={isDark}
+              {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
+              activeMatchIndex={containsActive ? activeMatchIndex : -1}
+              {...(containsActive ? { onActiveMatchRef } : {})}
+            />
+          </div>
+        )
+      }}
+    />
   )
 })
 

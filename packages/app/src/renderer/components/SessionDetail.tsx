@@ -362,6 +362,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
       {/* Messages */}
       <MessageList
+        key={session.sessionUuid}
         ref={listRef}
         messages={messages}
         isDark={isDark}
