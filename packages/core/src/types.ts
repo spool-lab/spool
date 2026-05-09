@@ -54,6 +54,7 @@ export type ProjectIdentityKind =
   | 'manifest_path'
   | 'path'
   | 'loose'
+  | 'spool_internal'
 
 export interface ProjectIdentity {
   kind: ProjectIdentityKind
