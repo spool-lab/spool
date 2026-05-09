@@ -406,6 +406,8 @@ ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { quer
       mainWindow?.webContents.send('spool:ai-chunk', { text })
     }, (toolCall) => {
       mainWindow?.webContents.send('spool:ai-tool-call', toolCall)
+    }, (info) => {
+      mainWindow?.webContents.send('spool:ai-session-started', info)
     })
     mainWindow?.webContents.send('spool:ai-done', { fullText })
     return { ok: true, fullText }

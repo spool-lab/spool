@@ -106,8 +106,9 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
         </div>
       )}
 
-      {/* CTA */}
-      {!streaming && answer && (
+      {/* CTA — only shown when a resume target is wired (i.e. agent has a
+          source we persisted a session row for: claude/codex/gemini). */}
+      {!streaming && answer && onResume && (
         <button
           onClick={onResume}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-accent dark:text-accent-dark bg-transparent border border-accent dark:border-accent-dark rounded-md px-3 py-1.5 cursor-pointer hover:bg-accent-bg dark:hover:bg-accent-bg-dark transition-colors"
