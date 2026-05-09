@@ -128,7 +128,8 @@ export class Syncer {
   private applyCodexTitles(): void {
     if (this.codexTitleIndex.size === 0) return
     const stmt = this.db.prepare(
-      'UPDATE sessions SET title = ? WHERE session_uuid = ? AND title != ?',
+      `UPDATE sessions SET title = ?
+         WHERE session_uuid = ? AND title != ? AND title_source = 'derived'`,
     )
     this.db.transaction(() => {
       for (const [uuid, title] of this.codexTitleIndex) {
