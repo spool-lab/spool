@@ -52,7 +52,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
     scrollToMessageId(id) {
       const idx = idToIndex.get(id)
       if (idx == null) return
-      virtuosoRef.current?.scrollToIndex({ index: idx, align: 'center' })
+      virtuosoRef.current?.scrollIntoView({ index: idx, align: 'center', behavior: 'auto' })
     },
   }), [idToIndex])
 
@@ -69,6 +69,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
       ref={virtuosoRef}
       data={messages}
       computeItemKey={(_index, msg) => msg.id}
+      defaultItemHeight={64}
       {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
       increaseViewportBy={400}
       data-testid="message-list-scroll"
