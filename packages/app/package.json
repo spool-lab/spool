@@ -15,7 +15,7 @@
     "build:electron": "pnpm run build:core && electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
-    "test:e2e": "pnpm run build:core && pnpm run rebuild:native:electron && npx playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "pnpm run build:core && pnpm run rebuild:native:electron && electron-vite build && npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",

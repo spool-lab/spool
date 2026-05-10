@@ -18,6 +18,7 @@ import type { ProjectSessionSortOrder } from '@spool-lab/core'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
+import { useHotkeys } from './hooks/useHotkeys.js'
 
 type View = 'search' | 'session'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
@@ -389,19 +390,10 @@ export default function App() {
     setView('search')
   }, [activeProjectKey])
 
-  // ⌘K opens overlay
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const isMacLike = /mac/i.test(navigator.platform)
-      const modifier = isMacLike ? event.metaKey : event.ctrlKey
-      if (modifier && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        setSearchOverlayOpen(open => !open)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
+  // ⌘K opens overlay (suppressed when a modal layer is on top, e.g. Settings)
+  useHotkeys({
+    'mod+k': () => setSearchOverlayOpen(open => !open),
+  })
 
   // Default scope follows active project
   useEffect(() => {
