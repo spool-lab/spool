@@ -160,7 +160,12 @@ const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
   },
 }
 
-const AGENTS_CONFIG_PATH = join(homedir(), '.spool', 'agents.json')
+function spoolHomeDir(): string {
+  const override = process.env['SPOOL_HOME']?.trim()
+  return override && override.length > 0 ? override : join(homedir(), '.spool')
+}
+
+const AGENTS_CONFIG_PATH = join(spoolHomeDir(), 'agents.json')
 
 /**
  * Stable cwd for ACP agent subprocesses spawned by agent search. Using a
@@ -169,7 +174,7 @@ const AGENTS_CONFIG_PATH = join(homedir(), '.spool', 'agents.json')
  * each agent writes downstream in a known, recognizable location and prevents
  * polluting unrelated projects in the library.
  */
-const SPOOL_AGENT_SEARCH_CWD = join(homedir(), '.spool', 'agent-search-sessions')
+const SPOOL_AGENT_SEARCH_CWD = join(spoolHomeDir(), 'agent-search-sessions')
 
 function ensureAgentSearchCwd(): string {
   mkdirSync(SPOOL_AGENT_SEARCH_CWD, { recursive: true })
@@ -196,7 +201,7 @@ function loadAgentsConfig(): AgentsConfig | null {
 }
 
 function saveAgentsConfig(config: AgentsConfig): void {
-  const dir = join(homedir(), '.spool')
+  const dir = spoolHomeDir()
   mkdirSync(dir, { recursive: true })
   writeFileSync(AGENTS_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8')
 }
