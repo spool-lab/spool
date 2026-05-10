@@ -417,8 +417,9 @@ function DirectoryGroupSection({
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
 }) {
-  const { name, tail } = formatCwdLabel(cwd, projectDisplayPath)
+  const { name } = formatCwdLabel(cwd, projectDisplayPath)
   const count = sessions.length
+  const tooltip = cwd === '(unknown)' ? undefined : cwd
 
   return (
     <div data-testid="project-view-directory-group" data-cwd={cwd}>
@@ -427,28 +428,25 @@ function DirectoryGroupSection({
         onClick={onToggleOpen}
         aria-expanded={open}
         aria-label={open ? 'Collapse directory' : 'Expand directory'}
-        title={cwd === '(unknown)' ? undefined : cwd}
-        className="w-full flex items-baseline gap-2 px-6 py-1.5 text-left transition-colors hover:bg-warm-surface/60 dark:hover:bg-dark-surface/60"
+        title={tooltip}
+        className="group w-full flex items-center gap-2 px-6 pt-3 pb-1 text-left text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
       >
-        <span className="text-[13px] font-medium text-warm-text dark:text-dark-text truncate">
+        <span className="font-mono text-[11px] font-medium truncate">
           {name}
         </span>
-        {tail && (
-          <span className="font-mono text-[11px] text-warm-faint/80 dark:text-dark-muted/80 truncate">
-            {tail}
-          </span>
-        )}
         <span className="ml-auto flex items-center gap-2 flex-none self-center">
-          <span className="font-mono text-[10px] tabular-nums text-warm-faint dark:text-dark-muted">
-            {count}
-          </span>
+          {count > 1 && (
+            <span className="font-mono text-[10px] tabular-nums">
+              {count}
+            </span>
+          )}
           <svg
             width="9"
             height="9"
             viewBox="0 0 9 9"
             fill="none"
             aria-hidden
-            className={`transition-transform text-warm-faint dark:text-dark-muted ${open ? 'rotate-90' : ''}`}
+            className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
           >
             <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
