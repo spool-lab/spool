@@ -10,6 +10,7 @@ import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { useIsDark } from '../hooks/useIsDark.js'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 import { extractRenderedText } from '../markdown/extractRenderedText.js'
 
 type Props = {
@@ -34,7 +35,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
   const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
-  const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
   const isDark = useIsDark()
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
@@ -143,57 +143,18 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     setFindResultNonce((value) => value + 1)
   }, [showFindBar, totalFindMatches, activeMatchIndex])
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const hasPrimaryModifier = isMacLike
-        ? event.metaKey && !event.ctrlKey
-        : event.ctrlKey && !event.metaKey
+  useHotkeys({
+    'mod+f': () => {
+      setShowFindBar(true)
+      setFindFocusNonce((value) => value + 1)
+    },
+  })
 
-      const isFindShortcut = (event.metaKey || event.ctrlKey)
-        && !event.altKey
-        && !event.shiftKey
-        && event.key.toLowerCase() === 'f'
-
-      const isFindPreviousShortcut = showFindBar
-        && hasPrimaryModifier
-        && !event.altKey
-        && !event.shiftKey
-        && event.key === 'ArrowLeft'
-
-      const isFindNextShortcut = showFindBar
-        && hasPrimaryModifier
-        && !event.altKey
-        && !event.shiftKey
-        && event.key === 'ArrowRight'
-
-      if (isFindShortcut) {
-        event.preventDefault()
-        setShowFindBar(true)
-        setFindFocusNonce((value) => value + 1)
-        return
-      }
-
-      if (isFindPreviousShortcut) {
-        event.preventDefault()
-        findPrevious()
-        return
-      }
-
-      if (isFindNextShortcut) {
-        event.preventDefault()
-        findNext()
-        return
-      }
-
-      if (event.key === 'Escape' && showFindBar) {
-        event.preventDefault()
-        closeFindBar()
-      }
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [closeFindBar, findNext, findPrevious, isMacLike, showFindBar])
+  useHotkeys({
+    Escape: closeFindBar,
+    'mod+arrowleft': findPrevious,
+    'mod+arrowright': findNext,
+  }, { active: showFindBar })
 
   useEffect(() => {
     if (!showFindBar || totalFindMatches === 0) return

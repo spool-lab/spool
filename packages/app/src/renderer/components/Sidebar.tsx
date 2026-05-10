@@ -186,6 +186,7 @@ function SidebarStatus({
       {onSettingsClick && (
         <button
           type="button"
+          data-testid="settings-button"
           onClick={onSettingsClick}
           title="Settings"
           aria-label="Settings"

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 
 type MenuItem = {
   label: string
@@ -24,16 +25,12 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
     function handleClickOutside(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
     }
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
-    }
     window.addEventListener('mousedown', handleClickOutside)
-    window.addEventListener('keydown', handleKey)
-    return () => {
-      window.removeEventListener('mousedown', handleClickOutside)
-      window.removeEventListener('keydown', handleKey)
-    }
+    return () => window.removeEventListener('mousedown', handleClickOutside)
   }, [open])
+
+  const close = useCallback(() => setOpen(false), [])
+  useHotkeys({ Escape: close }, { active: open, modal: true })
 
   return (
     <div ref={containerRef} className="relative inline-block" data-testid={testId}>

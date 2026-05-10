@@ -4,6 +4,7 @@ import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } 
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -105,8 +106,10 @@ export default function SettingsPanel({
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
 
+  useHotkeys({ Escape: onClose }, { modal: true })
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div data-testid="settings-panel" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-[720px] h-[560px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar */}
         <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
