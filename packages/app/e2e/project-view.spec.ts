@@ -53,14 +53,14 @@ test('changing sort order reloads sessions', async () => {
   await waitForSync(window)
 
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
-  await expect(window.locator('[data-testid="session-row"]').first()).toBeVisible({ timeout: 5000 })
+  const firstRow = window.locator('[data-testid="session-row"]').first()
+  await expect(firstRow).toBeVisible({ timeout: 5000 })
 
-  const recentFirst = await window.locator('[data-testid="session-row"]').first().getAttribute('data-session-uuid')
+  const recentFirst = await firstRow.getAttribute('data-session-uuid')
+  expect(recentFirst).not.toBeNull()
 
   await window.locator('[data-testid="project-sort"]').click()
   await window.getByRole('menuitem', { name: 'Oldest' }).click()
-  await expect(window.locator('[data-testid="session-row"]').first()).toBeVisible({ timeout: 5000 })
 
-  const oldestFirst = await window.locator('[data-testid="session-row"]').first().getAttribute('data-session-uuid')
-  expect(oldestFirst).not.toBe(recentFirst)
+  await expect(firstRow).not.toHaveAttribute('data-session-uuid', recentFirst!, { timeout: 5000 })
 })
