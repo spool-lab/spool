@@ -2,6 +2,7 @@ import { homedir } from 'node:os'
 import { dirname, join, isAbsolute, resolve } from 'node:path'
 import type { ProjectIdentity, ProjectIdentityKind } from '../types.js'
 import { fallbackDisplayName } from './display-name.js'
+import { DEFAULT_RESOLVERS, type WorktreeUpstreamResolver } from './worktree-resolvers.js'
 
 export interface IdentityFs {
   exists(path: string): boolean
@@ -35,7 +36,11 @@ export function normalizeGitRemote(url: string): string | null {
   return s.toLowerCase()
 }
 
-export function computeIdentity(cwd: string | null, fs: IdentityFs): ProjectIdentity {
+export function computeIdentity(
+  cwd: string | null,
+  fs: IdentityFs,
+  resolvers: readonly WorktreeUpstreamResolver[] = DEFAULT_RESOLVERS,
+): ProjectIdentity {
   if (!cwd) return loose()
 
   const home = homedir()
@@ -80,7 +85,23 @@ export function computeIdentity(cwd: string | null, fs: IdentityFs): ProjectIden
     }
   }
 
-  // 3. path
+  // 3. worktree resolvers — recover identity for sessions whose cwd has been
+  // deleted (e.g. superset/git worktree torn down before Spool synced). The
+  // resolver returns the upstream main-repo path; we recurse with empty
+  // resolvers to prevent loops and to ensure the upstream goes through the
+  // normal git/manifest detection on a real, existing path.
+  if (!fs.exists(cwd) && resolvers.length > 0) {
+    for (const r of resolvers) {
+      const upstream = r.resolve(cwd)
+      if (!upstream || !fs.exists(upstream)) continue
+      const id = computeIdentity(upstream, fs, [])
+      if (id.kind === 'git_remote' || id.kind === 'git_common_dir' || id.kind === 'manifest_path') {
+        return id
+      }
+    }
+  }
+
+  // 4. path
   return {
     kind: 'path',
     key: cwd,

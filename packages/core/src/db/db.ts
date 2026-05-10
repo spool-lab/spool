@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { computeIdentity, type IdentityFs } from '../projects/identity.js'
 import { realFs } from '../projects/fs.js'
 import { runAgentSearchCleanup } from '../migrations/agent-search-cleanup.js'
+import { upgradeWorktreeIdentities } from '../migrations/worktree-identity-upgrade.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -411,6 +412,19 @@ export function runMigrations(db: Database.Database): void {
       runAgentSearchCleanup(db)
     })()
     db.pragma('user_version = 9')
+  }
+
+  if (version < 10) {
+    // v10: re-classify path-kind projects that are stranded worktree cwds.
+    // Before the worktree resolvers landed, a session synced after its
+    // worktree was deleted couldn't reach the upstream git remote and was
+    // bucketed as its own path-kind project. The resolver now reads the
+    // worktree tool's persistent registry (e.g. ~/.superset/local.db) and
+    // recovers the real identity. See migrations/worktree-identity-upgrade.ts.
+    db.transaction(() => {
+      upgradeWorktreeIdentities(db, realFs)
+    })()
+    db.pragma('user_version = 10')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
