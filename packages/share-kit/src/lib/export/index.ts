@@ -167,9 +167,14 @@ export async function saveBlob(
       await writable.close()
       return
     } catch (err) {
-      // User cancelled the native dialog — not an error.
+      // User cancelled the native dialog — silent return.
       if (err instanceof DOMException && err.name === 'AbortError') return
-      throw err
+      // Anything else (SecurityError from a user-gesture timeout after a
+      // long rasterization, NotAllowedError on locked-down embeddings,
+      // unknown picker failures) falls through to the <a download>
+      // fallback below — the user clicked Export and expects a file,
+      // not a console-only failure. Log for visibility but keep going.
+      console.warn('[share-kit] File System Access save failed, falling back to <a download>:', err)
     }
   }
 
