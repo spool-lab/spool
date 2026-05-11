@@ -171,8 +171,12 @@ export class Syncer {
       }
 
       const sourceId = getSourceId(this.db, source)
-      const { slug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
+      const { slug: rawSlug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
       const identity = computeIdentity(parsed.cwd || null, realFs)
+      // Synthetic identities deduplicate by identity key, not by per-cwd slug,
+      // so every matching session converges to a single project row instead
+      // of accumulating one row per scratch dir.
+      const slug = identity.kind === 'synthetic' ? identity.key : rawSlug
       const projectId = getOrCreateProject(
         this.db, sourceId, slug,
         identity.displayPath ?? displayPath,

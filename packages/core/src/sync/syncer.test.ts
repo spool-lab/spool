@@ -124,6 +124,94 @@ describe('Syncer', () => {
     expect(results).toHaveLength(1)
     expect(results[0]?.snippet).toContain(tailKeyword)
   })
+
+  it('collapses multiple Codex scratch chats into a single project row', async () => {
+    const baseDir = makeTempDir('spool-syncer-codex-')
+    const codexHome = join(baseDir, 'codex-home')
+    const sessionsDir = join(codexHome, '.codex', 'sessions', '2026', '05', '11')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(sessionsDir, { recursive: true })
+
+    const scratchA = join(baseDir, 'Documents', 'Codex', '2026-05-11', 'codex-project')
+    const scratchB = join(baseDir, 'Documents', 'Codex', '2026-05-11', 'new-chat')
+    mkdirSync(scratchA, { recursive: true })
+    mkdirSync(scratchB, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('HOME', baseDir)
+    vi.stubEnv('CODEX_HOME', join(codexHome, '.codex'))
+
+    function writeCodexSession(name: string, sessionId: string, cwd: string): string {
+      const fp = join(sessionsDir, name)
+      writeFileSync(fp, [
+        JSON.stringify({
+          timestamp: '2026-05-11T12:00:00Z',
+          type: 'session_meta',
+          payload: { id: sessionId, cwd },
+        }),
+        JSON.stringify({
+          timestamp: '2026-05-11T12:00:01Z',
+          type: 'turn_context',
+          payload: { model: 'gpt-5.4', cwd },
+        }),
+        JSON.stringify({
+          timestamp: '2026-05-11T12:00:02Z',
+          type: 'event_msg',
+          payload: { type: 'user_message', message: 'hello' },
+        }),
+        JSON.stringify({
+          timestamp: '2026-05-11T12:00:03Z',
+          type: 'event_msg',
+          payload: { type: 'agent_message', message: 'hi' },
+        }),
+      ].join('\n'))
+      return fp
+    }
+
+    const fileA = writeCodexSession(
+      'rollout-2026-05-11T12-00-00-019e1559-3c84-7f53-9e3c-850bbb705720.jsonl',
+      '019e1559-3c84-7f53-9e3c-850bbb705720',
+      scratchA,
+    )
+    const fileB = writeCodexSession(
+      'rollout-2026-05-11T12-05-00-019e155c-4a84-7713-9ea4-b83f03f50589.jsonl',
+      '019e155c-4a84-7713-9ea4-b83f03f50589',
+      scratchB,
+    )
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    const syncer = new Syncer(db)
+
+    expect(syncer.syncFile(fileA, 'codex')).toBe('added')
+    expect(syncer.syncFile(fileB, 'codex')).toBe('added')
+
+    const rows = db.prepare(
+      `SELECT id, slug, display_path, display_name, identity_kind, identity_key
+       FROM projects WHERE identity_kind = 'synthetic'`,
+    ).all() as Array<{
+      id: number
+      slug: string
+      display_path: string
+      display_name: string
+      identity_kind: string
+      identity_key: string
+    }>
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      slug: 'codex:scratch',
+      display_path: join(baseDir, 'Documents', 'Codex'),
+      display_name: 'Codex Chats',
+      identity_key: 'codex:scratch',
+    })
+
+    const sessionCount = db.prepare(
+      `SELECT COUNT(*) AS n FROM sessions WHERE project_id = ?`,
+    ).get(rows[0]!.id) as { n: number }
+    expect(sessionCount.n).toBe(2)
+  })
 })
 
 async function loadCoreModules() {
