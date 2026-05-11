@@ -75,9 +75,9 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
           data-testid="sidebar-projects-toggle"
           aria-expanded={projectsOpen}
           onClick={() => setProjectsOpen(open => !open)}
-          className="flex-1 flex items-center gap-1.5 text-left text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
+          className="flex-1 flex items-center gap-1.5 text-left text-[11px] font-medium text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
         >
-          <span>PROJECTS</span>
+          <span>Projects</span>
           <svg
             width="12"
             height="12"
@@ -158,20 +158,10 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         )}
       </div>
 
-      {onSettingsClick && (
-        <div className="px-2 pt-1 flex-none">
-          <NavRow
-            testId="sidebar-settings"
-            icon={<SettingsIcon size={14} strokeWidth={1.75} />}
-            label="Settings"
-            onClick={onSettingsClick}
-          />
-        </div>
-      )}
-
       <SidebarStatus
         syncStatus={syncStatus ?? null}
         status={status ?? null}
+        {...(onSettingsClick ? { onSettingsClick } : {})}
       />
     </aside>
   )
@@ -224,21 +214,35 @@ function KbdHint({ children }: { children: ReactNode }) {
 function SidebarStatus({
   syncStatus,
   status,
+  onSettingsClick,
 }: {
   syncStatus: { phase: string; count: number; total: number } | null
   status: StatusInfo | null
+  onSettingsClick?: () => void
 }) {
   const text = getSyncStatusText(syncStatus, status)
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none h-[30px] pl-4 pr-2 flex items-center gap-2 border-t border-warm-border/50 dark:border-dark-border/50">
+    <div className="flex-none h-[30px] pl-4 pr-2 flex items-center gap-2">
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`} />
         <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
           {text}
         </span>
       </div>
+      {onSettingsClick && (
+        <button
+          type="button"
+          data-testid="settings-button"
+          onClick={onSettingsClick}
+          title="Settings"
+          aria-label="Settings"
+          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+        >
+          <SettingsIcon size={12} strokeWidth={1.75} />
+        </button>
+      )}
     </div>
   )
 }
