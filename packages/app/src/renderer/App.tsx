@@ -468,6 +468,7 @@ export default function App() {
     <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
       <Sidebar
         activeIdentityKey={activeProjectKey}
+        isLibraryActive={isHomeMode}
         onSelectProject={(key) => {
           setActiveProjectKey(key)
           setHomeMode(false)

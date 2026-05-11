@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectGroup, SessionSource, StatusInfo } from '@spool-lab/core'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-react'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import {
   DEFAULT_SIDEBAR_SORT_ORDER,
   SIDEBAR_SORT_OPTIONS,
   type SidebarSortOrder,
 } from '../../shared/sidebarSort.js'
-import { SearchTrigger } from './LibraryLanding.js'
 import Menu from './Menu.js'
 
 type Props = {
   activeIdentityKey: string | null
   onSelectProject: (identityKey: string) => void
   onSelectHome?: () => void
+  isLibraryActive?: boolean
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
   status?: StatusInfo | null
@@ -23,7 +24,7 @@ type Props = {
   onSortOrderChange?: (next: SidebarSortOrder) => void
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, isLibraryActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
 
@@ -47,25 +48,28 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       data-testid="sidebar"
       className="w-60 flex-none border-r border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
-      <div className="px-4 pt-3 pb-3 flex-none">
-        <button
-          type="button"
-          data-testid="sidebar-home"
-          onClick={() => onSelectHome?.()}
-          className="text-lg font-bold tracking-[-0.04em] select-none cursor-pointer hover:opacity-80 transition-opacity"
-          aria-label="Spool home"
-        >
-          Spool<span className="text-accent">.</span>
-        </button>
-      </div>
+      <nav className="px-2 pt-3 pb-2 flex-none flex flex-col gap-0.5" aria-label="Primary">
+        {onSelectHome && (
+          <NavRow
+            testId="sidebar-library"
+            icon={<LibraryIcon size={14} strokeWidth={1.75} />}
+            label="Library"
+            active={isLibraryActive}
+            onClick={onSelectHome}
+          />
+        )}
+        {onOpenSearch && (
+          <NavRow
+            testId="sidebar-search"
+            icon={<SearchIcon size={14} strokeWidth={1.75} />}
+            label="Search"
+            trailing={<KbdHint>⌘K</KbdHint>}
+            onClick={onOpenSearch}
+          />
+        )}
+      </nav>
 
-      {onOpenSearch && (
-        <div className="px-3 pb-3 flex-none">
-          <SearchTrigger onClick={onOpenSearch} fullWidth />
-        </div>
-      )}
-
-      <div className="group mx-2 px-2 py-1 flex-none flex items-center gap-1">
+      <div className="group mx-2 mt-1 px-2 py-1 flex-none flex items-center gap-1">
         <button
           type="button"
           data-testid="sidebar-projects-toggle"
@@ -154,49 +158,87 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
         )}
       </div>
 
+      {onSettingsClick && (
+        <div className="px-2 pt-1 flex-none">
+          <NavRow
+            testId="sidebar-settings"
+            icon={<SettingsIcon size={14} strokeWidth={1.75} />}
+            label="Settings"
+            onClick={onSettingsClick}
+          />
+        </div>
+      )}
+
       <SidebarStatus
         syncStatus={syncStatus ?? null}
         status={status ?? null}
-        {...(onSettingsClick ? { onSettingsClick } : {})}
       />
     </aside>
+  )
+}
+
+function NavRow({
+  testId,
+  icon,
+  label,
+  active = false,
+  trailing,
+  onClick,
+}: {
+  testId?: string
+  icon: ReactNode
+  label: string
+  active?: boolean
+  trailing?: ReactNode
+  onClick: () => void
+}) {
+  const dataAttrs = testId ? { 'data-testid': testId } : {}
+  return (
+    <button
+      type="button"
+      {...dataAttrs}
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={[
+        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px]',
+        active
+          ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
+          : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
+      ].join(' ')}
+    >
+      <span className="flex-none w-4 h-4 inline-flex items-center justify-center">{icon}</span>
+      <span className="flex-1 text-left truncate">{label}</span>
+      {trailing}
+    </button>
+  )
+}
+
+function KbdHint({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="flex-none font-mono text-[10px] tabular-nums text-warm-faint/80 dark:text-dark-muted/80">
+      {children}
+    </kbd>
   )
 }
 
 function SidebarStatus({
   syncStatus,
   status,
-  onSettingsClick,
 }: {
   syncStatus: { phase: string; count: number; total: number } | null
   status: StatusInfo | null
-  onSettingsClick?: () => void
 }) {
   const text = getSyncStatusText(syncStatus, status)
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none h-[30px] pl-4 pr-2 flex items-center gap-2">
+    <div className="flex-none h-[30px] pl-4 pr-2 flex items-center gap-2 border-t border-warm-border/50 dark:border-dark-border/50">
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`} />
         <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
           {text}
         </span>
       </div>
-      {onSettingsClick && (
-        <button
-          type="button"
-          data-testid="settings-button"
-          onClick={onSettingsClick}
-          title="Settings"
-          aria-label="Settings"
-          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-          </svg>
-        </button>
-      )}
     </div>
   )
 }
