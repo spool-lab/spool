@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import {
   TemplateRender,
   DEFAULT_OPTS,
+  TEMPLATE_RATIO,
   downloadSpoolFile,
   exportArtifact,
   type Conversation,
@@ -39,8 +40,22 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
     const node = previewRef.current
     if (!node) return
     setSaveState('saving')
+    // Yield one frame so the menu close + the button's "Exporting…"
+    // label paint before we start the synchronous rasterization
+    // (html-to-image blocks the main thread for ~1s on a real
+    // conversation, so without this the click feels frozen).
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    // The template's natural width is known; measure the height from
+    // the live DOM since it depends on how much content flowed in.
+    const width = TEMPLATE_RATIO[opts.template].w
+    const height = node.scrollHeight
     try {
-      await exportArtifact(format, { node, template: opts.template, conversation })
+      await exportArtifact(format, {
+        node,
+        template: opts.template,
+        conversation,
+        dims: { width, height },
+      })
       setSaveState('idle')
     } catch (err) {
       console.error(`Export to ${format} failed:`, err)
@@ -50,6 +65,7 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
 
   const exportSpoolFile = useCallback(async () => {
     setSaveState('saving')
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     try {
       await downloadSpoolFile(conversation, opts)
       setSaveState('idle')
@@ -120,9 +136,12 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
               overflow) but is NOT the export target — the rasterizer and
               the print-host need to read the raw template's intrinsic
               dimensions without our visual chrome interfering with
-              clientWidth / scrollHeight. */}
+              clientWidth / scrollHeight.
+              The inner div has an explicit width matching the template's
+              natural ratio so html-to-image rasterizes at the right size
+              regardless of how flex centering sized its parent. */}
           <div className="shadow-lg rounded-sm overflow-hidden">
-            <div ref={previewRef}>
+            <div ref={previewRef} style={{ width: TEMPLATE_RATIO[opts.template].w }}>
               <TemplateRender template={opts.template} convo={conversation} opts={opts} />
             </div>
           </div>
