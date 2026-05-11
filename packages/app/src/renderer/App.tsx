@@ -487,7 +487,13 @@ export default function App() {
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
       <AppTopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
       <div className="flex flex-1 min-h-0">
-      {!sidebarCollapsed && (
+      <div
+        className={[
+          'flex-none overflow-hidden transition-[width] duration-200 ease-out',
+          sidebarCollapsed ? 'w-0' : 'w-60',
+        ].join(' ')}
+        aria-hidden={sidebarCollapsed}
+      >
       <Sidebar
         activeIdentityKey={activeProjectKey}
         isLibraryActive={isHomeMode}
@@ -516,7 +522,7 @@ export default function App() {
         onSortOrderChange={handleSidebarSortChange}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
-      )}
+      </div>
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
