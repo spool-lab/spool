@@ -87,6 +87,12 @@ const api = {
   copyFragment: (text: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:copy-fragment', { text }),
 
+  getSidebarCollapsed: (): Promise<boolean> =>
+    ipcRenderer.invoke('spool:get-sidebar-collapsed'),
+
+  setSidebarCollapsed: (collapsed: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('spool:set-sidebar-collapsed', { collapsed }),
+
   // AI / ACP
   getAiAgents: (): Promise<AgentInfo[]> =>
     ipcRenderer.invoke('spool:ai-agents'),
