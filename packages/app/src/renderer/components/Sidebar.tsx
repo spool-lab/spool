@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectGroup, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Share2 as SharesIcon } from 'lucide-react'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon } from 'lucide-react'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import {
   DEFAULT_SIDEBAR_SORT_ORDER,

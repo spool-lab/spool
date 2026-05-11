@@ -1,81 +1,27 @@
-import { useState } from 'react'
+import { type ReactNode } from 'react'
+import { Newspaper } from 'lucide-react'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import type { ShareDraftRow } from '@spool-lab/core'
 
-type Tab = 'drafts' | 'published'
-
+/**
+ * The Drafts / Published tab strip is intentionally not rendered yet:
+ * Phase 0 only has Drafts, and showing a Published tab that maps to a
+ * "Coming in a future update" placeholder reads as a broken promise.
+ * The tab strip lands in Phase 2 alongside the actual publish flow.
+ */
 export default function SharesPage() {
-  const [tab, setTab] = useState<Tab>('drafts')
   const { drafts, loading, error } = useShareDrafts()
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <header className="flex-none px-6 pt-6 pb-3">
-        <h1 className="text-lg font-semibold tracking-[-0.02em] text-warm-text dark:text-dark-text">
-          Shares
-        </h1>
-      </header>
-
-      <div className="flex-none px-6 border-b border-warm-border dark:border-dark-border">
-        <div className="flex gap-1" role="tablist">
-          <TabButton
-            label="Drafts"
-            count={drafts.length}
-            active={tab === 'drafts'}
-            onClick={() => setTab('drafts')}
-          />
-          <TabButton
-            label="Published"
-            active={tab === 'published'}
-            onClick={() => setTab('published')}
-          />
-        </div>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === 'drafts' ? (
-          <DraftsTab drafts={drafts} loading={loading} error={error} />
-        ) : (
-          <PublishedTab />
-        )}
+        <DraftsList drafts={drafts} loading={loading} error={error} />
       </div>
     </div>
   )
 }
 
-function TabButton({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count?: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={[
-        'flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 transition-colors',
-        active
-          ? 'border-accent text-warm-text dark:text-dark-text'
-          : 'border-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text',
-      ].join(' ')}
-    >
-      <span>{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="text-xs text-warm-faint dark:text-dark-muted">({count})</span>
-      )}
-    </button>
-  )
-}
-
-function DraftsTab({
+function DraftsList({
   drafts,
   loading,
   error,
@@ -85,16 +31,17 @@ function DraftsTab({
   error: string | null
 }) {
   if (loading && drafts.length === 0) {
-    return <EmptyState label="Loading drafts…" />
+    return <SmallEmptyState>Loading drafts…</SmallEmptyState>
   }
   if (error) {
-    return <EmptyState label={`Couldn't load drafts: ${error}`} />
+    return <SmallEmptyState>Couldn't load drafts: {error}</SmallEmptyState>
   }
   if (drafts.length === 0) {
     return (
-      <EmptyState
-        label="No drafts yet"
-        hint="Create a share from a session, search result, or AI answer to start a draft."
+      <FeaturedEmptyState
+        icon={<Newspaper size={22} strokeWidth={1.5} />}
+        title="No shares yet"
+        hint="Start a share from a session, a search result, or an AI answer — drafts you create land here, ready to keep editing."
       />
     )
   }
@@ -118,20 +65,37 @@ function DraftsTab({
   )
 }
 
-function PublishedTab() {
+function FeaturedEmptyState({
+  icon,
+  title,
+  hint,
+}: {
+  icon: ReactNode
+  title: string
+  hint: string
+}) {
   return (
-    <EmptyState
-      label="Coming in a future update"
-      hint="Once Spool Share supports hosted permalinks, your published shares will appear here."
-    />
+    <div className="h-full flex flex-col items-center justify-center text-center px-6">
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center mb-5 bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted"
+        aria-hidden="true"
+      >
+        {icon}
+      </div>
+      <h2 className="text-xl font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text mb-2">
+        {title}
+      </h2>
+      <p className="text-sm leading-relaxed text-warm-muted dark:text-dark-muted max-w-[360px]">
+        {hint}
+      </p>
+    </div>
   )
 }
 
-function EmptyState({ label, hint }: { label: string; hint?: string }) {
+function SmallEmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-warm-muted dark:text-dark-muted">
-      <p className="text-sm">{label}</p>
-      {hint && <p className="text-xs mt-1.5 max-w-md">{hint}</p>}
+    <div className="flex items-center justify-center px-6 py-16 text-sm text-warm-muted dark:text-dark-muted text-center">
+      {children}
     </div>
   )
 }
