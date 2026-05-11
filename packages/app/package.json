@@ -22,6 +22,7 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
     "@spool-lab/core": "workspace:*",
+    "@spool/share-kit": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
     "acp-extension-codex": "^0.10.0",
