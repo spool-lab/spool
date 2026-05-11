@@ -1,30 +1,63 @@
-import { useMemo, useState } from 'react'
-import { TemplateRender, DEFAULT_OPTS, type Conversation, type EditorOpts } from '@spool/share-kit'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
+import {
+  TemplateRender,
+  DEFAULT_OPTS,
+  downloadSpoolFile,
+  exportArtifact,
+  type Conversation,
+  type EditorOpts,
+  type ExportFormat,
+} from '@spool/share-kit'
+import Menu from './Menu.js'
 
 type Props = {
   conversation: Conversation
   onBack: () => void
 }
 
+type SaveState = 'idle' | 'saving' | 'error'
+
 /**
- * Phase 0 share editor page — minimum viable surface that proves the
- * @spool/share-kit primitives render inside the Spool app.
- *
- * What's here: a back-button header and a live preview of the
- * conversation through TemplateRender at the template's natural
- * aspect ratio. What isn't (yet): turn selection + reorder, redaction
- * controls, template / paper / typeface picker, export buttons,
- * autosave to share_drafts. Those layer in over the next commits.
+ * Phase 0 share editor page. Renders the conversation through a
+ * share-kit template and lets the user export the result locally —
+ * PNG via html-to-image, PDF via the kit's print-to-PDF host, .spool
+ * via JSON serialization. Style picker + turn-level editing land in
+ * follow-up commits.
  */
 export default function ShareEditorPage({ conversation, onBack }: Props) {
-  // DEFAULT_OPTS is fine for now — once a style panel lands the user
-  // can mutate this and we wire it through to the renderer.
   const [opts] = useState<EditorOpts>(DEFAULT_OPTS)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const previewRef = useRef<HTMLDivElement | null>(null)
 
   const meta = useMemo(() => {
     const wordLabel = `${conversation.wordCount.toLocaleString()} ${conversation.wordCount === 1 ? 'word' : 'words'}`
     return [conversation.sourceLabel, conversation.createdAt, wordLabel, `~${conversation.readMin} min read`].join(' · ')
   }, [conversation])
+
+  const exportImage = useCallback(async (format: ExportFormat) => {
+    const node = previewRef.current
+    if (!node) return
+    setSaveState('saving')
+    try {
+      await exportArtifact(format, { node, template: opts.template, conversation })
+      setSaveState('idle')
+    } catch (err) {
+      console.error(`Export to ${format} failed:`, err)
+      setSaveState('error')
+    }
+  }, [conversation, opts.template])
+
+  const exportSpoolFile = useCallback(async () => {
+    setSaveState('saving')
+    try {
+      await downloadSpoolFile(conversation, opts)
+      setSaveState('idle')
+    } catch (err) {
+      console.error('Export to .spool failed:', err)
+      setSaveState('error')
+    }
+  }, [conversation, opts])
 
   return (
     <div className="flex flex-col h-full" data-testid="share-editor-page">
@@ -40,6 +73,7 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
             <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+
         <div className="flex-1 min-w-0">
           <h1 className="text-sm font-medium text-warm-text dark:text-dark-text truncate" title={conversation.title}>
             {conversation.title}
@@ -48,11 +82,41 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
             {meta}
           </p>
         </div>
+
+        <div className="flex-none self-start mt-0.5">
+          <Menu
+            align="right"
+            testId="share-editor-export"
+            trigger={({ open, toggle }) => (
+              <button
+                type="button"
+                onClick={toggle}
+                title="Export"
+                aria-label="Export"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                disabled={saveState === 'saving'}
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-text dark:text-dark-text bg-warm-surface dark:bg-dark-surface hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download size={12} strokeWidth={1.8} />
+                <span>{saveState === 'saving' ? 'Exporting…' : 'Export'}</span>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden>
+                  <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+            items={[
+              { label: 'Save as image (PNG)', onSelect: () => { void exportImage('png') } },
+              { label: 'Save as PDF', onSelect: () => { void exportImage('pdf') } },
+              { label: 'Save as .spool file', onSelect: () => { void exportSpoolFile() } },
+            ]}
+          />
+        </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-warm-bg dark:bg-dark-bg">
         <div className="flex justify-center px-6 py-6">
-          <div className="shadow-lg rounded-sm overflow-hidden">
+          <div ref={previewRef} className="shadow-lg rounded-sm overflow-hidden">
             <TemplateRender template={opts.template} convo={conversation} opts={opts} />
           </div>
         </div>
