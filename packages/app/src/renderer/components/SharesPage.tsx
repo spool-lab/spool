@@ -3,19 +3,23 @@ import { Newspaper } from 'lucide-react'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import type { ShareDraftListItem } from '@spool-lab/core'
 
+type Props = {
+  onOpenDraft?: (draft: ShareDraftRow) => void
+}
+
 /**
  * The Drafts / Published tab strip is intentionally not rendered yet:
  * Phase 0 only has Drafts, and showing a Published tab that maps to a
  * "Coming in a future update" placeholder reads as a broken promise.
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
-export default function SharesPage() {
+export default function SharesPage({ onOpenDraft }: Props) {
   const { drafts, loading, error } = useShareDrafts()
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <DraftsList drafts={drafts} loading={loading} error={error} />
+        <DraftsList drafts={drafts} loading={loading} error={error} onOpenDraft={onOpenDraft} />
       </div>
     </div>
   )
@@ -25,10 +29,12 @@ function DraftsList({
   drafts,
   loading,
   error,
+  onOpenDraft,
 }: {
   drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
+  onOpenDraft?: ((draft: ShareDraftRow) => void) | undefined
 }) {
   if (loading && drafts.length === 0) {
     return <SmallEmptyState>Loading drafts…</SmallEmptyState>
@@ -48,17 +54,22 @@ function DraftsList({
   return (
     <ul className="px-6 py-4 flex flex-col gap-2">
       {drafts.map((draft) => (
-        <li
-          key={draft.draft_id}
-          className="px-3 py-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface"
-        >
-          <div className="text-sm text-warm-text dark:text-dark-text">
-            {draft.title || 'untitled'}
-          </div>
-          <div className="text-xs text-warm-muted dark:text-dark-muted">
-            edited {formatRelative(draft.updated_at)}
-            {draft.source_origin ? ` · from ${describeSource(draft)}` : ''}
-          </div>
+        <li key={draft.draft_id}>
+          <button
+            type="button"
+            data-testid="shares-draft-row"
+            onClick={() => onOpenDraft?.(draft)}
+            disabled={!onOpenDraft}
+            className="w-full text-left px-3 py-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors disabled:cursor-default disabled:hover:bg-warm-surface dark:disabled:hover:bg-dark-surface"
+          >
+            <div className="text-sm text-warm-text dark:text-dark-text">
+              {draft.title || 'untitled'}
+            </div>
+            <div className="text-xs text-warm-muted dark:text-dark-muted">
+              edited {formatRelative(draft.updated_at)}
+              {draft.source_origin ? ` · from ${describeSource(draft)}` : ''}
+            </div>
+          </button>
         </li>
       ))}
     </ul>

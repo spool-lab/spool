@@ -2,6 +2,17 @@ import type { Session, Message, SessionSource } from '@spool-lab/core'
 import type { Conversation, Platform, Turn } from '@spool/share-kit'
 
 /**
+ * Stable per-session draft id. Re-opening the same Spool session always
+ * lands on the same draft row instead of accumulating one per Share
+ * click. Format mirrors quilt's draftIdFor() so the namespace is
+ * recognizable; the prefix doubles as the snapshot's source_origin
+ * carrier when the host queries share_drafts.
+ */
+export function sessionDraftId(sessionUuid: string): string {
+  return `session:${sessionUuid}`
+}
+
+/**
  * share-kit's Platform union currently covers ChatGPT / Claude / Gemini —
  * Codex doesn't exist there yet. We map it onto 'ChatGPT' since the two
  * share OpenAI tooling lineage; the field only drives the source chip's

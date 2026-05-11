@@ -13,9 +13,9 @@ import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
-import { composeFromSession } from './lib/compose-from-session.js'
-import type { Conversation } from '@spool/share-kit'
-import type { Message, Session } from '@spool-lab/core'
+import { composeFromSession, sessionDraftId } from './lib/compose-from-session.js'
+import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type SpoolDocument } from '@spool/share-kit'
+import type { Message, Session, ShareDraftRow } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -94,19 +94,43 @@ export default function App() {
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [shareConversation, setShareConversation] = useState<Conversation | null>(null)
+  // The view the user came from when opening the editor — Back returns
+  // here. Captured up front because guessing from current state
+  // (selectedSession etc.) misroutes when the user opens a draft from
+  // the Shares page while a session is also selected.
+  const [shareEditorReturnView, setShareEditorReturnView] = useState<View>('search')
 
   const handleStartShareFromSession = useCallback((session: Session, messages: Message[]) => {
-    setShareConversation(composeFromSession(session, messages))
+    const conversation = composeFromSession(session, messages)
+    const draftId = sessionDraftId(session.sessionUuid)
+    const doc = buildSpoolDocument(conversation, DEFAULT_OPTS)
+    void window.spool?.shareDraft?.upsert({
+      draft_id: draftId,
+      source_kind: 'spool-session',
+      source_origin: session.sessionUuid,
+      title: conversation.title,
+      snapshot_json: JSON.stringify(doc),
+    }).catch((err) => console.error('Failed to persist share draft:', err))
+    setShareConversation(conversation)
+    setShareEditorReturnView('session')
     setView('share-editor')
+  }, [])
+
+  const handleOpenDraft = useCallback((draft: ShareDraftRow) => {
+    try {
+      const doc = JSON.parse(draft.snapshot_json) as SpoolDocument
+      setShareConversation(doc.conversation)
+      setShareEditorReturnView('shares')
+      setView('share-editor')
+    } catch (err) {
+      console.error('Failed to parse draft snapshot:', err)
+    }
   }, [])
 
   const handleCloseShareEditor = useCallback(() => {
     setShareConversation(null)
-    // Back to session detail if a session was open, otherwise to wherever
-    // the user came from (Library / project / search results all resume
-    // naturally from their existing state).
-    setView(selectedSession ? 'session' : 'search')
-  }, [selectedSession])
+    setView(shareEditorReturnView)
+  }, [shareEditorReturnView])
 
   useEffect(() => {
     if (!window.spool?.getSidebarCollapsed) return
@@ -558,7 +582,7 @@ export default function App() {
         {isShareEditorView && shareConversation ? (
           <ShareEditorPage conversation={shareConversation} onBack={handleCloseShareEditor} />
         ) : isSharesView ? (
-          <SharesPage />
+          <SharesPage onOpenDraft={handleOpenDraft} />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {
