@@ -210,11 +210,101 @@ export async function saveBlob(
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-type Ext = 'png' | 'pdf'
+type Ext = 'png' | 'pdf' | 'spool'
 
 function filenameFor(c: Conversation, template: Template, ext: Ext): string {
   const safe = sanitizeFilename(c.title)
   const date = new Date().toISOString().slice(0, 10)
   const templateTag = template === 'chat' ? '' : ` · ${template}`
   return `${safe || 'spool'}${templateTag} · ${date}.${ext}`
+}
+
+export function filenameForExport(c: Conversation, template: Template, ext: 'png' | 'pdf' | 'spool'): string {
+  return filenameFor(c, template, ext)
+}
+
+/**
+ * Where a save-out is going to land. Surfaces three states so callers
+ * can plan the rest of the export flow: the user picked a destination
+ * via the native dialog, the picker isn't available so we'll use the
+ * <a download> fallback, or the user cancelled and the caller should
+ * bail without writing anything.
+ */
+export type SaveSlot =
+  | { kind: 'cancelled' }
+  | { kind: 'picker'; handle: FileSystemFileHandle }
+  | { kind: 'fallback' }
+
+/**
+ * Open the native Save dialog (or fall back) while the user gesture
+ * is still fresh. Call this synchronously on the click handler — not
+ * after a long async step — so showSaveFilePicker doesn't reject
+ * with SecurityError when the gesture has timed out.
+ *
+ * The returned slot is paired with a later writeToSlot() once the
+ * caller has a Blob ready to commit.
+ */
+export async function openSaveSlot(
+  filename: string,
+  accept: { description: string; mime: string; ext: string },
+): Promise<SaveSlot> {
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (opts: {
+      suggestedName: string
+      types: Array<{ description: string; accept: Record<string, string[]> }>
+    }) => Promise<FileSystemFileHandle>
+  }).showSaveFilePicker
+  if (!picker) return { kind: 'fallback' }
+  try {
+    const handle = await picker({
+      suggestedName: filename,
+      types: [{ description: accept.description, accept: { [accept.mime]: [accept.ext] } }],
+    })
+    return { kind: 'picker', handle }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { kind: 'cancelled' }
+    }
+    console.warn('[share-kit] showSaveFilePicker failed, falling back to <a download>:', err)
+    return { kind: 'fallback' }
+  }
+}
+
+/**
+ * Commit a previously-opened SaveSlot with a Blob. Writes through the
+ * native handle when one was picked, falls back to <a download>
+ * otherwise; cancelled slots are silent no-ops.
+ */
+export async function writeToSlot(slot: SaveSlot, blob: Blob, filename: string): Promise<void> {
+  if (slot.kind === 'cancelled') return
+  if (slot.kind === 'picker') {
+    const writable = await slot.handle.createWritable()
+    await writable.write(blob)
+    await writable.close()
+    return
+  }
+  // fallback: classic invisible-link click → Downloads folder
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/**
+ * Rasterize a DOM node to a PNG Blob without writing to disk. Use
+ * together with openSaveSlot + writeToSlot when the caller wants to
+ * pre-pick a destination on user gesture before running this expensive
+ * rasterization step.
+ */
+export async function rasterizeToPngBlob(
+  node: HTMLElement,
+  dims?: { width: number; height: number },
+  pixelRatio = 3,
+): Promise<Blob> {
+  await document.fonts.ready
+  return renderBlob(node, pixelRatio, dims)
 }

@@ -56,8 +56,15 @@ export { SourceMark } from './components/source-mark'
 export * as Icons from './components/icons'
 
 // ─── Exporters (local, in-browser) ──────────────────────────────
-export { exportArtifact, saveBlob } from './lib/export'
-export type { ExportFormat } from './lib/export'
+export {
+  exportArtifact,
+  saveBlob,
+  openSaveSlot,
+  writeToSlot,
+  rasterizeToPngBlob,
+  filenameForExport,
+} from './lib/export'
+export type { ExportFormat, SaveSlot } from './lib/export'
 
 // .spool file format ──────────────────────────────────────────────
 export {
