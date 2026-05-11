@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SquareTerminal } from 'lucide-react'
+import { SquareTerminal, Share2 } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
@@ -18,9 +18,10 @@ type Props = {
   targetMessageId?: number | null
   onCopySessionId: (source: Session['source']) => void
   onBack?: () => void
+  onShare?: (session: Session, messages: Message[]) => void
 }
 
-export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack }: Props) {
+export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,6 +265,18 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             pinned={pinned}
             onChange={setPinned}
           />
+
+          {onShare && session && (
+            <button
+              data-testid="detail-share"
+              onClick={() => onShare(session, messages)}
+              title="Create a share from this session"
+              aria-label="Create a share from this session"
+              className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              <Share2 size={13} strokeWidth={1.6} aria-hidden />
+            </button>
+          )}
 
           <button
             data-testid="detail-resume"

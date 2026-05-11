@@ -12,6 +12,10 @@ import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
 import SharesPage from './components/SharesPage.js'
+import ShareEditorPage from './components/ShareEditorPage.js'
+import { composeFromSession } from './lib/compose-from-session.js'
+import type { Conversation } from '@spool/share-kit'
+import type { Message, Session } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -22,7 +26,7 @@ import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 
-type View = 'search' | 'session' | 'shares'
+type View = 'search' | 'session' | 'shares' | 'share-editor'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
@@ -89,6 +93,20 @@ export default function App() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [shareConversation, setShareConversation] = useState<Conversation | null>(null)
+
+  const handleStartShareFromSession = useCallback((session: Session, messages: Message[]) => {
+    setShareConversation(composeFromSession(session, messages))
+    setView('share-editor')
+  }, [])
+
+  const handleCloseShareEditor = useCallback(() => {
+    setShareConversation(null)
+    // Back to session detail if a session was open, otherwise to wherever
+    // the user came from (Library / project / search results all resume
+    // naturally from their existing state).
+    setView(selectedSession ? 'session' : 'search')
+  }, [selectedSession])
 
   useEffect(() => {
     if (!window.spool?.getSidebarCollapsed) return
@@ -109,6 +127,7 @@ export default function App() {
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
   const isSharesView = view === 'shares'
+  const isShareEditorView = view === 'share-editor'
 
   useEffect(() => {
     loadThemeEditorState()
@@ -536,7 +555,9 @@ export default function App() {
       </div>
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
-        {isSharesView ? (
+        {isShareEditorView && shareConversation ? (
+          <ShareEditorPage conversation={shareConversation} onBack={handleCloseShareEditor} />
+        ) : isSharesView ? (
           <SharesPage />
         ) : isHomeMode ? (
           <LibraryLanding
@@ -592,6 +613,7 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
+                  onShare={handleStartShareFromSession}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
