@@ -3,6 +3,7 @@
 
 import type { Conversation, EditorOpts, SpoolDocument } from '../types'
 import { saveBlob } from '../export'
+import { sanitizeFilename } from '../filename'
 
 const MIME = 'application/spool+json'
 
@@ -49,12 +50,7 @@ function isSpoolDocument(v: unknown): v is SpoolDocument {
 }
 
 function filenameFor(c: Conversation): string {
-  const safe = c.title
-    .trim()
-    .replace(/[\/\\:*?"<>| -]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .slice(0, 80)
-    .trim()
+  const safe = sanitizeFilename(c.title)
   const date = new Date().toISOString().slice(0, 10)
   return `${safe || 'spool'} · ${date}.spool`
 }

@@ -80,3 +80,11 @@ export function normalizeBlock(s: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
+
+/** Collapse all whitespace runs to single spaces and truncate with an
+ *  ellipsis. Used by source extractors to derive a one-line title fallback
+ *  when the share page didn't give us a usable one. */
+export function truncate(s: string, n: number): string {
+  const flat = s.replace(/\s+/g, ' ').trim()
+  return flat.length <= n ? flat : flat.slice(0, n - 1) + '…'
+}

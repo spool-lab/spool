@@ -12,7 +12,7 @@
 // line. ChatGPT's title is preserved by Jina as `data.title`.
 
 import type { Turn } from '@/lib/types'
-import { ParseError, humanDate, normalizeBlock, stats, type ParserSource } from '../source'
+import { ParseError, humanDate, normalizeBlock, stats, truncate, type ParserSource } from '../source'
 
 const TURN_RX = /^####\s+(?:(You said):|(ChatGPT said):)\s*$/gm
 
@@ -119,8 +119,3 @@ function splitTurns(md: string): Turn[] {
 // Kept short and unambiguous so it reads as a legit typographic marker
 // rather than an error or a piece of real content.
 const HIDDEN_PROMPT = '⟨ prompt not included in this share ⟩'
-
-function truncate(s: string, n: number): string {
-  const flat = s.replace(/\s+/g, ' ').trim()
-  return flat.length <= n ? flat : flat.slice(0, n - 1) + '…'
-}

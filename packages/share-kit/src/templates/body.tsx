@@ -9,7 +9,7 @@
 // `[redacted]`, then customize the `code` renderer to detect that
 // exact string and render our styled chip instead of a code element.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -107,7 +107,7 @@ function preprocess(text: string, redact?: string[]): string {
 }
 
 export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, accent, accentBg, blockBorder }: BodyProps) {
-  const processed = preprocess(text, redact)
+  const processed = useMemo(() => preprocess(text, redact), [text, redact])
   const blockStroke = blockBorder ?? accent
 
   const baseFont = mono
@@ -119,103 +119,103 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
   // don't inherit useful types via contextual typing. We accept any-typed
   // props here; the markdown library guarantees their runtime shape.
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const components = {
+  const components = useMemo<Components>(() => ({
     code({ className, children, node: _node, ...props }: any) {
-            const text = String(children).replace(/\n$/, '')
-            if (text === REDACT_SENTINEL) {
-              return (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    padding: '0 4px',
-                    borderRadius: 2,
-                    background: accentBg,
-                    color: accent,
-                    fontFamily: 'Geist Mono, monospace',
-                    fontSize: '0.9em',
-                    letterSpacing: '0.02em',
-                  }}
-                >
-                  [redacted]
-                </span>
-              )
-            }
-            // react-markdown v10: block code carries a `language-xxx` class
-            // from the fence; inline code has no className.
-            const isBlock = typeof className === 'string' && className.startsWith('language-')
-            if (!isBlock) {
-              return (
-                <code
-                  className={className}
-                  {...props}
-                  style={{
-                    fontFamily: 'Geist Mono, monospace',
-                    fontSize: '0.92em',
-                    padding: '1px 5px',
-                    borderRadius: 3,
-                    background: 'rgba(128,128,128,0.12)',
-                  }}
-                >
-                  {children}
-                </code>
-              )
-            }
-            return (
-              <code className={className} {...props} style={{ fontFamily: 'Geist Mono, monospace' }}>
-                {children}
-              </code>
-            )
-          },
-          pre({ children }: { children?: React.ReactNode }) {
-            return (
-              <pre
-                style={{
-                  background: 'rgba(128,128,128,0.08)',
-                  padding: '10px 12px',
-                  borderRadius: 3,
-                  overflow: 'auto',
-                  fontFamily: 'Geist Mono, monospace',
-                  fontSize: '0.92em',
-                  lineHeight: 1.55,
-                  margin: '8px 0',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {children}
-              </pre>
-            )
-          },
-          h1: (props: any) => <h3 style={headStyle(18)} {...props} />,
-          h2: (props: any) => <h3 style={headStyle(16)} {...props} />,
-          h3: (props: any) => <h3 style={headStyle(14)} {...props} />,
-          h4: (props: any) => <h4 style={headStyle(13)} {...props} />,
-          h5: (props: any) => <h4 style={headStyle(12)} {...props} />,
-          h6: (props: any) => <h4 style={headStyle(12)} {...props} />,
-          p: (props: any) => <p style={{ margin: '6px 0' }} {...props} />,
-          ul: (props: any) => <ul style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'disc' }} {...props} />,
-          ol: (props: any) => <ol style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'decimal' }} {...props} />,
-          li: (props: any) => <li style={{ margin: '2px 0' }} {...props} />,
-          strong: (props: any) => <strong style={{ color: 'inherit', fontWeight: 600 }} {...props} />,
-          em: (props: any) => <em {...props} />,
-          blockquote: (props: any) => (
-            <blockquote
-              style={{
-                borderLeft: `2px solid ${blockStroke}`,
-                margin: '6px 0',
-                padding: '2px 0 2px 10px',
-                opacity: 0.9,
-              }}
-              {...props}
-            />
-          ),
-          hr: () => <hr style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.2, margin: '10px 0' }} />,
-          a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => (
-            <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}` }}>
-              {children}
-            </a>
-          ),
+      const codeText = String(children).replace(/\n$/, '')
+      if (codeText === REDACT_SENTINEL) {
+        return (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '0 4px',
+              borderRadius: 2,
+              background: accentBg,
+              color: accent,
+              fontFamily: 'Geist Mono, monospace',
+              fontSize: '0.9em',
+              letterSpacing: '0.02em',
+            }}
+          >
+            [redacted]
+          </span>
+        )
+      }
+      // react-markdown v10: block code carries a `language-xxx` class
+      // from the fence; inline code has no className.
+      const isBlock = typeof className === 'string' && className.startsWith('language-')
+      if (!isBlock) {
+        return (
+          <code
+            className={className}
+            {...props}
+            style={{
+              fontFamily: 'Geist Mono, monospace',
+              fontSize: '0.92em',
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: 'rgba(128,128,128,0.12)',
+            }}
+          >
+            {children}
+          </code>
+        )
+      }
+      return (
+        <code className={className} {...props} style={{ fontFamily: 'Geist Mono, monospace' }}>
+          {children}
+        </code>
+      )
+    },
+    pre({ children }: { children?: React.ReactNode }) {
+      return (
+        <pre
+          style={{
+            background: 'rgba(128,128,128,0.08)',
+            padding: '10px 12px',
+            borderRadius: 3,
+            overflow: 'auto',
+            fontFamily: 'Geist Mono, monospace',
+            fontSize: '0.92em',
+            lineHeight: 1.55,
+            margin: '8px 0',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {children}
+        </pre>
+      )
+    },
+    h1: (props: any) => <h3 style={headStyle(18)} {...props} />,
+    h2: (props: any) => <h3 style={headStyle(16)} {...props} />,
+    h3: (props: any) => <h3 style={headStyle(14)} {...props} />,
+    h4: (props: any) => <h4 style={headStyle(13)} {...props} />,
+    h5: (props: any) => <h4 style={headStyle(12)} {...props} />,
+    h6: (props: any) => <h4 style={headStyle(12)} {...props} />,
+    p: (props: any) => <p style={{ margin: '6px 0' }} {...props} />,
+    ul: (props: any) => <ul style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'disc' }} {...props} />,
+    ol: (props: any) => <ol style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'decimal' }} {...props} />,
+    li: (props: any) => <li style={{ margin: '2px 0' }} {...props} />,
+    strong: (props: any) => <strong style={{ color: 'inherit', fontWeight: 600 }} {...props} />,
+    em: (props: any) => <em {...props} />,
+    blockquote: (props: any) => (
+      <blockquote
+        style={{
+          borderLeft: `2px solid ${blockStroke}`,
+          margin: '6px 0',
+          padding: '2px 0 2px 10px',
+          opacity: 0.9,
+        }}
+        {...props}
+      />
+    ),
+    hr: () => <hr style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.2, margin: '10px 0' }} />,
+    a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => (
+      <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}` }}>
+        {children}
+      </a>
+    ),
     img: ({ src, alt }: { src?: string | undefined; alt?: string | undefined }) => <MarkdownImage src={src} alt={alt} accent={accent} />,
-  } satisfies Components
+  }), [accent, accentBg, blockStroke])
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   return (

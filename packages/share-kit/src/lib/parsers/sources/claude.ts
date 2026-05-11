@@ -20,6 +20,7 @@ import {
   humanDate,
   normalizeBlock,
   stats,
+  truncate,
   type ParserSource,
 } from '../source'
 
@@ -231,7 +232,3 @@ function deriveTitleFromTurns(turns: Turn[]): string | undefined {
   return undefined
 }
 
-function truncate(s: string, n: number): string {
-  const flat = s.replace(/\s+/g, ' ').trim()
-  return flat.length <= n ? flat : flat.slice(0, n - 1) + '…'
-}

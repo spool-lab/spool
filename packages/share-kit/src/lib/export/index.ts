@@ -18,6 +18,7 @@
 
 import { toBlob } from 'html-to-image'
 import type { Conversation, Template } from '@/lib/types'
+import { sanitizeFilename } from '@/lib/filename'
 
 export type ExportFormat = 'png' | 'pdf'
 
@@ -114,7 +115,7 @@ async function exportPdf({ node, template, conversation }: ExportArgs): Promise<
   document.head.appendChild(style)
 
   const origTitle = document.title
-  document.title = filenameBase(conversation, template, 'pdf')
+  document.title = filenameFor(conversation, template, 'pdf')
 
   const cleanup = () => {
     document.body.removeChild(host)
@@ -185,26 +186,9 @@ export async function saveBlob(
 
 type Ext = 'png' | 'pdf'
 
-function filenameBase(c: Conversation, template: Template, ext: Ext): string {
+function filenameFor(c: Conversation, template: Template, ext: Ext): string {
   const safe = sanitizeFilename(c.title)
   const date = new Date().toISOString().slice(0, 10)
-  const template_tag = template === 'chat' ? '' : ` · ${template}`
-  return `${safe || 'spool'}${template_tag} · ${date}.${ext}`
-}
-
-/** Filesystem-safe but preserves CJK / Unicode letters. Only strips the
- *  characters that OSes genuinely can't have in filenames. */
-function sanitizeFilename(title: string): string {
-  return title
-    .trim()
-    // Replace characters that actually break filesystems.
-    .replace(/[\/\\:*?"<>| -]+/g, ' ')
-    // Collapse runs of whitespace (but preserve the characters themselves).
-    .replace(/\s+/g, ' ')
-    .slice(0, 80)
-    .trim()
-}
-
-function filenameFor(c: Conversation, template: Template, ext: Ext): string {
-  return filenameBase(c, template, ext)
+  const templateTag = template === 'chat' ? '' : ` · ${template}`
+  return `${safe || 'spool'}${templateTag} · ${date}.${ext}`
 }
