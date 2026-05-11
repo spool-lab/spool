@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import type { ShareDraftRow } from './share-drafts.js'
 
 const tempDirs: string[] = []
 const openDbs: Array<{ close: () => void }> = []
@@ -83,6 +84,142 @@ describe('share_drafts schema (v11)', () => {
     expect(v).toBe(11)
   })
 
+  it('upsertShareDraft inserts a new row with timestamps', async () => {
+    const { db, mod } = await load()
+    mod.upsertShareDraft(db, {
+      draft_id: 'd-1',
+      source_kind: 'spool-session',
+      source_origin: 'sess-uuid',
+      title: 'first',
+      snapshot_json: '{"v":1}',
+    })
+    const row = mod.getShareDraft(db, 'd-1')
+    expect(row?.title).toBe('first')
+    expect(row?.snapshot_json).toBe('{"v":1}')
+    expect(row?.created_at).toBeTruthy()
+    expect(row?.updated_at).toBe(row?.created_at)
+  })
+
+  it('upsertShareDraft updates in place and bumps updated_at', async () => {
+    const { db, mod } = await load()
+    mod.upsertShareDraft(db, {
+      draft_id: 'd-1',
+      source_kind: 'spool-session',
+      source_origin: 'sess-uuid',
+      title: 'first',
+      snapshot_json: '{"v":1}',
+    })
+    const first = mod.getShareDraft(db, 'd-1')
+
+    // SQLite datetime('now') has 1-second granularity, so we have to
+    // shift the row's created_at backward to observe the timestamp
+    // movement in a sub-second test.
+    db.prepare(`UPDATE share_drafts SET updated_at = datetime('now', '-2 seconds') WHERE draft_id = ?`)
+      .run('d-1')
+
+    mod.upsertShareDraft(db, {
+      draft_id: 'd-1',
+      source_kind: 'spool-session',
+      source_origin: 'sess-uuid',
+      title: 'second',
+      snapshot_json: '{"v":2}',
+    })
+    const second = mod.getShareDraft(db, 'd-1')
+    expect(second?.title).toBe('second')
+    expect(second?.snapshot_json).toBe('{"v":2}')
+    expect(second!.updated_at >= first!.updated_at).toBe(true)
+  })
+
+  it('listShareDrafts returns rows in updated_at DESC order', async () => {
+    const { db, mod } = await load()
+    const ids = ['a', 'b', 'c']
+    for (const id of ids) {
+      mod.upsertShareDraft(db, {
+        draft_id: id,
+        source_kind: 'pasted-url',
+        source_origin: `https://example.com/${id}`,
+        title: id,
+        snapshot_json: '{}',
+      })
+    }
+    // Force a predictable order by stamping updated_at in reverse.
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-01 00:00:00', 'a')
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-02 00:00:00', 'b')
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-03 00:00:00', 'c')
+
+    const rows = mod.listShareDrafts(db)
+    expect(rows.map((r: ShareDraftRow) => r.draft_id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('listShareDrafts respects the limit option', async () => {
+    const { db, mod } = await load()
+    for (let i = 0; i < 5; i++) {
+      mod.upsertShareDraft(db, {
+        draft_id: `d-${i}`,
+        source_kind: 'spool-session',
+        source_origin: `sess-${i}`,
+        title: '',
+        snapshot_json: '{}',
+      })
+    }
+    expect(mod.listShareDrafts(db, { limit: 2 })).toHaveLength(2)
+  })
+
+  it('getShareDraft returns null for unknown id', async () => {
+    const { db, mod } = await load()
+    expect(mod.getShareDraft(db, 'nope')).toBeNull()
+  })
+
+  it('deleteShareDraft removes the row', async () => {
+    const { db, mod } = await load()
+    mod.upsertShareDraft(db, {
+      draft_id: 'gone',
+      source_kind: 'imported-file',
+      source_origin: 'foo.spool',
+      title: '',
+      snapshot_json: '{}',
+    })
+    mod.deleteShareDraft(db, 'gone')
+    expect(mod.getShareDraft(db, 'gone')).toBeNull()
+  })
+
+  it('countDraftsBySession counts only spool-session drafts with matching origin', async () => {
+    const { db, mod } = await load()
+    mod.upsertShareDraft(db, {
+      draft_id: 'a',
+      source_kind: 'spool-session',
+      source_origin: 'sess-X',
+      title: '',
+      snapshot_json: '{}',
+    })
+    mod.upsertShareDraft(db, {
+      draft_id: 'b',
+      source_kind: 'spool-session',
+      source_origin: 'sess-X',
+      title: '',
+      snapshot_json: '{}',
+    })
+    mod.upsertShareDraft(db, {
+      draft_id: 'c',
+      source_kind: 'spool-session',
+      source_origin: 'sess-Y',
+      title: '',
+      snapshot_json: '{}',
+    })
+    // A pasted-url draft whose origin happens to match a session uuid
+    // should not be counted as a spool-session.
+    mod.upsertShareDraft(db, {
+      draft_id: 'd',
+      source_kind: 'pasted-url',
+      source_origin: 'sess-X',
+      title: '',
+      snapshot_json: '{}',
+    })
+    expect(mod.countDraftsBySession(db, 'sess-X')).toBe(2)
+    expect(mod.countDraftsBySession(db, 'sess-Y')).toBe(1)
+    expect(mod.countDraftsBySession(db, 'sess-Z')).toBe(0)
+  })
+
   it('migration is idempotent across re-open', async () => {
     const spoolDir = makeTempDir('spool-share-drafts-reopen-')
     vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
@@ -118,7 +255,8 @@ async function load() {
 async function loadInto(_spoolDir: string) {
   vi.resetModules()
   const dbModule = await import('./db.js')
+  const mod = await import('./share-drafts.js')
   const db = dbModule.getDB()
   openDbs.push(db)
-  return { db }
+  return { db, mod }
 }
