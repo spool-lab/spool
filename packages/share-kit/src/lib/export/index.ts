@@ -66,23 +66,156 @@ async function exportPng({ node, template, conversation, dims }: ExportArgs): Pr
  * Our fonts are preloaded via @font-face in global.css, so the canvas
  * renderer has them available without re-embedding.
  */
+// Chromium's max canvas dimension on a single axis. html-to-image's
+// built-in checkCanvasDimensions will rescale the LONGER axis down to
+// this limit AND shrink the OTHER axis proportionally — so a 720×88000
+// conversation at 3× pixelRatio becomes a useless 134×16384 sliver.
+// We cap pixelRatio up-front so the resulting canvas fits, and we
+// disable html-to-image's autoscaling as a belt-and-suspenders.
+const CANVAS_MAX_AXIS = 16384
+
+/**
+ * Thrown when a conversation is too tall (or wide) to fit into a
+ * single PNG canvas axis. Hosts should catch this and steer the user
+ * toward PDF export, which has no equivalent dimension cap.
+ */
+export class PngTooTallError extends Error {
+  readonly width: number
+  readonly height: number
+  readonly maxAxis: number
+  constructor(width: number, height: number, maxAxis: number) {
+    super(
+      `Conversation is too tall for a single PNG (${width}×${height}px; max axis is ${maxAxis}px). ` +
+        `Use PDF export instead — PDF has no canvas size limit.`,
+    )
+    this.name = 'PngTooTallError'
+    this.width = width
+    this.height = height
+    this.maxAxis = maxAxis
+  }
+}
+
 async function renderBlob(
   node: HTMLElement,
   pixelRatio: number,
   dims?: { width: number; height: number },
 ): Promise<Blob> {
-  const opts: Parameters<typeof toBlob>[1] = { pixelRatio, cacheBust: true, skipFonts: true }
+  const width = dims?.width ?? node.clientWidth
+  const height = dims?.height ?? node.scrollHeight
+  const longestAxis = Math.max(width, height)
+  // Hard refuse if even ratio=1 won't fit in a single canvas axis.
+  // PNG export is fundamentally constrained by the 16384px canvas
+  // limit and there's no honest way to fit a 90k-pixel-tall
+  // conversation into one image. Callers should suggest PDF.
+  if (longestAxis > CANVAS_MAX_AXIS) {
+    throw new PngTooTallError(width, height, CANVAS_MAX_AXIS)
+  }
+  const safeRatio = Math.max(1, Math.min(pixelRatio, Math.floor(CANVAS_MAX_AXIS / longestAxis)))
+
+  const opts: Parameters<typeof toBlob>[1] = {
+    pixelRatio: safeRatio,
+    cacheBust: true,
+    skipFonts: true,
+    skipAutoScale: true,
+  }
   if (dims) {
     opts.width = dims.width
     opts.height = dims.height
-    // Lock the cloned node's box too — html-to-image keeps the
-    // original node's inline style on the clone; forcing the style
-    // matches the SVG viewport we just asked for.
     opts.style = { width: `${dims.width}px`, height: `${dims.height}px` }
+  }
+  if (safeRatio < pixelRatio) {
+    console.warn(
+      `[share-kit] PNG capped to ${safeRatio}× (requested ${pixelRatio}×) — content is ${width}×${height}px and would exceed canvas axis limit ${CANVAS_MAX_AXIS}.`,
+    )
   }
   const blob = await toBlob(node, opts)
   if (!blob) throw new Error('Failed to rasterize artifact — browser returned no blob.')
   return blob
+}
+
+/**
+ * Set up a print host so a subsequent webContents.printToPDF() (or
+ * window.print()) only sees the artifact, at its full intrinsic size,
+ * with no page background or browser chrome.
+ *
+ * Returns a `cleanup` callback the host MUST call once the print job
+ * has either resolved or thrown — otherwise the print-host clone +
+ * @media print stylesheet leak into the document.
+ *
+ * Splitting this out lets Electron hosts call webContents.printToPDF()
+ * via IPC and get back a PDF Buffer (which they can preview in-app)
+ * instead of routing through window.print() and the OS print dialog.
+ */
+export function installPdfPrintHost(
+  node: HTMLElement,
+  conversation: Conversation,
+  template: Template,
+  dims?: { width: number; height: number },
+): { cleanup: () => void; widthPx: number; heightPx: number; filename: string } {
+  const widthPx = dims?.width ?? node.clientWidth
+
+  const host = document.createElement('div')
+  host.className = 'spool-print-host'
+  host.style.cssText = 'position:fixed;left:-100000px;top:0;'
+  const clone = node.cloneNode(true) as HTMLElement
+  host.appendChild(clone)
+  document.body.appendChild(host)
+
+  // Trust the on-screen node's scrollHeight (caller passes it via
+  // dims). Pad by a generous margin (32px) to absorb sub-pixel
+  // rendering drift between screen rendering and Chromium's print
+  // pipeline — otherwise the artifact bleeds into a second page with
+  // mostly empty space. Don't over-pad: a too-large page is just as
+  // bad (PDF viewer zooms out to fit, content becomes unreadable).
+  const baseHeight = dims?.height ?? node.scrollHeight
+  const heightPx = Math.ceil(baseHeight + 32)
+  console.info('[share-kit/installPdfPrintHost]', {
+    nodeScrollHeight: node.scrollHeight,
+    nodeClientHeight: node.clientHeight,
+    cloneScrollHeight: clone.scrollHeight,
+    dimsHeight: dims?.height,
+    chosenHeightPx: heightPx,
+  })
+
+  const style = document.createElement('style')
+  style.setAttribute('data-spool-print', '')
+  style.textContent = `
+    @media print {
+      body > *:not(.spool-print-host) { display: none !important; }
+      body { background: white !important; }
+      .spool-print-host {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        width: auto !important;
+      }
+      .spool-print-host > * {
+        box-shadow: none !important;
+        margin: 0 auto !important;
+      }
+      /* No @page size — main process sets a standard A4 page size,
+         and forcing a custom @page here would step on it.
+         Page-break rules: keep message bubbles intact across page
+         boundaries. Direct grandchildren of the print host are the
+         typical message-container layer. */
+      .spool-print-host > * > * {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+    }
+  `
+  document.head.appendChild(style)
+
+  const filename = filenameFor(conversation, template, 'pdf')
+  const origTitle = document.title
+  document.title = filename
+
+  const cleanup = () => {
+    if (host.parentNode) host.parentNode.removeChild(host)
+    if (style.parentNode) style.parentNode.removeChild(style)
+    document.title = origTitle
+  }
+  return { cleanup, widthPx, heightPx, filename }
 }
 
 /**

@@ -196,6 +196,9 @@ const api = {
 
   installUpdate: (): Promise<void> =>
     ipcRenderer.invoke('spool:install-update'),
+
+  printToPdf: (widthPx: number, heightPx: number): Promise<Uint8Array> =>
+    ipcRenderer.invoke('spool:print-to-pdf', { widthPx, heightPx }),
 }
 
 contextBridge.exposeInMainWorld('spool', api)

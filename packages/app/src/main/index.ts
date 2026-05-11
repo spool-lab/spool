@@ -499,3 +499,26 @@ ipcMain.handle('spool:install-update', () => {
   quitAndInstall()
 })
 
+// Share editor — print the renderer's current page to a vector PDF
+// buffer. The renderer first installs a print host (share-kit's
+// installPdfPrintHost) that scopes @media print to a single artifact,
+// then calls this handler. We use a standard A4 page size: trying to
+// fit a long conversation onto one giant page hits Chromium's
+// ~200-inch axis cap and the PDF viewer can't display the result
+// sensibly anyway. Better to produce a normal-looking multi-page PDF.
+//
+// widthPx/heightPx are kept on the IPC contract for future use
+// (e.g. choosing between A4 and a custom tall page for short
+// conversations), but ignored today.
+ipcMain.handle(
+  'spool:print-to-pdf',
+  async (e, _args: { widthPx: number; heightPx: number }): Promise<Uint8Array> => {
+    const buf = await e.sender.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      margins: { marginType: 'default' },
+    })
+    return new Uint8Array(buf)
+  },
+)
+
