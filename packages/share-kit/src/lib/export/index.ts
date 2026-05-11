@@ -27,6 +27,14 @@ interface ExportArgs {
   node: HTMLElement
   template: Template
   conversation: Conversation
+  /** Force the rasterization area to these CSS-pixel dimensions instead
+   *  of trusting node.clientWidth / node.scrollHeight. The kit's
+   *  templates render at a known intrinsic width (TEMPLATE_RATIO[template].w);
+   *  hosts that wrap the preview in flex / overflow chrome can get
+   *  measurement quirks where the wrapper's measured width collapses
+   *  to its content's shrunk box and the resulting PNG comes out
+   *  narrow. Passing dims sidesteps that. */
+  dims?: { width: number; height: number }
 }
 
 export async function exportArtifact(format: ExportFormat, args: ExportArgs): Promise<void> {
@@ -40,10 +48,10 @@ export async function exportArtifact(format: ExportFormat, args: ExportArgs): Pr
   }
 }
 
-async function exportPng({ node, template, conversation }: ExportArgs): Promise<void> {
+async function exportPng({ node, template, conversation, dims }: ExportArgs): Promise<void> {
   // 3× pixel ratio keeps text crisp on retina phones where these
   // get posted most often.
-  const blob = await renderBlob(node, 3)
+  const blob = await renderBlob(node, 3, dims)
   await saveBlob(blob, filenameFor(conversation, template, 'png'), {
     description: 'PNG image',
     mime: 'image/png',
@@ -58,8 +66,21 @@ async function exportPng({ node, template, conversation }: ExportArgs): Promise<
  * Our fonts are preloaded via @font-face in global.css, so the canvas
  * renderer has them available without re-embedding.
  */
-async function renderBlob(node: HTMLElement, pixelRatio: number): Promise<Blob> {
-  const blob = await toBlob(node, { pixelRatio, cacheBust: true, skipFonts: true })
+async function renderBlob(
+  node: HTMLElement,
+  pixelRatio: number,
+  dims?: { width: number; height: number },
+): Promise<Blob> {
+  const opts: Parameters<typeof toBlob>[1] = { pixelRatio, cacheBust: true, skipFonts: true }
+  if (dims) {
+    opts.width = dims.width
+    opts.height = dims.height
+    // Lock the cloned node's box too — html-to-image keeps the
+    // original node's inline style on the clone; forcing the style
+    // matches the SVG viewport we just asked for.
+    opts.style = { width: `${dims.width}px`, height: `${dims.height}px` }
+  }
+  const blob = await toBlob(node, opts)
   if (!blob) throw new Error('Failed to rasterize artifact — browser returned no blob.')
   return blob
 }
