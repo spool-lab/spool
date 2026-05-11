@@ -21,8 +21,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - run: pnpm --filter @spool-lab/core build
       - run: pnpm --filter @spool-lab/core test
       - run: pnpm --filter @spool-lab/cli build
@@ -46,8 +44,6 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Build core
