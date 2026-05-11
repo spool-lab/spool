@@ -146,6 +146,8 @@ function describeSource(draft: ShareDraftRow): string {
       return draft.source_origin ?? 'imported file'
     case 'imported-jsonl':
       return draft.source_origin ?? 'imported transcript'
+    default:
+      return draft.source_origin ?? 'unknown source'
   }
 }
 
