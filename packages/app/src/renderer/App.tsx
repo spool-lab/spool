@@ -13,9 +13,9 @@ import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
-import { composeFromSession, sessionDraftId } from './lib/compose-from-session.js'
+import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
 import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type SpoolDocument } from '@spool/share-kit'
-import type { Message, Session, ShareDraftRow } from '@spool-lab/core'
+import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -100,25 +100,50 @@ export default function App() {
   // the Shares page while a session is also selected.
   const [shareEditorReturnView, setShareEditorReturnView] = useState<View>('search')
 
-  const handleStartShareFromSession = useCallback((session: Session, messages: Message[]) => {
-    const conversation = composeFromSession(session, messages)
+  const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[]) => {
     const draftId = sessionDraftId(session.sessionUuid)
-    const doc = buildSpoolDocument(conversation, DEFAULT_OPTS)
-    void window.spool?.shareDraft?.upsert({
-      draft_id: draftId,
-      source_kind: 'spool-session',
-      source_origin: session.sessionUuid,
-      title: conversation.title,
-      snapshot_json: JSON.stringify(doc),
-    }).catch((err) => console.error('Failed to persist share draft:', err))
+    // If the user has shared this session before, reopen their saved
+    // draft (their edits to template / paper / typeface / etc. are in
+    // the snapshot). Only when no draft exists do we build a fresh
+    // one with DEFAULT_OPTS and persist it.
+    let conversation: Conversation
+    try {
+      const existing = await window.spool?.shareDraft?.get(draftId)
+      if (existing) {
+        const doc = JSON.parse(existing.snapshot_json) as SpoolDocument
+        conversation = doc.conversation
+      } else {
+        conversation = composeFromSession(session, messages)
+        const doc = buildSpoolDocument(conversation, DEFAULT_OPTS)
+        await window.spool?.shareDraft?.upsert({
+          draft_id: draftId,
+          source_kind: 'spool-session',
+          source_origin: session.sessionUuid,
+          title: conversation.title,
+          snapshot_json: JSON.stringify(doc),
+          preview_json: JSON.stringify(buildPreviewDocument(doc)),
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load or persist share draft, falling back to a fresh compose:', err)
+      conversation = composeFromSession(session, messages)
+    }
     setShareConversation(conversation)
     setShareEditorReturnView('session')
     setView('share-editor')
   }, [])
 
-  const handleOpenDraft = useCallback((draft: ShareDraftRow) => {
+  const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
+    // The list query intentionally omits snapshot_json — fetch the
+    // full row before parsing so the editor gets the complete
+    // conversation rather than the truncated preview blob.
     try {
-      const doc = JSON.parse(draft.snapshot_json) as SpoolDocument
+      const full = await window.spool?.shareDraft?.get(draft.draft_id)
+      if (!full) {
+        console.error('Draft vanished between list and open:', draft.draft_id)
+        return
+      }
+      const doc = JSON.parse(full.snapshot_json) as SpoolDocument
       setShareConversation(doc.conversation)
       setShareEditorReturnView('shares')
       setView('share-editor')
