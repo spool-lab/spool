@@ -116,8 +116,15 @@ export default function ShareEditorPage({ conversation, onBack }: Props) {
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-warm-bg dark:bg-dark-bg">
         <div className="flex justify-center px-6 py-6">
-          <div ref={previewRef} className="shadow-lg rounded-sm overflow-hidden">
-            <TemplateRender template={opts.template} convo={conversation} opts={opts} />
+          {/* Outer wrapper carries the framing (shadow / rounded corners /
+              overflow) but is NOT the export target — the rasterizer and
+              the print-host need to read the raw template's intrinsic
+              dimensions without our visual chrome interfering with
+              clientWidth / scrollHeight. */}
+          <div className="shadow-lg rounded-sm overflow-hidden">
+            <div ref={previewRef}>
+              <TemplateRender template={opts.template} convo={conversation} opts={opts} />
+            </div>
           </div>
         </div>
       </div>
