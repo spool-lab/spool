@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup, ListSessionsByIdentityOptions, ProjectSessionSortOrder } from '@spool-lab/core'
+import type {
+  FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup,
+  ListSessionsByIdentityOptions, ProjectSessionSortOrder,
+  ShareDraftRow, UpsertShareDraftInput,
+} from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
@@ -92,6 +96,19 @@ const api = {
 
   setSidebarCollapsed: (collapsed: boolean): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:set-sidebar-collapsed', { collapsed }),
+
+  shareDraft: {
+    list: (limit?: number): Promise<ShareDraftRow[]> =>
+      ipcRenderer.invoke('spool:list-share-drafts', { limit }),
+    get: (draftId: string): Promise<ShareDraftRow | null> =>
+      ipcRenderer.invoke('spool:get-share-draft', { draftId }),
+    upsert: (input: UpsertShareDraftInput): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('spool:upsert-share-draft', { input }),
+    delete: (draftId: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('spool:delete-share-draft', { draftId }),
+    countBySession: (sessionUuid: string): Promise<number> =>
+      ipcRenderer.invoke('spool:count-drafts-by-session', { sessionUuid }),
+  },
 
   // AI / ACP
   getAiAgents: (): Promise<AgentInfo[]> =>

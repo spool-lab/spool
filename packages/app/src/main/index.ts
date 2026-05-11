@@ -6,8 +6,12 @@ import {
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity,
+  listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
 } from '@spool-lab/core'
-import type { FragmentResult, SessionSource, ListSessionsByIdentityOptions } from '@spool-lab/core'
+import type {
+  FragmentResult, SessionSource, ListSessionsByIdentityOptions,
+  ShareDraftRow, UpsertShareDraftInput,
+} from '@spool-lab/core'
 import { setupTray } from './tray.js'
 import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
@@ -321,6 +325,30 @@ ipcMain.handle('spool:list-pinned-sessions', () => {
 
 ipcMain.handle('spool:list-pinned-sessions-by-identity', (_e, { identityKey }: { identityKey: string }) => {
   return listPinnedSessionsByIdentity(db, identityKey)
+})
+
+ipcMain.handle('spool:list-share-drafts', (_e, { limit }: { limit?: number } = {}) => {
+  const opts: { limit?: number } = {}
+  if (limit !== undefined) opts.limit = limit
+  return listShareDrafts(db, opts)
+})
+
+ipcMain.handle('spool:get-share-draft', (_e, { draftId }: { draftId: string }) => {
+  return getShareDraft(db, draftId)
+})
+
+ipcMain.handle('spool:upsert-share-draft', (_e, { input }: { input: UpsertShareDraftInput }) => {
+  upsertShareDraft(db, input)
+  return { ok: true }
+})
+
+ipcMain.handle('spool:delete-share-draft', (_e, { draftId }: { draftId: string }) => {
+  deleteShareDraft(db, draftId)
+  return { ok: true }
+})
+
+ipcMain.handle('spool:count-drafts-by-session', (_e, { sessionUuid }: { sessionUuid: string }) => {
+  return countDraftsBySession(db, sessionUuid)
 })
 
 ipcMain.handle('spool:get-runtime-info', () => {
