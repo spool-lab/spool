@@ -34,6 +34,11 @@
         "vite",
         "vitest"
       ]
+    },
+    "overrides": {
+      "pathe@catalog:": "^2.0.3",
+      "wrangler@catalog:": "^4.0.0",
+      "@cloudflare/workers-types@catalog:": "^4.20260415.1"
     }
   }
 }
