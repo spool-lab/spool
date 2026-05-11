@@ -216,29 +216,3 @@ function bucketByDate(sessions: Session[]): DateBucket[] {
   if (older.length > 0) buckets.push({ label: 'OLDER', sessions: older })
   return buckets
 }
-
-export function SearchTrigger({
-  onClick,
-  label = 'Search…',
-  fullWidth = false,
-}: {
-  onClick: () => void
-  label?: string
-  fullWidth?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      data-testid="search-trigger"
-      onClick={onClick}
-      className={`flex items-center gap-2 h-8 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg px-2 text-xs text-warm-muted dark:text-dark-muted hover:border-accent/50 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 ${fullWidth ? 'w-full' : ''}`}
-    >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-none">
-        <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-      <span className="flex-1 text-left truncate">{label}</span>
-      <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex-none">⌘K</kbd>
-    </button>
-  )
-}
