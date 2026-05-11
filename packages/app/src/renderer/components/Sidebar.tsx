@@ -46,7 +46,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
   return (
     <aside
       data-testid="sidebar"
-      className="w-60 flex-none border-r border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
+      className="w-60 flex-none bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
       <nav className="px-2 pt-3 pb-2 flex-none flex flex-col gap-0.5" aria-label="Primary">
         {onSelectHome && (
