@@ -10,10 +10,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./src/styles/global.css",
+    "./styles/tokens.css": "./src/styles/tokens.css",
+    "./styles/fonts.css": "./src/styles/fonts.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/styles"
   ],
   "scripts": {
     "build": "pnpm run clean && vite build",
