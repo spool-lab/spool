@@ -25,7 +25,9 @@
   },
   "dependencies": {
     "html-to-image": "^1.11.13",
-    "idb-keyval": "^6.2.1"
+    "idb-keyval": "^6.2.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "peerDependencies": {
     "react": "^19.0.0",
