@@ -52,6 +52,7 @@ export type ProjectIdentityKind =
   | 'git_remote'
   | 'git_common_dir'
   | 'manifest_path'
+  | 'synthetic'
   | 'path'
   | 'loose'
   | 'spool_internal'
@@ -60,6 +61,11 @@ export interface ProjectIdentity {
   kind: ProjectIdentityKind
   key: string                       // normalized origin URL / abs path / 'loose'
   displayName: string
+  // Optional override for the project row's display_path. Used by synthetic
+  // identities to publish a stable header path (e.g. "~/Documents/Codex")
+  // instead of leaking the per-session scratch dir of whichever chat was
+  // synced first.
+  displayPath?: string
 }
 
 export interface ProjectGroup {

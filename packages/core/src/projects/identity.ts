@@ -3,6 +3,7 @@ import { dirname, join, isAbsolute, resolve } from 'node:path'
 import type { ProjectIdentity, ProjectIdentityKind } from '../types.js'
 import { fallbackDisplayName } from './display-name.js'
 import { DEFAULT_RESOLVERS, type WorktreeUpstreamResolver } from './worktree-resolvers.js'
+import { DEFAULT_SYNTHESIZERS, type IdentitySynthesizer } from './identity-synthesizers.js'
 
 export interface IdentityFs {
   exists(path: string): boolean
@@ -40,6 +41,7 @@ export function computeIdentity(
   cwd: string | null,
   fs: IdentityFs,
   resolvers: readonly WorktreeUpstreamResolver[] = DEFAULT_RESOLVERS,
+  synthesizers: readonly IdentitySynthesizer[] = DEFAULT_SYNTHESIZERS,
 ): ProjectIdentity {
   if (!cwd) return loose()
 
@@ -94,14 +96,24 @@ export function computeIdentity(
     for (const r of resolvers) {
       const upstream = r.resolve(cwd)
       if (!upstream || !fs.exists(upstream)) continue
-      const id = computeIdentity(upstream, fs, [])
+      const id = computeIdentity(upstream, fs, [], [])
       if (id.kind === 'git_remote' || id.kind === 'git_common_dir' || id.kind === 'manifest_path') {
         return id
       }
     }
   }
 
-  // 4. path
+  // 4. identity synthesizers — collapse known scratch-workspace patterns
+  // (e.g. Codex desktop's per-chat temp dirs under ~/Documents/Codex/<date>/)
+  // into a single synthetic project. Only runs when no real project signal
+  // was found above; a chat that happens to live inside a real git repo or
+  // manifest still groups under that repo.
+  for (const s of synthesizers) {
+    const id = s.synthesize(cwd)
+    if (id) return id
+  }
+
+  // 5. path
   return {
     kind: 'path',
     key: cwd,

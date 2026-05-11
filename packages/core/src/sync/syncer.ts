@@ -174,7 +174,8 @@ export class Syncer {
       const { slug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
       const identity = computeIdentity(parsed.cwd || null, realFs)
       const projectId = getOrCreateProject(
-        this.db, sourceId, slug, displayPath,
+        this.db, sourceId, slug,
+        identity.displayPath ?? displayPath,
         identity.displayName || displayName,
         { identityKind: identity.kind, identityKey: identity.key },
       )

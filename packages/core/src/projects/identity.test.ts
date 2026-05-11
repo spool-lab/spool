@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { homedir } from 'node:os'
 import { computeIdentity, normalizeGitRemote } from './identity.js'
 import type { WorktreeUpstreamResolver } from './worktree-resolvers.js'
+import type { IdentitySynthesizer } from './identity-synthesizers.js'
 
 const noFs = {
   exists: () => false,
@@ -12,6 +13,7 @@ const noFs = {
 // Empty resolver chain so unit tests don't reach into a dev machine's real
 // ~/.superset/local.db. Tests for resolver behavior pass an explicit chain.
 const noResolvers: WorktreeUpstreamResolver[] = []
+const noSynthesizers: IdentitySynthesizer[] = []
 
 describe('normalizeGitRemote', () => {
   it('strips .git and lowercases host', () => {
@@ -30,17 +32,17 @@ describe('normalizeGitRemote', () => {
 
 describe('computeIdentity', () => {
   it('returns loose for null cwd', () => {
-    const id = computeIdentity(null, noFs, noResolvers)
+    const id = computeIdentity(null, noFs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('loose')
     expect(id.key).toBe('loose')
   })
 
   it('returns loose for home dir', () => {
     const home = homedir()
-    expect(computeIdentity(home, noFs, noResolvers).kind).toBe('loose')
-    expect(computeIdentity(`${home}/Desktop`, noFs, noResolvers).kind).toBe('loose')
-    expect(computeIdentity(`${home}/Downloads`, noFs, noResolvers).kind).toBe('loose')
-    expect(computeIdentity('/tmp', noFs, noResolvers).kind).toBe('loose')
+    expect(computeIdentity(home, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
+    expect(computeIdentity(`${home}/Desktop`, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
+    expect(computeIdentity(`${home}/Downloads`, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
+    expect(computeIdentity('/tmp', noFs, noResolvers, noSynthesizers).kind).toBe('loose')
   })
 
   it('uses git remote when available', () => {
@@ -55,7 +57,7 @@ describe('computeIdentity', () => {
         return { stdout: '', exitCode: 1 }
       },
     }
-    const id = computeIdentity('/Users/chen/Code/spool', fs, noResolvers)
+    const id = computeIdentity('/Users/chen/Code/spool', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('git_remote')
     expect(id.key).toBe('github.com/spool-lab/spool')
   })
@@ -72,7 +74,7 @@ describe('computeIdentity', () => {
         return { stdout: '', exitCode: 1 }
       },
     }
-    const id = computeIdentity('/Users/chen/local-only', fs, noResolvers)
+    const id = computeIdentity('/Users/chen/local-only', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('git_common_dir')
     expect(id.key).toBe('/Users/chen/local-only/.git')
   })
@@ -84,7 +86,7 @@ describe('computeIdentity', () => {
         p.endsWith('package.json') ? '{"name":"my-proj"}' : null,
       spawn: () => ({ stdout: '', exitCode: 1 }),
     }
-    const id = computeIdentity('/Users/chen/proj/src', fs, noResolvers)
+    const id = computeIdentity('/Users/chen/proj/src', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('manifest_path')
     expect(id.key).toBe('/Users/chen/proj')
     expect(id.displayName).toBe('my-proj')
@@ -96,7 +98,7 @@ describe('computeIdentity', () => {
       readText: () => null,
       spawn: () => ({ stdout: '', exitCode: 1 }),
     }
-    const id = computeIdentity('/Users/chen/scratch/notes', fs, noResolvers)
+    const id = computeIdentity('/Users/chen/scratch/notes', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('path')
     expect(id.key).toBe('/Users/chen/scratch/notes')
     expect(id.displayName).toBe('notes')
@@ -121,14 +123,14 @@ describe('computeIdentity', () => {
       name: 'fake',
       resolve: (cwd) => cwd === '/wt/proj/branch' ? '/repos/proj' : null,
     }
-    const id = computeIdentity('/wt/proj/branch', fs, [resolver])
+    const id = computeIdentity('/wt/proj/branch', fs, [resolver], noSynthesizers)
     expect(id.kind).toBe('git_remote')
     expect(id.key).toBe('github.com/foo/proj')
   })
 
   it('falls through to path when resolver returns null', () => {
     const resolver: WorktreeUpstreamResolver = { name: 'fake', resolve: () => null }
-    const id = computeIdentity('/wt/proj/branch', noFs, [resolver])
+    const id = computeIdentity('/wt/proj/branch', noFs, [resolver], noSynthesizers)
     expect(id.kind).toBe('path')
     expect(id.key).toBe('/wt/proj/branch')
   })
@@ -138,7 +140,7 @@ describe('computeIdentity', () => {
       name: 'fake',
       resolve: () => '/repos/missing',
     }
-    const id = computeIdentity('/wt/proj/branch', noFs, [resolver])
+    const id = computeIdentity('/wt/proj/branch', noFs, [resolver], noSynthesizers)
     expect(id.kind).toBe('path')
   })
 
@@ -159,7 +161,7 @@ describe('computeIdentity', () => {
       name: 'fake',
       resolve: () => { resolverCalled = true; return '/elsewhere' },
     }
-    const id = computeIdentity('/Users/me/repo', fs, [resolver])
+    const id = computeIdentity('/Users/me/repo', fs, [resolver], noSynthesizers)
     expect(id.kind).toBe('git_remote')
     expect(resolverCalled).toBe(false)
   })
@@ -176,8 +178,48 @@ describe('computeIdentity', () => {
         return { stdout: '', exitCode: 1 }
       },
     }
-    const id = computeIdentity('/Users/chen/Code/spool-wt', fs, noResolvers)
+    const id = computeIdentity('/Users/chen/Code/spool-wt', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('git_common_dir')
     expect(id.key).toBe('/Users/chen/Code/shared.git')   // resolved up one level
+  })
+
+  it('runs synthesizers after worktree resolvers, before path fallback', () => {
+    const synth: IdentitySynthesizer = {
+      name: 'fake',
+      synthesize: (cwd) => cwd === '/scratch/x'
+        ? { kind: 'synthetic', key: 'fake:x', displayName: 'Fake' }
+        : null,
+    }
+    const id = computeIdentity('/scratch/x', noFs, noResolvers, [synth])
+    expect(id.kind).toBe('synthetic')
+    expect(id.key).toBe('fake:x')
+    expect(id.displayName).toBe('Fake')
+  })
+
+  it('prefers a real git identity over a synthesizer match', () => {
+    // Even if cwd matches a synthesizer prefix, an existing git remote wins —
+    // a chat that happens to live inside a real repo groups with that repo.
+    const fs = {
+      exists: (p: string) => p.endsWith('/.git') || p === '/scratch/x',
+      readText: () => null,
+      spawn: (_cmd: string, args: string[]) => {
+        if (args.includes('remote.origin.url'))
+          return { stdout: 'git@github.com:foo/bar.git\n', exitCode: 0 }
+        return { stdout: '', exitCode: 1 }
+      },
+    }
+    const synth: IdentitySynthesizer = {
+      name: 'fake',
+      synthesize: () => ({ kind: 'synthetic', key: 'fake:x', displayName: 'Fake' }),
+    }
+    const id = computeIdentity('/scratch/x', fs, noResolvers, [synth])
+    expect(id.kind).toBe('git_remote')
+  })
+
+  it('falls through to path when no synthesizer claims the cwd', () => {
+    const synth: IdentitySynthesizer = { name: 'fake', synthesize: () => null }
+    const id = computeIdentity('/Users/chen/random/dir', noFs, noResolvers, [synth])
+    expect(id.kind).toBe('path')
+    expect(id.key).toBe('/Users/chen/random/dir')
   })
 })
