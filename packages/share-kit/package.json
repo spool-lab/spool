@@ -26,6 +26,7 @@
   "dependencies": {
     "html-to-image": "^1.11.13",
     "idb-keyval": "^6.2.1",
+    "lucide-react": "^0.460.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
   },

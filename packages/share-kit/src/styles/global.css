@@ -1,0 +1,93 @@
+@import 'tailwindcss';
+@import './fonts.css';
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/eb-garamond';
+@import './tokens.css';
+
+@theme {
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle scrollbars — invisible until the pointer is over the scroll
+ * region, then fade in. Keeps multiple stacked scroll areas (editor
+ * panel + passages list) from fighting for attention. macOS already
+ * auto-hides by default; this harmonizes the other platforms. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 160ms;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
+}
+
+/* Zero the leading / trailing margins on the first and last children
+ * of a rendered body, so parent layouts can align cleanly via flex
+ * baseline without having to compensate for markdown's default
+ * paragraph / heading gutters. */
+.spool-body > *:first-child {
+  margin-top: 0 !important;
+}
+.spool-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Animations referenced from the prototype */
+@keyframes spool-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spool-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes spool-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
