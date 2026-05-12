@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup,
   ListSessionsByIdentityOptions, ProjectSessionSortOrder,
-  ShareDraftRow, UpsertShareDraftInput,
+  ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
 } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -98,7 +98,7 @@ const api = {
     ipcRenderer.invoke('spool:set-sidebar-collapsed', { collapsed }),
 
   shareDraft: {
-    list: (limit?: number): Promise<ShareDraftRow[]> =>
+    list: (limit?: number): Promise<ShareDraftListItem[]> =>
       ipcRenderer.invoke('spool:list-share-drafts', { limit }),
     get: (draftId: string): Promise<ShareDraftRow | null> =>
       ipcRenderer.invoke('spool:get-share-draft', { draftId }),

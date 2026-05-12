@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ShareDraftRow } from '@spool-lab/core'
+import type { ShareDraftListItem } from '@spool-lab/core'
 
 interface UseShareDraftsResult {
-  drafts: ShareDraftRow[]
+  drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -16,7 +16,7 @@ interface UseShareDraftsResult {
  * IPC event vs. just refetch on focus.
  */
 export function useShareDrafts(opts: { limit?: number } = {}): UseShareDraftsResult {
-  const [drafts, setDrafts] = useState<ShareDraftRow[]>([])
+  const [drafts, setDrafts] = useState<ShareDraftListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

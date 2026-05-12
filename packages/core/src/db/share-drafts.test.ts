@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { ShareDraftRow } from './share-drafts.js'
+import type { ShareDraftListItem } from './share-drafts.js'
 
 const tempDirs: string[] = []
 const openDbs: Array<{ close: () => void }> = []
@@ -31,6 +31,7 @@ describe('share_drafts schema (v11)', () => {
     expect(byName.get('source_origin')?.notnull).toBe(0)
     expect(byName.get('title')?.notnull).toBe(1)
     expect(byName.get('snapshot_json')?.notnull).toBe(1)
+    expect(byName.get('preview_json')?.notnull).toBe(1)
     expect(byName.get('created_at')?.notnull).toBe(1)
     expect(byName.get('updated_at')?.notnull).toBe(1)
 
@@ -92,6 +93,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-uuid',
       title: 'first',
       snapshot_json: '{"v":1}',
+      preview_json: '{"v":1}',
     })
     const row = mod.getShareDraft(db, 'd-1')
     expect(row?.title).toBe('first')
@@ -108,6 +110,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-uuid',
       title: 'first',
       snapshot_json: '{"v":1}',
+      preview_json: '{"v":1}',
     })
     const first = mod.getShareDraft(db, 'd-1')
 
@@ -123,6 +126,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-uuid',
       title: 'second',
       snapshot_json: '{"v":2}',
+      preview_json: '{"v":2}',
     })
     const second = mod.getShareDraft(db, 'd-1')
     expect(second?.title).toBe('second')
@@ -140,6 +144,7 @@ describe('share_drafts schema (v11)', () => {
         source_origin: `https://example.com/${id}`,
         title: id,
         snapshot_json: '{}',
+        preview_json: '{}',
       })
     }
     // Force a predictable order by stamping updated_at in reverse.
@@ -148,7 +153,11 @@ describe('share_drafts schema (v11)', () => {
     db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-03 00:00:00', 'c')
 
     const rows = mod.listShareDrafts(db)
-    expect(rows.map((r: ShareDraftRow) => r.draft_id)).toEqual(['c', 'b', 'a'])
+    expect(rows.map((r: ShareDraftListItem) => r.draft_id)).toEqual(['c', 'b', 'a'])
+    // List query must not haul snapshot_json across the IPC boundary —
+    // that's the whole point of the slim SELECT.
+    expect(rows[0]).not.toHaveProperty('snapshot_json')
+    expect(rows[0]).toHaveProperty('preview_json')
   })
 
   it('listShareDrafts respects the limit option', async () => {
@@ -160,6 +169,7 @@ describe('share_drafts schema (v11)', () => {
         source_origin: `sess-${i}`,
         title: '',
         snapshot_json: '{}',
+        preview_json: '{}',
       })
     }
     expect(mod.listShareDrafts(db, { limit: 2 })).toHaveLength(2)
@@ -178,6 +188,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'foo.spool',
       title: '',
       snapshot_json: '{}',
+      preview_json: '{}',
     })
     mod.deleteShareDraft(db, 'gone')
     expect(mod.getShareDraft(db, 'gone')).toBeNull()
@@ -191,6 +202,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-X',
       title: '',
       snapshot_json: '{}',
+      preview_json: '{}',
     })
     mod.upsertShareDraft(db, {
       draft_id: 'b',
@@ -198,6 +210,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-X',
       title: '',
       snapshot_json: '{}',
+      preview_json: '{}',
     })
     mod.upsertShareDraft(db, {
       draft_id: 'c',
@@ -205,6 +218,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-Y',
       title: '',
       snapshot_json: '{}',
+      preview_json: '{}',
     })
     // A pasted-url draft whose origin happens to match a session uuid
     // should not be counted as a spool-session.
@@ -214,6 +228,7 @@ describe('share_drafts schema (v11)', () => {
       source_origin: 'sess-X',
       title: '',
       snapshot_json: '{}',
+      preview_json: '{}',
     })
     expect(mod.countDraftsBySession(db, 'sess-X')).toBe(2)
     expect(mod.countDraftsBySession(db, 'sess-Y')).toBe(1)

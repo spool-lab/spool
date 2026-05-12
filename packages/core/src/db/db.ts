@@ -432,6 +432,16 @@ export function runMigrations(db: Database.Database): void {
     // managed by Spool Share's editor. Independent of the sessions index;
     // a draft can survive its source session being deleted because the
     // full snapshot is captured at compose time and stored as JSON.
+    //
+    // Two JSON payloads per row:
+    //   - snapshot_json: the complete SpoolDocument (full conversation +
+    //     opts). Used when opening the editor. Can be hundreds of KB on
+    //     long sessions.
+    //   - preview_json: a slim subset used by the Shares grid card —
+    //     opts + title + source + word count + the first handful of
+    //     turns. Kept under a few KB so listShareDrafts can SELECT it
+    //     across hundreds of rows without shipping multi-MB IPC payloads
+    //     to the renderer.
     db.exec(`
       CREATE TABLE IF NOT EXISTS share_drafts (
         draft_id        TEXT PRIMARY KEY,
@@ -441,6 +451,7 @@ export function runMigrations(db: Database.Database): void {
         source_origin   TEXT,
         title           TEXT NOT NULL DEFAULT '',
         snapshot_json   TEXT NOT NULL,
+        preview_json    TEXT NOT NULL DEFAULT '{}',
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
       );

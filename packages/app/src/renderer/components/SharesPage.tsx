@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { Newspaper } from 'lucide-react'
 import { useShareDrafts } from '../hooks/useShareDrafts'
-import type { ShareDraftRow } from '@spool-lab/core'
+import type { ShareDraftListItem } from '@spool-lab/core'
 
 /**
  * The Drafts / Published tab strip is intentionally not rendered yet:
@@ -26,7 +26,7 @@ function DraftsList({
   loading,
   error,
 }: {
-  drafts: ShareDraftRow[]
+  drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
 }) {
@@ -100,7 +100,7 @@ function SmallEmptyState({ children }: { children: ReactNode }) {
   )
 }
 
-function describeSource(draft: ShareDraftRow): string {
+function describeSource(draft: ShareDraftListItem): string {
   switch (draft.source_kind) {
     case 'spool-session':
       return `session ${draft.source_origin}`
