@@ -217,6 +217,12 @@ export interface EditorOpts {
   /** Bottom chrome — "Stitched on Spool" + page marker. Turn off for
    *  social-ready outputs where branding would read as clutter. */
   showColophon: boolean
+  /** Skip turns whose body is empty or whitespace-only. Tool-only
+   *  assistant turns (status updates, sub-conversation noise that
+   *  upstream parsers couldn't drop) otherwise show up as bare role
+   *  headers with no content. On by default; users can flip it off
+   *  to expose every turn explicitly. */
+  hideEmptyTurns: boolean
 }
 
 /** The on-disk .spool file format. Version-stamped for forward compat. */
@@ -271,6 +277,7 @@ export const DEFAULT_OPTS: EditorOpts = {
   showGaps: true,
   showMasthead: true,
   showColophon: true,
+  hideEmptyTurns: true,
 }
 
 /** Fill in any missing fields on stored opts with defaults. We're
