@@ -14,7 +14,7 @@ import AppTopBar from './components/AppTopBar.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
-import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type SpoolDocument } from '@spool/share-kit'
+import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
 import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
@@ -95,7 +95,17 @@ export default function App() {
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(true)
-  const [shareConversation, setShareConversation] = useState<Conversation | null>(null)
+  /** Active share-editor session: conversation, the user's last
+   *  accepted opts, and the draft-row metadata the editor needs to
+   *  upsert autosaves back into share_drafts. Cleared on Back. */
+  type ShareEditorBundle = {
+    draftId: string
+    sourceKind: 'spool-session' | 'pasted-url' | 'imported-file' | 'imported-jsonl'
+    sourceOrigin: string | null
+    conversation: Conversation
+    opts: EditorOpts
+  }
+  const [shareEditor, setShareEditor] = useState<ShareEditorBundle | null>(null)
   // The view the user came from when opening the editor — Back returns
   // here. Captured up front because guessing from current state
   // (selectedSession etc.) misroutes when the user opens a draft from
@@ -128,14 +138,21 @@ export default function App() {
     // the snapshot). Only when no draft exists do we build a fresh
     // one with DEFAULT_OPTS and persist it.
     let conversation: Conversation
+    let opts: EditorOpts
     try {
       const existing = await window.spool?.shareDraft?.get(draftId)
       if (existing) {
         const doc = JSON.parse(existing.snapshot_json) as SpoolDocument
         conversation = doc.conversation
+        // Merge with DEFAULT_OPTS so a snapshot saved before a new
+        // EditorOpts field landed (e.g. colorway, density) doesn't
+        // leave that field undefined and crash TEMPLATE_RATIO lookups
+        // / PreviewPane's TemplateRender downstream.
+        opts = { ...DEFAULT_OPTS, ...(doc.opts ?? {}) }
       } else {
         conversation = composeFromSession(session, messages)
-        const doc = buildSpoolDocument(conversation, DEFAULT_OPTS)
+        opts = DEFAULT_OPTS
+        const doc = buildSpoolDocument(conversation, opts)
         await window.spool?.shareDraft?.upsert({
           draft_id: draftId,
           source_kind: 'spool-session',
@@ -148,9 +165,16 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load or persist share draft, falling back to a fresh compose:', err)
       conversation = composeFromSession(session, messages)
+      opts = DEFAULT_OPTS
     }
     enterShareEditor(sidebarCollapsed)
-    setShareConversation(conversation)
+    setShareEditor({
+      draftId,
+      sourceKind: 'spool-session',
+      sourceOrigin: session.sessionUuid,
+      conversation,
+      opts,
+    })
     setShareEditorReturnView('session')
     setView('share-editor')
   }, [enterShareEditor, sidebarCollapsed])
@@ -167,7 +191,13 @@ export default function App() {
       }
       const doc = JSON.parse(full.snapshot_json) as SpoolDocument
       enterShareEditor(sidebarCollapsed)
-      setShareConversation(doc.conversation)
+      setShareEditor({
+        draftId: draft.draft_id,
+        sourceKind: draft.source_kind,
+        sourceOrigin: draft.source_origin,
+        conversation: doc.conversation,
+        opts: { ...DEFAULT_OPTS, ...(doc.opts ?? {}) },
+      })
       setShareEditorReturnView('shares')
       setView('share-editor')
     } catch (err) {
@@ -176,7 +206,7 @@ export default function App() {
   }, [enterShareEditor, sidebarCollapsed])
 
   const handleCloseShareEditor = useCallback(() => {
-    setShareConversation(null)
+    setShareEditor(null)
     setView(shareEditorReturnView)
   }, [shareEditorReturnView])
 
@@ -633,11 +663,15 @@ export default function App() {
 
   // Share editor owns its own PageLayout (with a right panel) — short-
   // circuit App's regular two-column layout for that view.
-  if (isShareEditorView && shareConversation) {
+  if (isShareEditorView && shareEditor) {
     return (
       <>
         <ShareEditorPage
-          conversation={shareConversation}
+          draftId={shareEditor.draftId}
+          sourceKind={shareEditor.sourceKind}
+          sourceOrigin={shareEditor.sourceOrigin}
+          conversation={shareEditor.conversation}
+          initialOpts={shareEditor.opts}
           onBack={handleCloseShareEditor}
           panelOpen={sharePanelOpen}
           onTogglePanel={() => setSharePanelOpen((v) => !v)}

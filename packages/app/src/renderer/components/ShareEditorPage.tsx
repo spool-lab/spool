@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { flushSync } from 'react-dom'
 import { Download, PanelRight } from 'lucide-react'
 import {
-  DEFAULT_OPTS,
   TEMPLATE_RATIO,
   buildSpoolDocument,
   openSaveSlot,
@@ -13,13 +12,22 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
+import type { ShareDraftSourceKind } from '@spool-lab/core'
 import PageLayout from './PageLayout.js'
 import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
 import { DownloadButton } from './share-editor/DownloadButton.js'
+import { buildPreviewDocument } from '../lib/compose-from-session.js'
 
 type Props = {
+  /** Stable id of the share_drafts row to autosave into. */
+  draftId: string
+  sourceKind: ShareDraftSourceKind
+  sourceOrigin: string | null
   conversation: Conversation
+  /** Editor opts loaded from the persisted snapshot. The editor takes
+   *  this as its initial state and persists any subsequent change. */
+  initialOpts: EditorOpts
   onBack: () => void
   panelOpen: boolean
   onTogglePanel: () => void
@@ -41,7 +49,11 @@ type SaveState = 'idle' | 'saving' | 'error'
  * follow-up commits.
  */
 export default function ShareEditorPage({
+  draftId,
+  sourceKind,
+  sourceOrigin,
   conversation,
+  initialOpts,
   onBack,
   panelOpen,
   onTogglePanel,
@@ -49,12 +61,40 @@ export default function ShareEditorPage({
   sidebarCollapsed,
   onToggleSidebar,
 }: Props) {
-  const [opts, setOpts] = useState<EditorOpts>(DEFAULT_OPTS)
+  const [opts, setOpts] = useState<EditorOpts>(initialOpts)
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [toast, setToast] = useState<string | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
   const previewRef = useRef<HTMLDivElement | null>(null)
+
+  // Autosave opts changes back into share_drafts. Debounced so a
+  // rapid sequence of clicks (e.g. paging through colorways) collapses
+  // into one upsert. We skip the very first effect run — that one
+  // fires on mount with the value we just loaded from disk, no need
+  // to write the same bytes back. Using a didMount ref instead of
+  // identity-checking opts keeps this robust even if a parent re-render
+  // produces a new conversation/opts object reference with no actual
+  // change in content.
+  const didMountRef = useRef(false)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    const handle = window.setTimeout(() => {
+      const doc = buildSpoolDocument(conversation, opts)
+      void window.spool?.shareDraft?.upsert({
+        draft_id: draftId,
+        source_kind: sourceKind,
+        source_origin: sourceOrigin,
+        title: conversation.title,
+        snapshot_json: JSON.stringify(doc),
+        preview_json: JSON.stringify(buildPreviewDocument(doc)),
+      }).catch((err) => console.error('Autosave share draft failed:', err))
+    }, 400)
+    return () => window.clearTimeout(handle)
+  }, [opts, conversation, draftId, sourceKind, sourceOrigin])
 
   // Revoke the in-memory blob: URL when the preview modal closes so we
   // don't leak the PDF buffer for the rest of the session.
