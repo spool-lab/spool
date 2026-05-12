@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   TemplateRender,
   TEMPLATE_RATIO,
@@ -11,10 +11,18 @@ export type Zoom = number | 'fit'
 
 export const ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const
 
-const PANE_W = 740
+/** Horizontal breathing room around the canvas inside the pane.
+ *  px-10 (40px each side) + 20px safety so the canvas never touches
+ *  the pane edge at fit. */
+const FIT_HORIZONTAL_PAD = 80 + 40
 
-export function fitScale(ratioW: number) {
-  return Math.min((PANE_W - 100) / ratioW, 0.7)
+/** Compute the scale that fits a canvas of natural width `ratioW` into a
+ *  pane whose inner client width is `paneW`. Clamped to 5–100% so a
+ *  narrow template can't blow up past native resolution. Exported so
+ *  callers / tests can reason about it without measuring DOM. */
+export function fitScaleFor(paneW: number, ratioW: number): number {
+  const available = Math.max(paneW - FIT_HORIZONTAL_PAD, 200)
+  return Math.max(0.05, Math.min(available / ratioW, 1))
 }
 
 export function nextZoomStep(current: number, direction: 1 | -1): number {
@@ -46,8 +54,6 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
   ref,
 ) {
   const ratio = TEMPLATE_RATIO[opts.template]
-  const fit = fitScale(ratio.w)
-  const scale = zoom === 'fit' ? fit : zoom
 
   const innerRef = useRef<HTMLDivElement>(null)
   const [naturalH, setNaturalH] = useState(ratio.h)
@@ -56,9 +62,96 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
     setNaturalH(Math.max(ratio.h, innerRef.current.scrollHeight))
   }, [convo, opts, ratio.h])
 
+  // Pan: drag-to-scroll on the empty backdrop / padding around the
+  // canvas. Holding Space extends pan over the canvas too — that's
+  // the Figma / Sketch convention and keeps mousedown on text from
+  // hijacking the user's text-selection gesture.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const [isPanning, setIsPanning] = useState(false)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+
+  // Fit-scale is captured at mount and only refreshed when the user
+  // explicitly clicks Fit. Layout-driven re-fits (panel toggle,
+  // sidebar toggle, template switch) intentionally do NOT recompute —
+  // the canvas stays at whatever scale the user last accepted.
+  const [fitScale, setFitScale] = useState<number>(0.7)
+  const measureFit = useCallback((): number => {
+    const sc = scrollRef.current
+    if (!sc) return 0.7
+    return fitScaleFor(sc.clientWidth, ratio.w)
+  }, [ratio.w])
+  useLayoutEffect(() => {
+    // Run once on mount — useLayoutEffect commits before paint, so
+    // the canvas appears at the correct fit scale on the very first
+    // frame and the user never sees a 0.7 fallback flash.
+    setFitScale(measureFit())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const scale = zoom === 'fit' ? fitScale : zoom
+
+  useEffect(() => {
+    const isTypingTarget = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false
+      const tag = el.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      if (isTypingTarget(e.target)) return
+      // Always preventDefault — even on key repeat — otherwise the
+      // browser's "Space scrolls down by a page" default fires for
+      // every repeat event and the preview races to the bottom.
+      e.preventDefault()
+      if (!e.repeat) setSpaceHeld(true)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
+    }
+  }, [])
+
+  const beginPan = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('[data-pan-ignore]')) return
+    const onCanvas = canvasRef.current?.contains(target) ?? false
+    if (onCanvas && !spaceHeld) return
+    const sc = scrollRef.current
+    if (!sc) return
+    e.preventDefault()
+    const startX = e.clientX
+    const startY = e.clientY
+    const sLeft = sc.scrollLeft
+    const sTop = sc.scrollTop
+    setIsPanning(true)
+    const onMove = (m: globalThis.MouseEvent) => {
+      sc.scrollLeft = sLeft - (m.clientX - startX)
+      sc.scrollTop = sTop - (m.clientY - startY)
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setIsPanning(false)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const scrollCursor = isPanning ? 'grabbing' : spaceHeld ? 'grab' : undefined
+
   const handleIn = () => setZoom(nextZoomStep(scale, 1))
   const handleOut = () => setZoom(nextZoomStep(scale, -1))
-  const handleFit = () => setZoom('fit')
+  const handleFit = () => {
+    setFitScale(measureFit())
+    setZoom('fit')
+  }
 
   // Stash the live ratio onto the forwarded ref's parent target via
   // useImperativeHandle pattern — but since we just need the unscaled
@@ -72,7 +165,12 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
 
   return (
     <div className="relative flex-1 min-w-0 flex">
-      <div className="flex-1 overflow-auto scrollbar-none relative bg-warm-bg dark:bg-dark-bg">
+      <div
+        ref={scrollRef}
+        onMouseDown={beginPan}
+        style={scrollCursor ? { cursor: scrollCursor } : undefined}
+        className="flex-1 overflow-auto scrollbar-none relative bg-warm-bg dark:bg-dark-bg cursor-grab"
+      >
         <div
           className="relative px-10 py-8 flex flex-col items-center gap-3.5"
           style={{ margin: '0 auto', width: 'fit-content', minWidth: '100%', boxSizing: 'border-box' }}
@@ -93,6 +191,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
               otherwise the first paint at fallback scale visibly
               animates into the real scale, looking like a double zoom. */}
           <div
+            ref={canvasRef}
             className="relative overflow-hidden"
             style={{
               width: ratio.w * scale,
@@ -100,6 +199,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
               boxShadow: '0 2px 6px rgba(0,0,0,.1), 0 20px 50px rgba(0,0,0,.08)',
               borderRadius: 2,
               transition: 'width 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1)',
+              cursor: spaceHeld || isPanning ? 'inherit' : 'default',
             }}
           >
             <div
@@ -145,7 +245,10 @@ function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
   const minPercent = ZOOM_STEPS[0]! * 100
   const maxPercent = ZOOM_STEPS[ZOOM_STEPS.length - 1]! * 100
   return (
-    <div className="absolute right-4 bottom-4 z-20 flex items-center gap-0.5 px-1 h-7 rounded-md bg-warm-surface dark:bg-dark-surface shadow-sm text-[11px] text-warm-text dark:text-dark-text">
+    <div
+      data-pan-ignore
+      className="absolute right-4 bottom-4 z-20 flex items-center gap-0.5 px-1 h-7 rounded-md bg-warm-surface dark:bg-dark-surface shadow-sm text-[11px] text-warm-text dark:text-dark-text"
+    >
       <ZoomBtn label="−" onClick={onOut} ariaLabel="Zoom out" disabled={percent <= minPercent} />
       <span className="min-w-[34px] text-center select-none text-warm-text dark:text-dark-text tabular-nums">
         {percent}%

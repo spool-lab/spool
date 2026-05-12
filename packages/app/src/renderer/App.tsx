@@ -101,6 +101,25 @@ export default function App() {
   // the Shares page while a session is also selected.
   const [shareEditorReturnView, setShareEditorReturnView] = useState<View>('search')
 
+  // Remembers the sidebar fold state at the moment the user entered
+  // the share editor, so we can restore it on exit. Lives outside
+  // React state because it isn't part of any render output.
+  const sidebarRestoreRef = useRef<boolean | null>(null)
+
+  // Auto-collapse the left sidebar synchronously alongside the view
+  // change so the share editor renders with sidebar=collapsed on its
+  // very first paint. Doing this asynchronously via useEffect causes
+  // PreviewPane's initial fit measurement to sample a mid-animation
+  // pane width and produce a too-small scale.
+  const enterShareEditor = useCallback((nextSidebarCollapsed: boolean) => {
+    if (!nextSidebarCollapsed) {
+      sidebarRestoreRef.current = nextSidebarCollapsed
+      setSidebarCollapsed(true)
+    } else {
+      sidebarRestoreRef.current = null
+    }
+  }, [])
+
   const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[]) => {
     const draftId = sessionDraftId(session.sessionUuid)
     // If the user has shared this session before, reopen their saved
@@ -129,10 +148,11 @@ export default function App() {
       console.error('Failed to load or persist share draft, falling back to a fresh compose:', err)
       conversation = composeFromSession(session, messages)
     }
+    enterShareEditor(sidebarCollapsed)
     setShareConversation(conversation)
     setShareEditorReturnView('session')
     setView('share-editor')
-  }, [])
+  }, [enterShareEditor, sidebarCollapsed])
 
   const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
     // The list query intentionally omits snapshot_json — fetch the
@@ -145,13 +165,14 @@ export default function App() {
         return
       }
       const doc = JSON.parse(full.snapshot_json) as SpoolDocument
+      enterShareEditor(sidebarCollapsed)
       setShareConversation(doc.conversation)
       setShareEditorReturnView('shares')
       setView('share-editor')
     } catch (err) {
       console.error('Failed to parse draft snapshot:', err)
     }
-  }, [])
+  }, [enterShareEditor, sidebarCollapsed])
 
   const handleCloseShareEditor = useCallback(() => {
     setShareConversation(null)
@@ -165,27 +186,16 @@ export default function App() {
       .catch(console.error)
   }, [])
 
-  // Auto-collapse the left sidebar while the share editor is open —
-  // the editor already shows a right panel, so leaving both rails
-  // expanded leaves very little room for the preview. The user's
-  // previous sidebar state is restored on exit; the persisted
-  // preference on disk is intentionally untouched.
-  const sidebarRestoreRef = useRef<boolean | null>(null)
+  // Restore the pre-editor sidebar state when the user leaves the
+  // share editor — by Back button, by clicking into a sidebar
+  // destination, or any other path that moves view away. Skip when
+  // the user manually re-expanded the sidebar mid-edit so their
+  // explicit choice wins.
   useEffect(() => {
-    if (view === 'share-editor') {
-      if (sidebarRestoreRef.current === null) {
-        sidebarRestoreRef.current = sidebarCollapsed
-        if (!sidebarCollapsed) setSidebarCollapsed(true)
-      }
-    } else if (sidebarRestoreRef.current !== null) {
-      const restore = sidebarRestoreRef.current
-      const stillCollapsed = sidebarCollapsed
-      sidebarRestoreRef.current = null
-      // Only restore the saved state if the user didn't override it
-      // while editing — if they manually re-opened the sidebar during
-      // the editor session, honor that explicit choice.
-      if (stillCollapsed) setSidebarCollapsed(restore)
-    }
+    if (view === 'share-editor' || sidebarRestoreRef.current === null) return
+    const restore = sidebarRestoreRef.current
+    sidebarRestoreRef.current = null
+    if (sidebarCollapsed) setSidebarCollapsed(restore)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view])
 
