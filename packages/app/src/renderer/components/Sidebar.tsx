@@ -152,13 +152,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
               ) : null}
             />
             {pinnedOpen && (
-              <div
-                className={
-                  sortedPinned.length > 8
-                    ? 'px-2 max-h-64 overflow-y-auto scrollbar-none'
-                    : 'px-2'
-                }
-              >
+              <div className="px-2 max-h-64 overflow-y-auto scrollbar-none">
                 {sortedPinned.map(session => (
                   <PinnedRow
                     key={session.sessionUuid}
@@ -474,7 +468,7 @@ function PinnedRow({
     >
       <span className="flex-1 truncate text-[13px]">{title}</span>
       <span
-        className="flex-none flex items-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+        className="flex-none flex items-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -490,13 +484,15 @@ function PinnedRow({
         </button>
         <Menu
           align="right"
-          trigger={({ toggle }) => (
+          trigger={({ open, toggle }) => (
             <button
               type="button"
               data-testid="sidebar-pinned-menu-trigger"
               onMouseDown={(e) => e.preventDefault()}
               onClick={toggle}
               aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={open}
               className="inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
               <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
