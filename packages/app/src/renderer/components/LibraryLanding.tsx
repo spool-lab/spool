@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
@@ -17,9 +17,13 @@ type DateBucket = {
 }
 
 export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare, onImportSpool }: Props) {
+  const onImport = useCallback(
+    (file: File) => onImportSpool?.(file),
+    [onImportSpool],
+  )
   const { isDragActive, dragHandlers } = useSpoolDrop({
     enabled: Boolean(onImportSpool),
-    onImport: (file) => onImportSpool?.(file),
+    onImport,
   })
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[] | null>(null)

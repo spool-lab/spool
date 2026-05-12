@@ -5,14 +5,10 @@ type Options = {
   onImport: (file: File) => void | Promise<void>
 }
 
-/** Drag-and-drop intake for `.spool` files. Tracks an isDragActive flag
- *  that flips on only when the user is dragging files (not in-document
- *  drags), so the consumer can show a drop overlay without false
- *  positives from text/element dragging. */
 export function useSpoolDrop({ enabled, onImport }: Options) {
   const [isDragActive, setIsDragActive] = useState(false)
-  // dragenter / dragleave fire per nested element, so a depth counter
-  // is needed to know when the drag has truly left the target.
+  // dragenter / dragleave fire per nested element; depth counter tells
+  // us when the drag has truly left the target.
   const depthRef = useRef(0)
 
   const isFileDrag = (event: DragEvent) =>
