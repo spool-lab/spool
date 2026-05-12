@@ -23,9 +23,15 @@ type Props = {
  */
 export default function SharesPage({ onOpenDraft }: Props) {
   const { drafts, loading, error } = useShareDrafts()
+  const hasDrafts = drafts.length > 0
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {hasDrafts && (
+        <div className="flex-none px-6 pt-1.5 pb-3 font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+          Drafts · {drafts.length}
+        </div>
+      )}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <DraftsList drafts={drafts} loading={loading} error={error} onOpenDraft={onOpenDraft} />
       </div>
@@ -61,7 +67,7 @@ function DraftsList({
   }
   return (
     <ul
-      className="grid gap-5 px-6 pt-3 pb-6 justify-center"
+      className="grid gap-5 px-6 pb-6"
       style={{ gridTemplateColumns: `repeat(auto-fill, ${CARD_W}px)` }}
     >
       {drafts.map((draft) => (
@@ -73,7 +79,7 @@ function DraftsList({
   )
 }
 
-const CARD_W = 150
+const CARD_W = 158
 const FALLBACK_RATIO = { w: 720, h: 960 }
 
 function DraftCard({
