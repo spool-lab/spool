@@ -8,14 +8,16 @@
     "rebuild:native": "pnpm run rebuild:native:electron",
     "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
     "build:core": "pnpm --filter @spool-lab/core build",
-    "dev": "pnpm run build:core && pnpm run rebuild:native && electron-vite dev",
-    "build": "pnpm run build:core && electron-vite build && electron-builder --publish never",
-    "build:mac": "pnpm run build:core && electron-vite build && electron-builder --mac --arm64",
-    "build:linux": "pnpm run build:core && electron-vite build && electron-builder --linux",
-    "build:electron": "pnpm run build:core && electron-vite build",
+    "build:share-kit": "pnpm --filter @spool/share-kit build",
+    "build:deps": "pnpm run build:core && pnpm run build:share-kit",
+    "dev": "pnpm run build:deps && pnpm run rebuild:native && electron-vite dev",
+    "build": "pnpm run build:deps && electron-vite build && electron-builder --publish never",
+    "build:mac": "pnpm run build:deps && electron-vite build && electron-builder --mac --arm64",
+    "build:linux": "pnpm run build:deps && electron-vite build && electron-builder --linux",
+    "build:electron": "pnpm run build:deps && electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
-    "test:e2e": "pnpm run build:core && pnpm run rebuild:native:electron && electron-vite build && npx playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "pnpm run build:deps && pnpm run rebuild:native:electron && electron-vite build && npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",
