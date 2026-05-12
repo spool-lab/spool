@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
+import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 
 type Props = {
   onSelectProject: (identityKey: string) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
   onShare?: (uuid: string) => void
+  onImportSpool?: (file: File) => void | Promise<void>
 }
 
 type DateBucket = {
@@ -14,7 +16,11 @@ type DateBucket = {
   sessions: Session[]
 }
 
-export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare }: Props) {
+export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare, onImportSpool }: Props) {
+  const { isDragActive, dragHandlers } = useSpoolDrop({
+    enabled: Boolean(onImportSpool),
+    onImport: (file) => onImportSpool?.(file),
+  })
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[] | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -66,7 +72,12 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
   const totalSessions = (pinnedSessions.length) + (recentSessions?.length ?? 0)
 
   return (
-    <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
+    <div
+      data-testid="library-landing"
+      className="relative flex flex-col h-full overflow-hidden"
+      {...dragHandlers}
+    >
+      {isDragActive && <SpoolDropOverlay />}
       <div className="flex-1 overflow-y-auto pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {recentSessions === null ? (
           <SessionRowsSkeleton count={6} />
@@ -161,6 +172,20 @@ export function CollapsibleSection({
         </svg>
       </button>
       {open && children}
+    </div>
+  )
+}
+
+function SpoolDropOverlay() {
+  return (
+    <div
+      data-testid="library-spool-drop-overlay"
+      aria-hidden
+      className="absolute inset-2 z-20 pointer-events-none flex items-center justify-center rounded-[10px] border-2 border-dashed border-accent dark:border-accent-dark bg-accent-bg/70 dark:bg-accent-bg-dark/70 backdrop-blur-[1px]"
+    >
+      <p className="text-sm font-medium text-accent dark:text-accent-dark">
+        Drop <span className="font-mono">.spool</span> to import
+      </p>
     </div>
   )
 }

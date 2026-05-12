@@ -16,6 +16,7 @@ import AppToaster from './components/AppToaster.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
+import { parseSpoolFile, draftIdForImport, SpoolImportError } from './lib/import-spool.js'
 import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
 import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
@@ -193,6 +194,46 @@ export default function App() {
       console.error('Failed to load session for share:', err)
     }
   }, [handleStartShareFromSession, view])
+
+  const handleImportSpoolFile = useCallback(async (file: File) => {
+    let snapshotJson: string
+    let doc: SpoolDocument
+    try {
+      snapshotJson = await file.text()
+      doc = parseSpoolFile(snapshotJson)
+    } catch (err) {
+      const message = err instanceof SpoolImportError ? err.message : 'Could not read file'
+      toast.error(`Couldn't import ${file.name}`, { description: message })
+      return
+    }
+    try {
+      const draftId = await draftIdForImport(snapshotJson)
+      const opts: EditorOpts = { ...DEFAULT_OPTS, ...(doc.opts ?? {}) }
+      const normalized: SpoolDocument = { ...doc, opts }
+      const normalizedJson = JSON.stringify(normalized)
+      await window.spool?.shareDraft?.upsert({
+        draft_id: draftId,
+        source_kind: 'imported-file',
+        source_origin: file.name,
+        title: normalized.conversation.title,
+        snapshot_json: normalizedJson,
+        preview_json: JSON.stringify(buildPreviewDocument(normalized)),
+      })
+      enterShareEditor(sidebarCollapsed)
+      setShareEditor({
+        draftId,
+        sourceKind: 'imported-file',
+        sourceOrigin: file.name,
+        conversation: normalized.conversation,
+        opts,
+      })
+      setShareEditorReturnView('shares')
+      setView('share-editor')
+    } catch (err) {
+      console.error('Failed to persist imported .spool draft:', err)
+      toast.error(`Couldn't import ${file.name}`, { description: 'Saving the draft failed' })
+    }
+  }, [enterShareEditor, sidebarCollapsed])
 
   const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
     // The list query intentionally omits snapshot_json — fetch the
@@ -838,6 +879,7 @@ export default function App() {
             onOpenSession={handleOpenSession}
             onCopySessionId={handleCopySessionId}
             {...(FEATURES.share ? { onShare: handleStartShareFromUuid } : {})}
+            {...(FEATURES.share ? { onImportSpool: handleImportSpoolFile } : {})}
           />
         ) : (
           <>
