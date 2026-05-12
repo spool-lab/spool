@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, memo, startTransition, useDeferredValue } from 'react'
+import { toast } from 'sonner'
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import { type SearchMode } from './components/SearchBar.js'
 import FragmentResults from './components/FragmentResults.js'
@@ -11,6 +12,7 @@ import ProjectView from './components/ProjectView.js'
 import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
+import AppToaster from './components/AppToaster.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
@@ -60,7 +62,6 @@ export default function App() {
   const [status, setStatus] = useState<StatusInfo | null>(null)
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchRequestSeq = useRef(0)
   const previewRequestSeq = useRef(0)
@@ -86,7 +87,6 @@ export default function App() {
   const [sidebarSortOrder, setSidebarSortOrder] = useState<SidebarSortOrder>(DEFAULT_SIDEBAR_SORT_ORDER)
   const [pinnedSortOrder, setPinnedSortOrder] = useState<PinnedSortOrder>(DEFAULT_PINNED_SORT_ORDER)
   const [projectSortOrder, setProjectSortOrder] = useState<ProjectSessionSortOrder>(DEFAULT_PROJECT_SORT_ORDER)
-  const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
   const themeHydrated = useRef(false)
   const deferredResults = useDeferredValue(results)
@@ -344,7 +344,6 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current)
-      if (toastTimer.current) clearTimeout(toastTimer.current)
       if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
     }
   }, [])
@@ -622,9 +621,18 @@ export default function App() {
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
-    setResumeToastCommand(command)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setResumeToastCommand(null), 3200)
+    toast('Session ID copied', {
+      id: 'resume-command',
+      description: (
+        <span>
+          Write{' '}
+          <code className="rounded bg-warm-bg dark:bg-dark-bg px-1.5 py-0.5 font-mono text-[11px]">
+            {command}
+          </code>{' '}
+          then paste the id to resume this session
+        </span>
+      ),
+    })
   }, [])
 
   const activeAgentInfo = availableAgents.find(a => a.id === aiAgent) ?? availableAgents[0]
@@ -698,6 +706,7 @@ export default function App() {
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={toggleSidebar}
         />
+        <AppToaster />
         {/* App-level overlays (settings, search) still mount above the
             share editor's PageLayout. */}
         {showSettings && (
@@ -915,9 +924,7 @@ export default function App() {
       </div>
       </div>
 
-      {resumeToastCommand && (
-        <ResumeToast command={resumeToastCommand} />
-      )}
+      <AppToaster />
 
       {showSettings && (
         <SettingsPanel
@@ -958,20 +965,6 @@ export default function App() {
         onCommit={handleSearchCommit}
         onOpenResult={handleOpenResultFromOverlay}
       />
-    </div>
-  )
-}
-
-function ResumeToast({ command }: { command: string }) {
-  const suffix = 'then paste the id to resume this session'
-
-  return (
-    <div className="pointer-events-none absolute bottom-10 left-1/2 z-40 -translate-x-1/2 animate-in fade-in duration-150 px-4">
-      <div className="rounded-full border border-warm-border dark:border-dark-border bg-warm-surface2/95 dark:bg-dark-surface2/95 px-4 py-2 shadow-lg backdrop-blur-sm">
-        <p className="whitespace-nowrap text-xs text-warm-text dark:text-dark-text">
-          Write <code className="rounded bg-warm-bg dark:bg-dark-bg px-1.5 py-0.5 font-mono text-[11px]">{command}</code> {suffix}
-        </p>
-      </div>
     </div>
   )
 }

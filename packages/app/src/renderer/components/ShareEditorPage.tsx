@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Download, PanelRight } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   TEMPLATE_RATIO,
   buildSpoolDocument,
@@ -64,7 +65,6 @@ export default function ShareEditorPage({
   const [opts, setOpts] = useState<EditorOpts>(initialOpts)
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [saveState, setSaveState] = useState<SaveState>('idle')
-  const [toast, setToast] = useState<string | null>(null)
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
   const previewRef = useRef<HTMLDivElement | null>(null)
 
@@ -108,13 +108,6 @@ export default function ShareEditorPage({
     return `${conversation.createdAt} · ${wordLabel}`
   }, [conversation])
 
-  // Auto-dismiss the toast after a few seconds.
-  useEffect(() => {
-    if (!toast) return
-    const id = window.setTimeout(() => setToast(null), 3200)
-    return () => window.clearTimeout(id)
-  }, [toast])
-
   // Force React to commit the "Exporting…" state and let the browser
   // paint before kicking off rasterization. Without this, batched
   // updates + a blocking main thread keep the button at "Export" until
@@ -149,14 +142,14 @@ export default function ShareEditorPage({
       const blob = await rasterizeToPngBlob(node, { width, height })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
-      setToast(`Saved ${filename}`)
+      toast.success(`Saved ${filename}`)
     } catch (err) {
       console.error('Export to PNG failed:', err)
       setSaveState('error')
       if (err instanceof PngTooTallError) {
-        setToast('Conversation too tall for PNG — try PDF export.')
+        toast.error('Conversation too tall for PNG — try PDF export.')
       } else {
-        setToast('Export failed — see console for details')
+        toast.error('Export failed — see console for details')
       }
     }
   }, [beginSaving, conversation, opts.template])
@@ -178,7 +171,7 @@ export default function ShareEditorPage({
     } catch (err) {
       console.error('Export to PDF failed:', err)
       setSaveState('error')
-      setToast('Export failed — see console for details')
+      toast.error('Export failed — see console for details')
     }
   }, [beginSaving, conversation, opts.template])
 
@@ -193,7 +186,7 @@ export default function ShareEditorPage({
     const res = await fetch(pdfPreview.url)
     const blob = await res.blob()
     await writeToSlot(slot, blob, pdfPreview.filename)
-    setToast(`Saved ${pdfPreview.filename}`)
+    toast.success(`Saved ${pdfPreview.filename}`)
     setPdfPreview(null)
   }, [pdfPreview])
 
@@ -214,11 +207,11 @@ export default function ShareEditorPage({
       const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/spool+json' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
-      setToast(`Saved ${filename}`)
+      toast.success(`Saved ${filename}`)
     } catch (err) {
       console.error('Export to .spool failed:', err)
       setSaveState('error')
-      setToast('Export failed — see console for details')
+      toast.error('Export failed — see console for details')
     }
   }, [beginSaving, conversation, opts])
 
@@ -278,15 +271,6 @@ export default function ShareEditorPage({
       rightPanelOpen={panelOpen}
     >
       <div className="flex flex-col h-full" data-testid="share-editor-page">
-        {toast && (
-          <div
-            role="status"
-            className="pointer-events-none fixed bottom-5 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 rounded-md text-[12px] text-white bg-warm-text/95 dark:bg-dark-surface2/95 shadow-lg backdrop-blur-sm"
-          >
-            {toast}
-          </div>
-        )}
-
         {pdfPreview && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
