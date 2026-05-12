@@ -22,7 +22,9 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
 
   return (
     <div data-testid="app-top-bar" className="relative flex-none min-h-9 select-none" style={dragStyle}>
-      {/* Background: animated sidebar/content split, behind the button. */}
+      {/* Background: animated sidebar split + content bg flooding the
+          rest of the bar (including over the right rail). The rail
+          itself gets its surface tint only BELOW the bar. */}
       <div className="absolute inset-0 flex pointer-events-none" aria-hidden="true">
         <div
           className={[
