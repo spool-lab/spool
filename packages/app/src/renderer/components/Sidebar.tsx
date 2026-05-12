@@ -244,6 +244,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         )}
       </div>
 
+      <UpdateBanner />
       <SidebarStatus
         syncStatus={syncStatus ?? null}
         status={status ?? null}
@@ -330,6 +331,83 @@ function SidebarStatus({
         </button>
       )}
     </div>
+  )
+}
+
+type UpdateStatus = {
+  status: 'available' | 'downloading' | 'ready' | 'error'
+  version?: string | undefined
+  percent?: number | undefined
+}
+
+function UpdateBanner() {
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
+
+  useEffect(() => {
+    if (!window.spool?.onUpdateStatus) return
+    const off = window.spool.onUpdateStatus((data) => {
+      if (data.status === 'error') setUpdate(null)
+      else setUpdate(data)
+    })
+    return () => { off() }
+  }, [])
+
+  if (!update) return null
+
+  const isDownloading = update.status === 'downloading'
+  const isAction = update.status === 'available' || update.status === 'ready'
+
+  const onClick = () => {
+    if (update.status === 'available') void window.spool?.downloadUpdate()
+    else if (update.status === 'ready') void window.spool?.installUpdate()
+  }
+
+  const label =
+    update.status === 'available' ? `Update available${update.version ? ` · v${update.version}` : ''}` :
+    update.status === 'ready' ? 'Restart to update' :
+    update.percent != null ? `Downloading update… ${update.percent}%` : 'Downloading update…'
+
+  const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
+
+  const icon =
+    update.status === 'available' ? (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ) : update.status === 'ready' ? (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <polyline points="23 4 23 10 17 10" />
+        <polyline points="1 20 1 14 7 14" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+    ) : (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none animate-spin">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+    )
+
+  if (isDownloading || !isAction) {
+    return (
+      <div data-testid={`update-banner-${update.status}`} className={`${baseRow} text-warm-muted dark:text-dark-muted`}>
+        {icon}
+        <span className="flex-1 min-w-0 truncate">{label}</span>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      data-testid={`update-banner-${update.status}`}
+      onClick={onClick}
+      title={label}
+      className={`${baseRow} text-left w-auto hover:brightness-95 dark:hover:brightness-110 transition-[filter]`}
+    >
+      {icon}
+      <span className="flex-1 min-w-0 truncate">{label}</span>
+    </button>
   )
 }
 
