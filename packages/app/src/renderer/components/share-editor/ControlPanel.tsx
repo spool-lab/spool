@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { PanelRight } from 'lucide-react'
 import {
   COLORWAYS,
   PAPERS,
@@ -27,39 +26,29 @@ const COLORWAY_CHOICES = COLORWAYS.filter((c) => (COLORWAY_IDS as Set<string>).h
 type Props = {
   opts: EditorOpts
   setOpts: (next: EditorOpts) => void
-  onClose: () => void
 }
 
-export function ControlPanel({ opts, setOpts, onClose }: Props) {
+export function ControlPanel({ opts, setOpts }: Props) {
   const [advancedOpen, setAdvancedOpen] = useState(true)
   const currentColor = COLORWAY_CHOICES.find((c) => c.id === opts.colorway) ?? COLORWAY_CHOICES[0]!
   const currentPaper = PAPER_CHOICES.find((p) => p.id === opts.paper) ?? PAPER_CHOICES[0]!
   const currentTypeface = TYPEFACE_CHOICES.find((t) => t.id === opts.typeface) ?? TYPEFACE_CHOICES[0]!
 
   return (
+    <div className="w-full h-full p-2 pt-0">
     <aside
       data-testid="share-editor-style-panel"
-      className="w-full h-full bg-warm-surface dark:bg-dark-surface overflow-y-auto scrollbar-none flex flex-col"
+      className="w-full h-full bg-warm-bg dark:bg-dark-bg overflow-y-auto scrollbar-none flex flex-col rounded-[10px] border border-warm-border dark:border-dark-border"
     >
-      {/* First section's header lives in an h-9 row so it sits in the
-          same vertical band as the AppTopBar to the left — TEMPLATE
-          label visually aligns with the Download button. The panel
-          fold toggle occupies the right edge of this row. */}
-      <div className="flex-none h-9 pl-4 pr-2 flex items-center justify-between">
-        <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
-          Template
+      <div className="px-4 pt-3 pb-4">
+        <div className="flex items-baseline justify-between mb-3">
+          <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
+            Template
+          </div>
+          <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">
+            {TEMPLATE_CHOICES.length} looks
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          title="Hide style panel"
-          aria-label="Hide style panel"
-          className="flex-none inline-flex items-center justify-center w-7 h-7 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-        >
-          <PanelRight size={15} strokeWidth={1.75} />
-        </button>
-      </div>
-      <div className="px-4 pb-4">
         <div className="flex flex-col gap-1.5">
           {TEMPLATE_CHOICES.map((tpl) => {
             const active = opts.template === tpl.id
@@ -182,6 +171,7 @@ export function ControlPanel({ opts, setOpts, onClose }: Props) {
         />
       </Collapsible>
     </aside>
+    </div>
   )
 }
 

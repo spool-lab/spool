@@ -255,27 +255,13 @@ export default function ShareEditorPage({
         onPdf={() => { void exportPdf() }}
         onSpool={() => { void exportSpoolFile() }}
       />
-      {/* Always mounted so toggling panelOpen doesn't snap-shift the
-          Download button. The button's width, leading margin, and
-          opacity all animate in sync with the right panel's 200ms
-          width transition. When the panel is open the button shrinks
-          to zero width and the negative margin absorbs the parent's
-          gap-3 so Download sits flush against the right column. */}
       <button
         type="button"
         onClick={onTogglePanel}
-        title="Show style panel"
-        aria-label="Show style panel"
-        aria-pressed={false}
-        aria-hidden={panelOpen}
-        tabIndex={panelOpen ? -1 : 0}
-        style={{
-          width: panelOpen ? 0 : 28,
-          marginLeft: panelOpen ? -12 : 0,
-          opacity: panelOpen ? 0 : 1,
-          transition: 'width 200ms ease-out, margin-left 200ms ease-out, opacity 200ms ease-out',
-        }}
-        className="flex-none inline-flex items-center justify-center h-7 overflow-hidden rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
+        title={panelOpen ? 'Hide style panel' : 'Show style panel'}
+        aria-label={panelOpen ? 'Hide style panel' : 'Show style panel'}
+        aria-pressed={panelOpen}
+        className="flex-none inline-flex items-center justify-center w-7 h-7 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
         <PanelRight size={15} strokeWidth={1.75} />
       </button>
@@ -288,7 +274,7 @@ export default function ShareEditorPage({
       sidebarCollapsed={sidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       topBar={topBarContent}
-      rightPanel={<ControlPanel opts={opts} setOpts={setOpts} onClose={onTogglePanel} />}
+      rightPanel={<ControlPanel opts={opts} setOpts={setOpts} />}
       rightPanelOpen={panelOpen}
     >
       <div className="flex flex-col h-full" data-testid="share-editor-page">

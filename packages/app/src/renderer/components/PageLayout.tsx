@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import AppTopBar from './AppTopBar.js'
 
+const RIGHT_PANEL_WIDTH = 280
+
 type Props = {
   /** Left sidebar (Library / Shares / Projects rail). The caller
    *  owns this so each page can pass the same Sidebar instance with
@@ -12,10 +14,9 @@ type Props = {
    *  (back arrow, title, primary action buttons). Pass null on pages
    *  that don't need any. */
   topBar?: ReactNode
-  /** Page-level right column (e.g. share editor's style picker). Lives
-   *  as a full-height sibling of the (sidebar + content) sub-tree, so
-   *  its top edge sits at the window top rather than below AppTopBar.
-   *  Pass null when the page doesn't want a right column. */
+  /** Page-level right column (e.g. share editor's style picker).
+   *  Sits below the AppTopBar so the bar spans the full window width
+   *  and its primary actions stay reachable while the panel scrolls. */
   rightPanel?: ReactNode
   /** Controls the right column's animated width. */
   rightPanelOpen?: boolean
@@ -24,10 +25,10 @@ type Props = {
 }
 
 /**
- * Three-column layout shell: [sidebar | content | rightPanel]. The
- * AppTopBar sits on top of (sidebar + content) only, so the right
- * column extends from window top to bottom and its first content row
- * can align vertically with the top bar's row.
+ * Three-column layout shell. AppTopBar sits at the top and spans the
+ * full window width (sidebar + content + rightPanel are all sibling
+ * columns BELOW it). The bar paints a matching surface-coloured
+ * segment over the right column so the top edge reads as one band.
  *
  * Slot prop pattern — callers pass JSX nodes for each slot instead of
  * portaling content via DOM ids. Keeps the layout's contract typed
@@ -43,44 +44,37 @@ export default function PageLayout({
   children,
 }: Props) {
   return (
-    <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
-      {/* Main column: AppTopBar over (sidebar + content). Shrinks
-          horizontally when the right column is open. */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <AppTopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={onToggleSidebar}>
-          {topBar}
-        </AppTopBar>
-        <div className="flex flex-1 min-h-0">
-          <div
-            className="flex-none overflow-hidden"
-            style={{
-              width: sidebarCollapsed ? 0 : 240,
-              transition: 'width 200ms ease-out',
-            }}
-            aria-hidden={sidebarCollapsed}
-          >
-            {sidebar}
-          </div>
-          <div className="relative flex flex-col flex-1 min-w-0">
-            {children}
-          </div>
-        </div>
-      </div>
-
-      {/* Right column — full-height sibling of the main column.
-          Width animates to 0 when collapsed so it slides out cleanly.
-          Inline style transition (rather than Tailwind's
-          transition-[width]) is the only one that reliably animates
-          across all React/Tailwind v4 builds. */}
-      <div
-        className="flex-none overflow-hidden"
-        style={{
-          width: rightPanelOpen ? 280 : 0,
-          transition: 'width 200ms ease-out',
-        }}
-        aria-hidden={!rightPanelOpen}
+    <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+      <AppTopBar
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
       >
-        {rightPanel}
+        {topBar}
+      </AppTopBar>
+      <div className="flex flex-1 min-h-0">
+        <div
+          className="flex-none overflow-hidden"
+          style={{
+            width: sidebarCollapsed ? 0 : 240,
+            transition: 'width 200ms ease-out',
+          }}
+          aria-hidden={sidebarCollapsed}
+        >
+          {sidebar}
+        </div>
+        <div className="relative flex flex-col flex-1 min-w-0">
+          {children}
+        </div>
+        <div
+          className="flex-none overflow-hidden"
+          style={{
+            width: rightPanelOpen ? RIGHT_PANEL_WIDTH : 0,
+            transition: 'width 200ms ease-out',
+          }}
+          aria-hidden={!rightPanelOpen}
+        >
+          {rightPanel}
+        </div>
       </div>
     </div>
   )
