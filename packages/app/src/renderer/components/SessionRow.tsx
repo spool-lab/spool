@@ -106,10 +106,10 @@ export default function SessionRow({ session, pinned = false, showProject = fals
                 aria-expanded={open}
                 className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <circle cx="3" cy="7" r="1.2" />
-                  <circle cx="7" cy="7" r="1.2" />
-                  <circle cx="11" cy="7" r="1.2" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <circle cx="5" cy="12" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="19" cy="12" r="1.5" />
                 </svg>
               </button>
             )}

@@ -228,7 +228,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   return (
     <div className="relative flex flex-col h-full" data-testid="session-detail">
       {/* Session header */}
-      <div className="flex-none flex items-start gap-3 px-6 pt-1.5 pb-3 border-b border-warm-border dark:border-dark-border">
+      <div className="flex-none flex items-start gap-3 px-6 pt-1.5 pb-3">
         {onBack && (
           <button
             type="button"
@@ -249,12 +249,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           </h2>
 
           <p className="mt-1 flex items-center gap-1.5 text-[11px] text-warm-faint dark:text-dark-muted min-w-0">
-            <span className="font-mono truncate" title={session.projectDisplayPath}>{session.projectDisplayPath}</span>
-            <span aria-hidden>·</span>
-            <span className="flex-none">{session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}</span>
-            <span aria-hidden>·</span>
-            <span className="flex-none">{formatRelativeDate(session.startedAt)}</span>
-            <span aria-hidden>·</span>
             <span className="inline-flex items-center gap-1 flex-none">
               <span
                 aria-hidden
@@ -263,6 +257,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               />
               <span className="font-mono">{getSessionSourceShortLabel(session.source)}</span>
             </span>
+            <span aria-hidden>·</span>
+            <span className="font-mono truncate" title={session.projectDisplayPath}>{session.projectDisplayPath}</span>
+            <span aria-hidden>·</span>
+            <span className="flex-none">{formatRelativeDate(session.startedAt)}</span>
+            <span aria-hidden>·</span>
+            <span className="flex-none">{session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}</span>
           </p>
         </div>
 
@@ -279,7 +279,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               onClick={() => onShare(session, messages)}
               title="Create a share from this session"
               aria-label="Create a share from this session"
-              className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
               <Share2 size={13} strokeWidth={1.6} aria-hidden />
             </button>
@@ -291,7 +291,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             disabled={resuming}
             title={resuming ? 'Opening…' : 'Resume in Terminal'}
             aria-label={resuming ? 'Opening…' : 'Resume in Terminal'}
-            className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
           </button>
@@ -304,12 +304,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 type="button"
                 onClick={toggle}
                 aria-label="More actions"
-                className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor">
-                  <circle cx="3" cy="7" r="1.2" />
-                  <circle cx="7" cy="7" r="1.2" />
-                  <circle cx="11" cy="7" r="1.2" />
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="19" cy="12" r="1.5" />
                 </svg>
               </button>
             )}

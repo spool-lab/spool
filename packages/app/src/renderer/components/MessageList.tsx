@@ -80,19 +80,22 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
           && activeMatchIndex >= matchState.offset
           && activeMatchIndex < matchState.offset + matchState.ranges.length
         const isTarget = msg.id === targetMessageId
+        const prev = index > 0 ? messages[index - 1] : undefined
+        const showAvatar = !prev || prev.role !== msg.role || prev.role === 'system'
 
         return (
           <div
             data-index={index}
             {...(isTarget ? { 'data-testid': 'target-message' } : {})}
             {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
-            className={`border-b border-warm-border/50 dark:border-dark-border/50 transition-colors duration-700 ${
+            className={`transition-colors duration-700 ${
               isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
             }`}
           >
             <MessageBubble
               message={msg}
               isDark={isDark}
+              showAvatar={showAvatar}
               {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
               activeMatchIndex={containsActive ? activeMatchIndex : -1}
               {...(containsActive ? { onActiveMatchRef } : {})}

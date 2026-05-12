@@ -28,7 +28,7 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
     }
   }
 
-  const dim = size === 'md' ? 'w-8 h-8' : 'w-6 h-6'
+  const dim = size === 'md' ? 'w-8 h-8' : 'w-5 h-5'
   const icon = size === 'md' ? 16 : 13
 
   return (

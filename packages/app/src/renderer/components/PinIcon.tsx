@@ -12,15 +12,15 @@ export default function PinIcon({ size = 13, filled = false, className }: Props)
       viewBox="0 0 24 24"
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth={filled ? 1.5 : 1.8}
+      strokeWidth={filled ? 1.4 : 1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
     >
-      <path d="M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" />
-      <path d="M9 15l-4.5 4.5" />
-      <path d="M14.5 4l5.5 5.5" />
+      <path d="M15.3 3.3l-4.8 4.8l-4.8 1.8l-1.8 1.8l8.4 8.4l1.8 -1.8l1.8 -4.8l4.8 -4.8" />
+      <path d="M8.1 15.9l-5.4 5.4" />
+      <path d="M14.7 2.7l6.6 6.6" />
     </svg>
   )
 }

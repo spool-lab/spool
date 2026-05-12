@@ -163,7 +163,7 @@ export default function SearchOverlay({
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
       <div className="w-full max-w-xl rounded-xl border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface shadow-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-warm-border dark:border-dark-border">
+        <div className="flex items-center gap-2 px-4 py-3">
           <SearchIcon />
           <input
             ref={inputRef}
@@ -189,7 +189,7 @@ export default function SearchOverlay({
           )}
         </div>
 
-        <div className="px-4 py-2 flex items-center gap-2 border-b border-warm-border dark:border-dark-border">
+        <div className="px-4 py-2 flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wider text-warm-faint">Searching:</span>
           <ScopeChip
             label={scopeProjectName ? `in: ${scopeProjectName}` : 'in: project'}
@@ -283,7 +283,7 @@ export default function SearchOverlay({
                   aria-selected={index === activeIndex}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => onOpenResult(result.sessionUuid, result.messageId, query)}
-                  className={`px-4 py-2.5 cursor-pointer border-b border-warm-border/50 dark:border-dark-border/50 ${
+                  className={`px-4 py-2.5 cursor-pointer ${
                     index === activeIndex ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
                   }`}
                 >
@@ -304,7 +304,7 @@ export default function SearchOverlay({
           )}
         </div>
 
-        <div className="w-full px-4 py-2 text-[11px] border-t border-warm-border dark:border-dark-border flex items-center justify-between text-warm-faint dark:text-dark-muted gap-3">
+        <div className="w-full px-4 py-2 text-[11px] flex items-center justify-between text-warm-faint dark:text-dark-muted gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             {(showRecents ? flatRecents.length > 0 : results.length > 0) && (
               <>

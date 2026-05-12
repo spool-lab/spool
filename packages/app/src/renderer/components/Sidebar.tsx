@@ -466,7 +466,7 @@ function PinnedRow({
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
-      <span className="flex-1 truncate text-[13px]">{title}</span>
+      <span className="flex-1 truncate text-[13px]" title={title}>{title}</span>
       <span
         className="flex-none flex items-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity"
         onClick={(e) => e.stopPropagation()}
@@ -495,10 +495,10 @@ function PinnedRow({
               aria-expanded={open}
               className="inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
-                <circle cx="3" cy="7" r="1.2" />
-                <circle cx="7" cy="7" r="1.2" />
-                <circle cx="11" cy="7" r="1.2" />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <circle cx="5" cy="12" r="1.5" />
+                <circle cx="12" cy="12" r="1.5" />
+                <circle cx="19" cy="12" r="1.5" />
               </svg>
             </button>
           )}
