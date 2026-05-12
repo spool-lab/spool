@@ -20,8 +20,8 @@ export default function AppToaster() {
         classNames: {
           toast: [
             'group/toast pointer-events-auto',
-            'flex items-start gap-2.5',
-            'w-[340px] px-3.5 py-3',
+            'flex items-center gap-3',
+            'min-w-[260px] max-w-[380px] w-max px-3.5 py-2.5',
             'rounded-[10px]',
             // Default (neutral / non-typed) — elevated white card.
             'bg-white dark:bg-[#2A2A24]',
@@ -48,9 +48,9 @@ export default function AppToaster() {
             'bg-warm-surface dark:bg-dark-surface2',
             'ring-warm-border dark:ring-dark-border',
           ].join(' '),
-          icon: 'flex-none mt-px',
+          icon: 'flex-none flex items-center justify-center',
           content: 'flex flex-col gap-0.5 min-w-0 flex-1',
-          title: 'text-[13px] font-medium leading-snug tracking-[-0.005em]',
+          title: 'text-[13px] font-normal leading-snug tracking-[-0.005em] truncate',
           description:
             'text-[12px] leading-snug text-warm-muted dark:text-dark-muted',
           actionButton: [

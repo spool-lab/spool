@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Newspaper } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Newspaper, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import type { ShareDraftListItem } from '@spool-lab/core'
 import {
@@ -22,8 +23,30 @@ type Props = {
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
 export default function SharesPage({ onOpenDraft }: Props) {
-  const { drafts, loading, error } = useShareDrafts()
+  const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
+
+  const handleDelete = useCallback(async (draft: ShareDraftListItem) => {
+    try {
+      const full = await removeDraft(draft.draft_id)
+      if (!full) return
+      const title = draft.title || 'Untitled'
+      toast(`Deleted “${title}”`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void restoreDraft(full).catch((err) => {
+              console.error('Restore share draft failed:', err)
+              toast.error('Could not restore draft')
+            })
+          },
+        },
+      })
+    } catch (err) {
+      console.error('Delete share draft failed:', err)
+      toast.error('Could not delete draft')
+    }
+  }, [removeDraft, restoreDraft])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -33,7 +56,13 @@ export default function SharesPage({ onOpenDraft }: Props) {
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <DraftsList drafts={drafts} loading={loading} error={error} onOpenDraft={onOpenDraft} />
+        <DraftsList
+          drafts={drafts}
+          loading={loading}
+          error={error}
+          onOpenDraft={onOpenDraft}
+          onDeleteDraft={handleDelete}
+        />
       </div>
     </div>
   )
@@ -44,11 +73,13 @@ function DraftsList({
   loading,
   error,
   onOpenDraft,
+  onDeleteDraft,
 }: {
   drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
+  onDeleteDraft: (draft: ShareDraftListItem) => void
 }) {
   const [skeletonCount] = useState(readSkeletonCount)
   // Defer skeleton render by 150ms so sub-threshold loads (local sqlite is
@@ -96,7 +127,7 @@ function DraftsList({
     >
       {drafts.map((draft) => (
         <li key={draft.draft_id}>
-          <DraftCard draft={draft} onClick={onOpenDraft} />
+          <DraftCard draft={draft} onClick={onOpenDraft} onDelete={onDeleteDraft} />
         </li>
       ))}
     </ul>
@@ -109,9 +140,11 @@ const FALLBACK_RATIO = { w: 720, h: 960 }
 function DraftCard({
   draft,
   onClick,
+  onDelete,
 }: {
   draft: ShareDraftListItem
   onClick?: ((draft: ShareDraftListItem) => void) | undefined
+  onDelete: (draft: ShareDraftListItem) => void
 }) {
   // The preview blob is a SpoolDocument-shaped subset: full opts +
   // conversation metadata + first ~6 turns. Card rendering only ever
@@ -126,7 +159,7 @@ function DraftCard({
   }, [draft.preview_json])
 
   if (!doc) {
-    return <CorruptDraftCard draft={draft} onClick={onClick} />
+    return <CorruptDraftCard draft={draft} onClick={onClick} onDelete={onDelete} />
   }
 
   const ratio = TEMPLATE_RATIO[doc.opts.template] ?? FALLBACK_RATIO
@@ -145,8 +178,19 @@ function DraftCard({
   )
 
   const title = doc.conversation.title || 'Untitled'
+  const [hover, setHover] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   return (
+    <div
+      className="relative inline-block"
+      style={{ width: CARD_W, height: cardH }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => {
+        setHover(false)
+        setConfirmingDelete(false)
+      }}
+    >
     <button
       type="button"
       data-testid="shares-draft-row"
@@ -218,6 +262,64 @@ function DraftCard({
         </span>
       </span>
     </button>
+      {hover && (
+        <DeleteChip
+          confirming={confirmingDelete}
+          onClick={() => {
+            if (confirmingDelete) {
+              onDelete(draft)
+              setConfirmingDelete(false)
+            } else {
+              setConfirmingDelete(true)
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Quilt-style click-twice delete affordance. Resting state is a small
+ * X-chip in the top-right corner; first click expands it to a "Delete?"
+ * pill with inverted colors; second click fires onClick. The parent
+ * resets confirming state on mouse-leave so the pill never lingers in
+ * its primed state after the user has moved on.
+ */
+function DeleteChip({ confirming, onClick }: { confirming: boolean; onClick: () => void }) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      data-testid="shares-draft-delete"
+      data-confirming={confirming ? '' : undefined}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.stopPropagation()
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      aria-label={confirming ? 'Click again to confirm delete' : 'Delete draft'}
+      title={confirming ? 'Click again to confirm' : 'Delete draft'}
+      className={`absolute top-1.5 right-1.5 z-10 h-5 min-w-5 inline-flex items-center justify-center rounded-full cursor-pointer select-none transition-[padding,background,color,border-color] duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.12)] font-sans text-[10.5px] font-medium tracking-[0.02em] whitespace-nowrap ${
+        confirming
+          ? 'bg-warm-text dark:bg-dark-text text-warm-bg dark:text-dark-bg border border-warm-text dark:border-dark-text px-2'
+          : 'bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted border border-warm-border dark:border-dark-border'
+      }`}
+    >
+      {confirming ? (
+        'Delete'
+      ) : (
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+          <path d="M2 2l6 6M8 2l-6 6" />
+        </svg>
+      )}
+    </span>
   )
 }
 
@@ -268,19 +370,50 @@ function DraftsSkeleton({ count }: { count: number }) {
   )
 }
 
-function CorruptDraftCard({ draft }: { draft: ShareDraftListItem; onClick?: unknown }) {
+function CorruptDraftCard({
+  draft,
+  onDelete,
+}: {
+  draft: ShareDraftListItem
+  onClick?: unknown
+  onDelete: (draft: ShareDraftListItem) => void
+}) {
   const ratio = FALLBACK_RATIO
   const cardH = Math.round(CARD_W * (ratio.h / ratio.w))
+  const title = draft.title || 'Untitled'
+  const [hover, setHover] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   return (
     <div
-      className="block rounded-md border border-dashed border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-faint dark:text-dark-muted text-xs flex flex-col items-center justify-center gap-1 px-3 text-center"
+      className="relative inline-block"
       style={{ width: CARD_W, height: cardH }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => {
+        setHover(false)
+        setConfirmingDelete(false)
+      }}
     >
-      <span className="font-medium text-warm-text dark:text-dark-text line-clamp-2">
-        {draft.title || 'Untitled'}
-      </span>
-      <span>snapshot unreadable</span>
-      <span>edited {formatRelative(draft.updated_at)}</span>
+      <div
+        className="block rounded-md border border-dashed border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-faint dark:text-dark-muted text-xs flex flex-col items-center justify-center gap-1 px-3 text-center"
+        style={{ width: CARD_W, height: cardH }}
+      >
+        <span className="font-medium text-warm-text dark:text-dark-text line-clamp-2">{title}</span>
+        <span>snapshot unreadable</span>
+        <span>edited {formatRelative(draft.updated_at)}</span>
+      </div>
+      {hover && (
+        <DeleteChip
+          confirming={confirmingDelete}
+          onClick={() => {
+            if (confirmingDelete) {
+              onDelete(draft)
+              setConfirmingDelete(false)
+            } else {
+              setConfirmingDelete(true)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
