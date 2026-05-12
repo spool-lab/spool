@@ -62,9 +62,11 @@ export {
   openSaveSlot,
   writeToSlot,
   rasterizeToPngBlob,
+  installPdfPrintHost,
   filenameForExport,
 } from './lib/export'
 export type { ExportFormat, SaveSlot } from './lib/export'
+export { PngTooTallError } from './lib/export'
 
 // .spool file format ──────────────────────────────────────────────
 export {

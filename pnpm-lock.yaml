@@ -34,6 +34,9 @@ importers:
       '@spool-lab/core':
         specifier: workspace:*
         version: link:../core
+      '@spool/share-kit':
+        specifier: workspace:*
+        version: link:../share-kit
       '@tanstack/react-virtual':
         specifier: ^3.13.6
         version: 3.13.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5)

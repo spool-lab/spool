@@ -12,6 +12,10 @@ import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
 import SharesPage from './components/SharesPage.js'
+import ShareEditorPage from './components/ShareEditorPage.js'
+import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
+import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type SpoolDocument } from '@spool/share-kit'
+import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -22,7 +26,7 @@ import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 
-type View = 'search' | 'session' | 'shares'
+type View = 'search' | 'session' | 'shares' | 'share-editor'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
@@ -89,6 +93,70 @@ export default function App() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sharePanelOpen, setSharePanelOpen] = useState(true)
+  const [shareConversation, setShareConversation] = useState<Conversation | null>(null)
+  // The view the user came from when opening the editor — Back returns
+  // here. Captured up front because guessing from current state
+  // (selectedSession etc.) misroutes when the user opens a draft from
+  // the Shares page while a session is also selected.
+  const [shareEditorReturnView, setShareEditorReturnView] = useState<View>('search')
+
+  const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[]) => {
+    const draftId = sessionDraftId(session.sessionUuid)
+    // If the user has shared this session before, reopen their saved
+    // draft (their edits to template / paper / typeface / etc. are in
+    // the snapshot). Only when no draft exists do we build a fresh
+    // one with DEFAULT_OPTS and persist it.
+    let conversation: Conversation
+    try {
+      const existing = await window.spool?.shareDraft?.get(draftId)
+      if (existing) {
+        const doc = JSON.parse(existing.snapshot_json) as SpoolDocument
+        conversation = doc.conversation
+      } else {
+        conversation = composeFromSession(session, messages)
+        const doc = buildSpoolDocument(conversation, DEFAULT_OPTS)
+        await window.spool?.shareDraft?.upsert({
+          draft_id: draftId,
+          source_kind: 'spool-session',
+          source_origin: session.sessionUuid,
+          title: conversation.title,
+          snapshot_json: JSON.stringify(doc),
+          preview_json: JSON.stringify(buildPreviewDocument(doc)),
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load or persist share draft, falling back to a fresh compose:', err)
+      conversation = composeFromSession(session, messages)
+    }
+    setShareConversation(conversation)
+    setShareEditorReturnView('session')
+    setView('share-editor')
+  }, [])
+
+  const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
+    // The list query intentionally omits snapshot_json — fetch the
+    // full row before parsing so the editor gets the complete
+    // conversation rather than the truncated preview blob.
+    try {
+      const full = await window.spool?.shareDraft?.get(draft.draft_id)
+      if (!full) {
+        console.error('Draft vanished between list and open:', draft.draft_id)
+        return
+      }
+      const doc = JSON.parse(full.snapshot_json) as SpoolDocument
+      setShareConversation(doc.conversation)
+      setShareEditorReturnView('shares')
+      setView('share-editor')
+    } catch (err) {
+      console.error('Failed to parse draft snapshot:', err)
+    }
+  }, [])
+
+  const handleCloseShareEditor = useCallback(() => {
+    setShareConversation(null)
+    setView(shareEditorReturnView)
+  }, [shareEditorReturnView])
 
   useEffect(() => {
     if (!window.spool?.getSidebarCollapsed) return
@@ -109,6 +177,7 @@ export default function App() {
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
   const isSharesView = view === 'shares'
+  const isShareEditorView = view === 'share-editor'
 
   useEffect(() => {
     loadThemeEditorState()
@@ -485,9 +554,106 @@ export default function App() {
   const fragmentSources = deferredResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
+  const sidebarElement = (
+    <Sidebar
+      activeIdentityKey={activeProjectKey}
+      isLibraryActive={isHomeMode}
+      onSelectProject={(key) => {
+        setActiveProjectKey(key)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        setQuery('')
+      }}
+      onSelectHome={() => {
+        setActiveProjectKey(null)
+        setHomeMode(true)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        setQuery('')
+      }}
+      onSelectShares={() => {
+        setActiveProjectKey(null)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('shares')
+        setQuery('')
+      }}
+      isSharesActive={isSharesView}
+      onOpenSearch={handleSearchOpen}
+      syncStatus={syncStatus}
+      status={status}
+      showSourceDots={sidebarShowSourceDots}
+      showSessionCount={sidebarShowSessionCount}
+      sortOrder={sidebarSortOrder}
+      onSortOrderChange={handleSidebarSortChange}
+      onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
+    />
+  )
+
+  // Share editor owns its own PageLayout (with a right panel) — short-
+  // circuit App's regular two-column layout for that view.
+  if (isShareEditorView && shareConversation) {
+    return (
+      <>
+        <ShareEditorPage
+          conversation={shareConversation}
+          onBack={handleCloseShareEditor}
+          panelOpen={sharePanelOpen}
+          onTogglePanel={() => setSharePanelOpen((v) => !v)}
+          sidebar={sidebarElement}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={toggleSidebar}
+        />
+        {/* App-level overlays (settings, search) still mount above the
+            share editor's PageLayout. */}
+        {showSettings && (
+          <SettingsPanel
+            onClose={() => { setShowSettings(false); refreshAgents() }}
+            initialTab={settingsTab}
+            claudeCount={status?.claudeSessions ?? null}
+            codexCount={status?.codexSessions ?? null}
+            geminiCount={status?.geminiSessions ?? null}
+            themeEditor={themeEditor}
+            onThemeEditorChange={setThemeEditor}
+          />
+        )}
+        <SearchOverlay
+          open={searchOverlayOpen}
+          initialQuery={query}
+          scope={searchScope}
+          scopeProjectName={activeProjectName}
+          scopeProjectKey={activeProjectKey}
+          defaultScope={activeProjectKey ? 'project' : 'all'}
+          mode={searchMode}
+          {...(hasAgents ? { onModeChange: setSearchMode } : {})}
+          {...(hasAgents ? {
+            agentSelector: (
+              <AgentSelector
+                agents={availableAgents}
+                activeAgent={aiAgent}
+                onSelect={setAiAgent}
+              />
+            )
+          } : {})}
+          onClose={handleSearchClose}
+          onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
+          onCommit={handleSearchCommit}
+          onOpenResult={handleOpenResultFromOverlay}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
-      <AppTopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
+      <AppTopBar
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={toggleSidebar}
+      />
       <div className="flex flex-1 min-h-0">
       <div
         className={[
@@ -537,7 +703,7 @@ export default function App() {
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isSharesView ? (
-          <SharesPage />
+          <SharesPage onOpenDraft={handleOpenDraft} />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {
@@ -592,6 +758,7 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
+                  onShare={handleStartShareFromSession}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
