@@ -102,6 +102,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
                     key={session.sessionUuid}
                     session={session}
                     showProject
+                    bucket={bucket.label}
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
@@ -118,14 +119,12 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
 export function CollapsibleSection({
   label,
-  accent = false,
   children,
   testId,
   dataAttr,
   defaultOpen = true,
 }: {
   label: string
-  accent?: boolean
   children: ReactNode
   testId?: string
   dataAttr?: Record<string, string>
@@ -138,9 +137,7 @@ export function CollapsibleSection({
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className={`group w-full flex items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none ${
-          accent ? 'bg-accent/[0.04] dark:bg-accent-dark/[0.04]' : ''
-        }`}
+        className="group w-full flex items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
       >
         <span>{label}</span>
         <svg

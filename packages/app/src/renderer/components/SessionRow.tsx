@@ -11,16 +11,18 @@ type Props = {
   session: Session
   pinned?: boolean
   showProject?: boolean
+  bucket?: string
   onPinChange?: (uuid: string, pinned: boolean) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
 }
 
-export default function SessionRow({ session, pinned = false, showProject = false, onPinChange, onOpenSession, onCopySessionId }: Props) {
+export default function SessionRow({ session, pinned = false, showProject = false, bucket, onPinChange, onOpenSession, onCopySessionId }: Props) {
   const [resuming, setResuming] = useState(false)
 
   const title = session.title?.trim() || '(no title)'
-  const date = formatRelativeDate(session.startedAt)
+  const date = formatRelativeDate(session.startedAt, { bucket })
+  const model = compactModel(session.model)
 
   function handleOpen() {
     onOpenSession(session.sessionUuid)
@@ -56,7 +58,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
           handleOpen()
         }
       }}
-      className="group flex items-start gap-3 px-5 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75 border-b border-warm-border dark:border-dark-border cursor-pointer focus:outline-none focus:bg-warm-surface dark:focus:bg-dark-surface"
+      className="group flex items-start gap-3 px-5 py-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75 cursor-pointer focus:outline-none focus:bg-warm-surface dark:focus:bg-dark-surface"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-0.5">
@@ -66,14 +68,25 @@ export default function SessionRow({ session, pinned = false, showProject = fals
           </span>
         </div>
         <p className="text-xs text-warm-faint dark:text-dark-muted truncate">
-          {showProject && <span className="text-warm-muted dark:text-dark-muted">{session.projectDisplayName} · </span>}
-          {date} · {session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}
-          {session.model && ` · ${session.model}`}
+          {showProject && (
+            <>
+              <span className="text-warm-muted dark:text-dark-muted">{session.projectDisplayName}</span>
+              {' · '}
+            </>
+          )}
+          {date} · {session.messageCount} {session.messageCount === 1 ? 'msg' : 'msgs'}
+          {model && ` · ${model}`}
         </p>
       </div>
 
       <div className="flex-none flex items-center gap-1 -mt-0.5" onClick={(e) => e.stopPropagation()}>
-        <span className={pinned ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'}>
+        <span
+          className={
+            pinned
+              ? 'opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'
+              : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'
+          }
+        >
           <PinButton
             sessionUuid={session.sessionUuid}
             pinned={pinned}
@@ -122,6 +135,18 @@ export default function SessionRow({ session, pinned = false, showProject = fals
       </div>
     </div>
   )
+}
+
+function compactModel(model: string | null | undefined): string {
+  if (!model) return ''
+  const m = model.match(/^claude-(opus|sonnet|haiku)(?:-(\d+))?(?:-(\d+))?$/)
+  if (!m) return model
+  const name = m[1]!
+  const major = m[2]
+  const minor = m[3]
+  if (minor) return `${name} ${major}.${minor}`
+  if (major) return `${name} ${major}`
+  return name
 }
 
 function PlayIcon() {

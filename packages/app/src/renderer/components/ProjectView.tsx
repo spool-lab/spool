@@ -171,7 +171,7 @@ export default function ProjectView({
 
   return (
     <div data-testid="project-view" className="flex flex-col h-full overflow-hidden">
-      <div className="flex-none px-6 pt-1.5 pb-3 border-b border-warm-border dark:border-dark-border">
+      <div className="flex-none px-6 pt-1.5 pb-3">
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-xl font-semibold tracking-tight text-warm-text dark:text-dark-text">
             {group?.displayName ?? identityKey}
@@ -314,10 +314,9 @@ export default function ProjectView({
             {visiblePinned.length > 0 && (
               <CollapsibleSection
                 label={`PINNED · ${visiblePinned.length} ${visiblePinned.length === 1 ? 'session' : 'sessions'}`}
-                accent
                 testId="project-view-pinned"
               >
-                <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
+                <div>
                   {visiblePinned.map(session => (
                     <SessionRow
                       key={session.sessionUuid}
@@ -434,23 +433,21 @@ function DirectoryGroupSection({
         <span className="font-mono text-[11px] font-medium truncate">
           {name}
         </span>
-        <span className="ml-auto flex items-center gap-2 flex-none self-center">
-          {count > 1 && (
-            <span className="font-mono text-[10px] tabular-nums">
-              {count}
-            </span>
-          )}
-          <svg
-            width="9"
-            height="9"
-            viewBox="0 0 9 9"
-            fill="none"
-            aria-hidden
-            className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
-          >
-            <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+        {count > 1 && (
+          <span className="font-mono text-[10px] tabular-nums flex-none">
+            {count}
+          </span>
+        )}
+        <svg
+          width="9"
+          height="9"
+          viewBox="0 0 9 9"
+          fill="none"
+          aria-hidden
+          className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+        >
+          <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
         <div>
