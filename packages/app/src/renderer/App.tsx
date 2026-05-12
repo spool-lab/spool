@@ -25,6 +25,7 @@ import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editor
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
+import { FEATURES } from './featureFlags.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
@@ -210,8 +211,8 @@ export default function App() {
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
-  const isSharesView = view === 'shares'
-  const isShareEditorView = view === 'share-editor'
+  const isSharesView = FEATURES.share && view === 'shares'
+  const isShareEditorView = FEATURES.share && view === 'share-editor'
 
   useEffect(() => {
     loadThemeEditorState()
@@ -608,14 +609,16 @@ export default function App() {
         setView('search')
         setQuery('')
       }}
-      onSelectShares={() => {
-        setActiveProjectKey(null)
-        setHomeMode(false)
-        setSelectedSession(null)
-        setTargetMessageId(null)
-        setView('shares')
-        setQuery('')
-      }}
+      {...(FEATURES.share ? {
+        onSelectShares: () => {
+          setActiveProjectKey(null)
+          setHomeMode(false)
+          setSelectedSession(null)
+          setTargetMessageId(null)
+          setView('shares')
+          setQuery('')
+        },
+      } : {})}
       isSharesActive={isSharesView}
       onOpenSearch={handleSearchOpen}
       syncStatus={syncStatus}
@@ -715,14 +718,16 @@ export default function App() {
           setView('search')
           setQuery('')
         }}
-        onSelectShares={() => {
-          setActiveProjectKey(null)
-          setHomeMode(false)
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setView('shares')
-          setQuery('')
-        }}
+        {...(FEATURES.share ? {
+          onSelectShares: () => {
+            setActiveProjectKey(null)
+            setHomeMode(false)
+            setSelectedSession(null)
+            setTargetMessageId(null)
+            setView('shares')
+            setQuery('')
+          },
+        } : {})}
         isSharesActive={isSharesView}
         onOpenSearch={handleSearchOpen}
         syncStatus={syncStatus}
@@ -792,7 +797,7 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
-                  onShare={handleStartShareFromSession}
+                  {...(FEATURES.share ? { onShare: handleStartShareFromSession } : {})}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
