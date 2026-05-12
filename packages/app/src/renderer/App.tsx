@@ -19,6 +19,7 @@ import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
+import { DEFAULT_PINNED_SORT_ORDER, type PinnedSortOrder } from '../shared/pinnedSort.js'
 import { DEFAULT_PROJECT_SORT_ORDER } from '../shared/projectView.js'
 import type { ProjectSessionSortOrder } from '@spool-lab/core'
 import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editorTypes.js'
@@ -83,6 +84,7 @@ export default function App() {
   const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
   const [sidebarShowSessionCount, setSidebarShowSessionCount] = useState(true)
   const [sidebarSortOrder, setSidebarSortOrder] = useState<SidebarSortOrder>(DEFAULT_SIDEBAR_SORT_ORDER)
+  const [pinnedSortOrder, setPinnedSortOrder] = useState<PinnedSortOrder>(DEFAULT_PINNED_SORT_ORDER)
   const [projectSortOrder, setProjectSortOrder] = useState<ProjectSessionSortOrder>(DEFAULT_PROJECT_SORT_ORDER)
   const [resumeToastCommand, setResumeToastCommand] = useState<string | null>(null)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
@@ -294,6 +296,7 @@ export default function App() {
       setSidebarShowSourceDots(config.sidebarShowSourceDots ?? true)
       setSidebarShowSessionCount(config.sidebarShowSessionCount ?? true)
       setSidebarSortOrder(config.sidebarSortOrder ?? DEFAULT_SIDEBAR_SORT_ORDER)
+      setPinnedSortOrder(config.pinnedSortOrder ?? DEFAULT_PINNED_SORT_ORDER)
       setProjectSortOrder(config.projectSortOrder ?? DEFAULT_PROJECT_SORT_ORDER)
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
@@ -311,6 +314,17 @@ export default function App() {
     try {
       const config = await window.spool.getAgentsConfig()
       await window.spool.setAgentsConfig({ ...config, sidebarSortOrder: next })
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  const handlePinnedSortChange = useCallback(async (next: PinnedSortOrder) => {
+    setPinnedSortOrder(next)
+    if (!window.spool?.setAgentsConfig) return
+    try {
+      const config = await window.spool.getAgentsConfig()
+      await window.spool.setAgentsConfig({ ...config, pinnedSortOrder: next })
     } catch (err) {
       console.error(err)
     }
@@ -622,6 +636,7 @@ export default function App() {
   const sidebarElement = (
     <Sidebar
       activeIdentityKey={activeProjectKey}
+      activeSessionUuid={view === 'session' ? selectedSession : null}
       isLibraryActive={isHomeMode}
       onSelectProject={(key) => {
         setActiveProjectKey(key)
@@ -631,6 +646,7 @@ export default function App() {
         setView('search')
         setQuery('')
       }}
+      onSelectSession={handleOpenSession}
       onSelectHome={() => {
         setActiveProjectKey(null)
         setHomeMode(true)
@@ -657,6 +673,9 @@ export default function App() {
       showSessionCount={sidebarShowSessionCount}
       sortOrder={sidebarSortOrder}
       onSortOrderChange={handleSidebarSortChange}
+      pinnedSortOrder={pinnedSortOrder}
+      onPinnedSortOrderChange={handlePinnedSortChange}
+      onCopySessionId={handleCopySessionId}
       onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
     />
   )
@@ -735,6 +754,7 @@ export default function App() {
       >
       <Sidebar
         activeIdentityKey={activeProjectKey}
+        activeSessionUuid={view === 'session' ? selectedSession : null}
         isLibraryActive={isHomeMode}
         onSelectProject={(key) => {
           setActiveProjectKey(key)
@@ -744,6 +764,7 @@ export default function App() {
           setView('search')
           setQuery('')
         }}
+        onSelectSession={handleOpenSession}
         onSelectHome={() => {
           setActiveProjectKey(null)
           setHomeMode(true)
@@ -770,6 +791,9 @@ export default function App() {
         showSessionCount={sidebarShowSessionCount}
         sortOrder={sidebarSortOrder}
         onSortOrderChange={handleSidebarSortChange}
+        pinnedSortOrder={pinnedSortOrder}
+        onPinnedSortOrderChange={handlePinnedSortChange}
+        onCopySessionId={handleCopySessionId}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       </div>

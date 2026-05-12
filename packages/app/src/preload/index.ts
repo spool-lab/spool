@@ -6,6 +6,7 @@ import type {
 } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
+import type { PinnedSortOrder } from '../shared/pinnedSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 
 export interface AgentInfo {
@@ -29,6 +30,7 @@ export interface AgentsConfig {
   sidebarShowSourceDots?: boolean
   sidebarShowSessionCount?: boolean
   sidebarSortOrder?: SidebarSortOrder
+  pinnedSortOrder?: PinnedSortOrder
   projectSortOrder?: ProjectSessionSortOrder
   customAgents?: Record<string, {
     name?: string

@@ -39,6 +39,12 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
     return () => { cancelled = true }
   }, [reloadKey])
 
+  useEffect(() => {
+    function bump() { setReloadKey(k => k + 1) }
+    window.addEventListener('spool:pin-change', bump)
+    return () => window.removeEventListener('spool:pin-change', bump)
+  }, [])
+
   function handlePinChange(sessionUuid: string, pinned: boolean) {
     if (pinned) {
       const candidate = recentSessions?.find(s => s.sessionUuid === sessionUuid)

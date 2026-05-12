@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PinIcon from './PinIcon.js'
 
 type Props = {
   sessionUuid: string
@@ -19,6 +20,7 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
     try {
       if (next) await window.spool.pinSession(sessionUuid)
       else await window.spool.unpinSession(sessionUuid)
+      window.dispatchEvent(new CustomEvent('spool:pin-change', { detail: { sessionUuid, pinned: next } }))
     } catch {
       onChange?.(pinned)
     } finally {
@@ -50,24 +52,5 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
     >
       <PinIcon size={icon} filled={pinned} />
     </button>
-  )
-}
-
-function PinIcon({ size, filled }: { size: number; filled: boolean }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={filled ? 1.5 : 1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" />
-      <path d="M9 15l-4.5 4.5" />
-      <path d="M14.5 4l5.5 5.5" />
-    </svg>
   )
 }
