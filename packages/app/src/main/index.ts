@@ -113,6 +113,26 @@ function createWindow(): BrowserWindow {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url) || /^mailto:/i.test(url)) {
+      void shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  win.webContents.on('will-navigate', (event, url) => {
+    const current = win.webContents.getURL()
+    const isInternal =
+      url === current ||
+      url.startsWith('file://') ||
+      (!!process.env['ELECTRON_RENDERER_URL'] && url.startsWith(process.env['ELECTRON_RENDERER_URL']))
+    if (isInternal) return
+    if (/^https?:/i.test(url) || /^mailto:/i.test(url)) {
+      event.preventDefault()
+      void shell.openExternal(url)
+    }
+  })
+
   win.on('closed', () => {
     mainWindow = null
     if (!isDevMode) app.dock?.hide()
