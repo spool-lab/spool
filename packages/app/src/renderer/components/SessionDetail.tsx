@@ -303,7 +303,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               <button
                 type="button"
                 onClick={toggle}
-                title="More actions"
                 aria-label="More actions"
                 className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >

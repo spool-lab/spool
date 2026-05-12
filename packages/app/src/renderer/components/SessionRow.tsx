@@ -93,16 +93,17 @@ export default function SessionRow({ session, pinned = false, showProject = fals
             onChange={(next) => onPinChange?.(session.sessionUuid, next)}
           />
         </span>
-        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity">
           <Menu
             align="right"
-            trigger={({ toggle }) => (
+            trigger={({ open, toggle }) => (
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={toggle}
-                title="More actions"
                 aria-label="More actions"
+                aria-haspopup="menu"
+                aria-expanded={open}
                 className="inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
