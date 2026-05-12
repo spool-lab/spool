@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Newspaper } from 'lucide-react'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import type { ShareDraftListItem } from '@spool-lab/core'
@@ -50,8 +50,32 @@ function DraftsList({
   error: string | null
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
 }) {
+  const [skeletonCount] = useState(readSkeletonCount)
+  // Defer skeleton render by 150ms so sub-threshold loads (local sqlite is
+  // usually <50ms) don't flash a meaningless placeholder. The same gate
+  // applies to the screen-reader announcement: if loading is imperceptible
+  // visually, there's no value announcing it either.
+  const [showLoadingHint, setShowLoadingHint] = useState(false)
+  useEffect(() => {
+    if (!loading || drafts.length > 0) {
+      setShowLoadingHint(false)
+      return
+    }
+    const t = setTimeout(() => setShowLoadingHint(true), 150)
+    return () => clearTimeout(t)
+  }, [loading, drafts.length])
+  useEffect(() => {
+    if (!loading && !error) writeSkeletonCount(drafts.length)
+  }, [loading, error, drafts.length])
+
   if (loading && drafts.length === 0) {
-    return <SmallEmptyState>Loading drafts…</SmallEmptyState>
+    if (!showLoadingHint) return null
+    return (
+      <>
+        <span className="sr-only" role="status">Loading drafts…</span>
+        {skeletonCount > 0 && <DraftsSkeleton count={skeletonCount} />}
+      </>
+    )
   }
   if (error) {
     return <SmallEmptyState>Couldn't load drafts: {error}</SmallEmptyState>
@@ -194,6 +218,53 @@ function DraftCard({
         </span>
       </span>
     </button>
+  )
+}
+
+const SKELETON_COUNT_KEY = 'spool.shares.skeletonCount'
+const SKELETON_COUNT_DEFAULT = 4
+const SKELETON_COUNT_MAX = 24
+
+function readSkeletonCount(): number {
+  try {
+    const raw = localStorage.getItem(SKELETON_COUNT_KEY)
+    if (raw === null) return SKELETON_COUNT_DEFAULT
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n < 0) return SKELETON_COUNT_DEFAULT
+    return Math.min(Math.floor(n), SKELETON_COUNT_MAX)
+  } catch {
+    return SKELETON_COUNT_DEFAULT
+  }
+}
+
+function writeSkeletonCount(n: number): void {
+  try {
+    const clamped = Math.min(Math.max(0, Math.floor(n)), SKELETON_COUNT_MAX)
+    localStorage.setItem(SKELETON_COUNT_KEY, String(clamped))
+  } catch {
+    // localStorage can throw (private mode, quota); skeleton just falls
+    // back to the default count on the next mount.
+  }
+}
+
+function DraftsSkeleton({ count }: { count: number }) {
+  const cardH = Math.round(CARD_W * (FALLBACK_RATIO.h / FALLBACK_RATIO.w))
+  return (
+    <ul
+      aria-hidden
+      data-testid="shares-skeleton"
+      className="grid gap-5 px-6 pt-3 pb-6"
+      style={{ gridTemplateColumns: `repeat(auto-fill, ${CARD_W}px)` }}
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <li key={i}>
+          <div
+            className="rounded-md bg-warm-surface2 dark:bg-dark-surface2 border border-warm-border dark:border-dark-border opacity-60 animate-pulse"
+            style={{ width: CARD_W, height: cardH }}
+          />
+        </li>
+      ))}
+    </ul>
   )
 }
 
