@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectGroup, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-react'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon } from 'lucide-react'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import {
   DEFAULT_SIDEBAR_SORT_ORDER,
@@ -14,6 +14,8 @@ type Props = {
   onSelectProject: (identityKey: string) => void
   onSelectHome?: () => void
   isLibraryActive?: boolean
+  onSelectShares?: () => void
+  isSharesActive?: boolean
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
   status?: StatusInfo | null
@@ -24,7 +26,7 @@ type Props = {
   onSortOrderChange?: (next: SidebarSortOrder) => void
 }
 
-export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, isLibraryActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
+export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
 
@@ -56,6 +58,15 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
             label="Library"
             active={isLibraryActive}
             onClick={onSelectHome}
+          />
+        )}
+        {onSelectShares && (
+          <NavRow
+            testId="sidebar-shares"
+            icon={<SharesIcon size={14} strokeWidth={1.75} />}
+            label="Shares"
+            active={isSharesActive}
+            onClick={onSelectShares}
           />
         )}
         {onOpenSearch && (

@@ -427,6 +427,42 @@ export function runMigrations(db: Database.Database): void {
     db.pragma('user_version = 10')
   }
 
+  if (version < 11) {
+    // v11: share_drafts table — locally-persisted in-progress shares
+    // managed by Spool Share's editor. Independent of the sessions index;
+    // a draft can survive its source session being deleted because the
+    // full snapshot is captured at compose time and stored as JSON.
+    //
+    // Two JSON payloads per row:
+    //   - snapshot_json: the complete SpoolDocument (full conversation +
+    //     opts). Used when opening the editor. Can be hundreds of KB on
+    //     long sessions.
+    //   - preview_json: a slim subset used by the Shares grid card —
+    //     opts + title + source + word count + the first handful of
+    //     turns. Kept under a few KB so listShareDrafts can SELECT it
+    //     across hundreds of rows without shipping multi-MB IPC payloads
+    //     to the renderer.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS share_drafts (
+        draft_id        TEXT PRIMARY KEY,
+        source_kind     TEXT NOT NULL CHECK (source_kind IN (
+          'spool-session', 'pasted-url', 'imported-file', 'imported-jsonl'
+        )),
+        source_origin   TEXT,
+        title           TEXT NOT NULL DEFAULT '',
+        snapshot_json   TEXT NOT NULL,
+        preview_json    TEXT NOT NULL DEFAULT '{}',
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_share_drafts_updated_at
+        ON share_drafts(updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_share_drafts_source_origin
+        ON share_drafts(source_origin);
+    `)
+    db.pragma('user_version = 11')
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
