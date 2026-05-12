@@ -32,6 +32,7 @@ export function selectSegments(convo: Conversation, opts: EditorOpts): SelectedS
   const all = convo.turns
   const sel = opts.selected
   const keep = sel ? new Set(sel) : null
+  const hideEmpty = opts.hideEmptyTurns
 
   const turns: KeptTurn[] = []
   const gapBefore: number[] = []
@@ -39,6 +40,10 @@ export function selectSegments(convo: Conversation, opts: EditorOpts): SelectedS
 
   for (let i = 0; i < all.length; i++) {
     if (keep !== null && !keep.has(i)) {
+      gap++
+      continue
+    }
+    if (hideEmpty && all[i]!.body.trim() === '') {
       gap++
       continue
     }
@@ -52,6 +57,6 @@ export function selectSegments(convo: Conversation, opts: EditorOpts): SelectedS
     gapBefore,
     kept: turns.length,
     total: all.length,
-    isExcerpt: keep !== null && turns.length !== all.length,
+    isExcerpt: turns.length !== all.length,
   }
 }

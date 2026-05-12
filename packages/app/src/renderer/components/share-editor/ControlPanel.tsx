@@ -151,6 +151,12 @@ export function ControlPanel({ opts, setOpts, onClose }: Props) {
           </div>
         </div>
         <Toggle
+          label="Hide empty turns"
+          sub="Skip role headers with no content (tool-only assistant turns)"
+          value={opts.hideEmptyTurns}
+          onChange={(v) => setOpts({ ...opts, hideEmptyTurns: v })}
+        />
+        <Toggle
           label="Gap markers"
           sub="Show ⋯ where turns are skipped"
           value={opts.showGaps}
