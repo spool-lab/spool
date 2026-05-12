@@ -73,7 +73,7 @@ export async function waitForSync(window: Page) {
 export async function search(window: Page, query: string) {
   const overlay = window.locator('[data-testid="search-overlay"]')
   if (!(await overlay.isVisible().catch(() => false))) {
-    await window.locator('[data-testid="search-trigger"]').first().click()
+    await window.locator('[data-testid="sidebar-search"]').first().click()
   }
   const input = window.locator('[data-testid="search-overlay-input"]')
   await expect(input).toBeVisible({ timeout: 3000 })

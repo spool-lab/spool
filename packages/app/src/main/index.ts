@@ -14,7 +14,7 @@ import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
-import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSpoolDaemonNoticeShown } from './uiPreferences.js'
+import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSpoolDaemonNoticeShown, saveSidebarCollapsed } from './uiPreferences.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -91,6 +91,11 @@ function createWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 520,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141410' : '#FAFAF8',
+    // hiddenInset keeps the traffic lights but lets the renderer paint
+    // up to y=0, so the app's top bar sits flush with the close/min/max
+    // buttons instead of stacking under a separate OS-rendered title bar.
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -435,6 +440,16 @@ ipcMain.handle('spool:get-daemon-notice-pending', (): boolean => {
   if (wasNewDb()) return false
   const initialVersion = getInitialUserVersion()
   return initialVersion !== null && initialVersion < 5
+})
+
+ipcMain.handle('spool:get-sidebar-collapsed', (): boolean => {
+  return uiPreferences.sidebarCollapsed
+})
+
+ipcMain.handle('spool:set-sidebar-collapsed', (_e, { collapsed }: { collapsed: boolean }) => {
+  uiPreferences.sidebarCollapsed = collapsed
+  saveSidebarCollapsed(collapsed)
+  return { ok: true }
 })
 
 ipcMain.handle('spool:daemon-notice-action', (_e, { action }: { action: 'install' | 'dismiss' }) => {

@@ -8,8 +8,9 @@ import SettingsPanel from './components/SettingsPanel.js'
 import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import Sidebar from './components/Sidebar.js'
 import ProjectView from './components/ProjectView.js'
-import LibraryLanding, { SearchTrigger } from './components/LibraryLanding.js'
+import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
+import AppTopBar from './components/AppTopBar.js'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -86,6 +87,22 @@ export default function App() {
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null)
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    if (!window.spool?.getSidebarCollapsed) return
+    window.spool.getSidebarCollapsed()
+      .then(setSidebarCollapsed)
+      .catch(console.error)
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      void window.spool?.setSidebarCollapsed?.(next)
+      return next
+    })
+  }, [])
 
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
@@ -391,8 +408,10 @@ export default function App() {
   }, [activeProjectKey])
 
   // ⌘K opens overlay (suppressed when a modal layer is on top, e.g. Settings)
+  // ⌘B toggles the sidebar — macOS convention shared with Mail, Notes, Xcode.
   useHotkeys({
     'mod+k': () => setSearchOverlayOpen(open => !open),
+    'mod+b': () => toggleSidebar(),
   })
 
   // Default scope follows active project
@@ -465,9 +484,19 @@ export default function App() {
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
   return (
-    <div className="relative flex h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+    <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+      <AppTopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
+      <div className="flex flex-1 min-h-0">
+      <div
+        className={[
+          'flex-none overflow-hidden transition-[width] duration-200 ease-out',
+          sidebarCollapsed ? 'w-0' : 'w-60',
+        ].join(' ')}
+        aria-hidden={sidebarCollapsed}
+      >
       <Sidebar
         activeIdentityKey={activeProjectKey}
+        isLibraryActive={isHomeMode}
         onSelectProject={(key) => {
           setActiveProjectKey(key)
           setHomeMode(false)
@@ -493,6 +522,7 @@ export default function App() {
         onSortOrderChange={handleSidebarSortChange}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
+      </div>
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isHomeMode ? (
@@ -605,6 +635,7 @@ export default function App() {
         )}
       </div>
 
+      </div>
       </div>
 
       {resumeToastCommand && (

@@ -14,7 +14,7 @@ test.afterAll(async () => {
 test('home view shows title and session counts after sync', async () => {
   const { window } = ctx
 
-  await expect(window.locator('h1')).toContainText('AI Session Library')
+  await expect(window.locator('[data-testid="library-landing"]')).toBeVisible({ timeout: 5000 })
   await waitForSync(window)
   await expect(window.locator('[data-testid="session-row"]').first()).toBeVisible({ timeout: 5000 })
 })

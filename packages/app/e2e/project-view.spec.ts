@@ -33,7 +33,7 @@ test('clicking sidebar wordmark returns to home', async () => {
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
   await expect(window.locator('[data-testid="project-view"]')).toBeVisible()
 
-  await window.locator('[data-testid="sidebar-home"]').click()
+  await window.locator('[data-testid="sidebar-library"]').click()
   await expect(window.locator('[data-testid="project-view"]')).toBeHidden()
   await expect(window.locator('[data-testid="library-landing"]')).toBeVisible()
 })
