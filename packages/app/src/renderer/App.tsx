@@ -181,6 +181,19 @@ export default function App() {
     setView('share-editor')
   }, [enterShareEditor, sidebarCollapsed])
 
+  const handleStartShareFromUuid = useCallback(async (sessionUuid: string) => {
+    try {
+      const result = await window.spool?.getSession(sessionUuid)
+      if (!result) {
+        console.error('Cannot share — session not found:', sessionUuid)
+        return
+      }
+      await handleStartShareFromSession(result.session, result.messages)
+    } catch (err) {
+      console.error('Failed to load session for share:', err)
+    }
+  }, [handleStartShareFromSession])
+
   const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
     // The list query intentionally omits snapshot_json — fetch the
     // full row before parsing so the editor gets the complete
@@ -911,6 +924,7 @@ export default function App() {
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
+                        {...(FEATURES.share ? { onShareSession: handleStartShareFromUuid } : {})}
                       />
                     </div>
                   )}
