@@ -499,26 +499,52 @@ ipcMain.handle('spool:install-update', () => {
   quitAndInstall()
 })
 
-// Share editor — print the renderer's current page to a vector PDF
-// buffer. The renderer first installs a print host (share-kit's
-// installPdfPrintHost) that scopes @media print to a single artifact,
-// then calls this handler. We use a standard A4 page size: trying to
-// fit a long conversation onto one giant page hits Chromium's
-// ~200-inch axis cap and the PDF viewer can't display the result
-// sensibly anyway. Better to produce a normal-looking multi-page PDF.
-//
-// widthPx/heightPx are kept on the IPC contract for future use
-// (e.g. choosing between A4 and a custom tall page for short
-// conversations), but ignored today.
+// Share editor PDF export — render the artifact in a hidden
+// BrowserWindow that contains ONLY the cloned target element, then
+// printToPDF that window. Targeting an isolated window (instead of
+// trying to scope the main renderer with @media print rules) sidesteps
+// all the CSS/layout interference that comes from sharing a page with
+// the rest of the Spool app — body width, Tailwind utilities, React
+// portals, the works. The hidden window loads the same renderer URL
+// (so the same CSS bundle is available), then swaps its body for the
+// caller-supplied HTML, waits for fonts, and prints.
+// A4 page width @ 96dpi. We reflow the cloned artifact to this width
+// so it fills the page edge-to-edge (no left/right gutter), then
+// printToPDF at A4 — Chromium paginates vertically as content runs.
+const A4_PAGE_WIDTH_PX = 794
 ipcMain.handle(
   'spool:print-to-pdf',
-  async (e, _args: { widthPx: number; heightPx: number }): Promise<Uint8Array> => {
-    const buf = await e.sender.printToPDF({
-      printBackground: true,
-      pageSize: 'A4',
-      margins: { marginType: 'default' },
+  async (e, args: { html: string; widthPx: number; heightPx: number }): Promise<Uint8Array> => {
+    const callerUrl = e.sender.getURL()
+    const printWin = new BrowserWindow({
+      show: false,
+      width: A4_PAGE_WIDTH_PX,
+      height: 1123,
+      useContentSize: true,
+      webPreferences: { sandbox: false, offscreen: true },
     })
-    return new Uint8Array(buf)
+    try {
+      await printWin.loadURL(callerUrl)
+      await printWin.webContents.executeJavaScript(`(async () => {
+        document.body.innerHTML = ${JSON.stringify(args.html)}
+        document.body.style.cssText = 'margin:0;padding:0;background:white;width:${A4_PAGE_WIDTH_PX}px;overflow:visible;height:auto;'
+        document.documentElement.style.cssText = 'margin:0;padding:0;background:white;width:${A4_PAGE_WIDTH_PX}px;overflow:visible;height:auto;'
+        const artifact = document.body.firstElementChild
+        if (artifact) {
+          artifact.style.width = '${A4_PAGE_WIDTH_PX}px'
+          artifact.style.maxWidth = '${A4_PAGE_WIDTH_PX}px'
+        }
+        await document.fonts.ready
+      })()`)
+      const buf = await printWin.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'A4',
+        margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+      })
+      return new Uint8Array(buf)
+    } finally {
+      printWin.destroy()
+    }
   },
 )
 

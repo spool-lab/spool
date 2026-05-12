@@ -188,7 +188,7 @@ export function typefaceFamily(id: Typeface): string {
 }
 
 export interface Colorway {
-  id: 'amber' | 'rust' | 'moss' | 'ink' | 'bone'
+  id: 'amber' | 'iris' | 'moss' | 'ink' | 'bone'
   name: string
   swatch: string
 }
@@ -244,7 +244,7 @@ export const TEMPLATES: { id: Template; name: string; blurb: string }[] = [
 
 export const COLORWAYS: Colorway[] = [
   { id: 'amber', name: 'Amber', swatch: '#C85A00' },
-  { id: 'rust', name: 'Rust', swatch: '#8E3A1F' },
+  { id: 'iris', name: 'Iris', swatch: '#7E6BB5' },
   { id: 'moss', name: 'Moss', swatch: '#4A6B3E' },
   { id: 'ink', name: 'Ink', swatch: '#1C1C18' },
   { id: 'bone', name: 'Bone', swatch: '#B8A98C' },

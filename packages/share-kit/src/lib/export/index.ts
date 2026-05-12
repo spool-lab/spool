@@ -134,6 +134,66 @@ async function renderBlob(
 }
 
 /**
+ * The @media print stylesheet that scopes printing to a single
+ * artifact and centers it on the page. Extracted as a pure string so
+ * it can be unit-tested without a real DOM — see
+ * `index.test.ts` for the regression suite.
+ *
+ * Why this looks the way it does:
+ *  - `width: 100%` on html/body locks the print containing block to
+ *    Chromium's print viewport (which equals the page width). On-
+ *    screen viewport sizes leaking through were the original bug:
+ *    body was 924px wide during print, host got centered there, and
+ *    the result landed off-center on the actual A4 page.
+ *  - `margin: 0 auto` on the host then deterministically centers it
+ *    on the page.
+ *  - No `@page { size: ... }` here on purpose — the main process owns
+ *    page size (A4) via Electron's printToPDF options. Setting it
+ *    here would race with that.
+ */
+/** A4 page width at 96dpi (8.27 in × 96 px/in ≈ 794 px). The print
+ *  CSS pins body to this so margin-auto-centering on the host lands
+ *  on the actual page center — `width: 100%` is interpreted relative
+ *  to Chromium's print rendering viewport (which can be wider than
+ *  the page itself) and breaks centering. */
+const A4_WIDTH_PX = 794
+
+export function pdfPrintCss(widthPx: number, pageWidthPx = A4_WIDTH_PX): string {
+  return `
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: ${pageWidthPx}px !important;
+        max-width: ${pageWidthPx}px !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+      }
+      body > *:not(.spool-print-host) { display: none !important; }
+      body { background: white !important; }
+      .spool-print-host {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        display: block !important;
+        width: ${widthPx}px !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+      }
+      .spool-print-host > * {
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .spool-print-host > * > * {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+    }
+  `
+}
+
+/**
  * Set up a print host so a subsequent webContents.printToPDF() (or
  * window.print()) only sees the artifact, at its full intrinsic size,
  * with no page background or browser chrome.
@@ -179,31 +239,7 @@ export function installPdfPrintHost(
 
   const style = document.createElement('style')
   style.setAttribute('data-spool-print', '')
-  style.textContent = `
-    @media print {
-      body > *:not(.spool-print-host) { display: none !important; }
-      body { background: white !important; }
-      .spool-print-host {
-        position: static !important;
-        left: auto !important;
-        top: auto !important;
-        width: auto !important;
-      }
-      .spool-print-host > * {
-        box-shadow: none !important;
-        margin: 0 auto !important;
-      }
-      /* No @page size — main process sets a standard A4 page size,
-         and forcing a custom @page here would step on it.
-         Page-break rules: keep message bubbles intact across page
-         boundaries. Direct grandchildren of the print host are the
-         typical message-container layer. */
-      .spool-print-host > * > * {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-      }
-    }
-  `
+  style.textContent = pdfPrintCss(widthPx)
   document.head.appendChild(style)
 
   const filename = filenameFor(conversation, template, 'pdf')

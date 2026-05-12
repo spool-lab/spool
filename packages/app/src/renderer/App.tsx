@@ -93,6 +93,7 @@ export default function App() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sharePanelOpen, setSharePanelOpen] = useState(true)
   const [shareConversation, setShareConversation] = useState<Conversation | null>(null)
   // The view the user came from when opening the editor — Back returns
   // here. Captured up front because guessing from current state
@@ -553,9 +554,106 @@ export default function App() {
   const fragmentSources = deferredResults.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
   const fragmentPreview = previewSuggestions.filter((result): result is FragmentSearchResult => result.kind === 'fragment')
 
+  const sidebarElement = (
+    <Sidebar
+      activeIdentityKey={activeProjectKey}
+      isLibraryActive={isHomeMode}
+      onSelectProject={(key) => {
+        setActiveProjectKey(key)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        setQuery('')
+      }}
+      onSelectHome={() => {
+        setActiveProjectKey(null)
+        setHomeMode(true)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('search')
+        setQuery('')
+      }}
+      onSelectShares={() => {
+        setActiveProjectKey(null)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('shares')
+        setQuery('')
+      }}
+      isSharesActive={isSharesView}
+      onOpenSearch={handleSearchOpen}
+      syncStatus={syncStatus}
+      status={status}
+      showSourceDots={sidebarShowSourceDots}
+      showSessionCount={sidebarShowSessionCount}
+      sortOrder={sidebarSortOrder}
+      onSortOrderChange={handleSidebarSortChange}
+      onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
+    />
+  )
+
+  // Share editor owns its own PageLayout (with a right panel) — short-
+  // circuit App's regular two-column layout for that view.
+  if (isShareEditorView && shareConversation) {
+    return (
+      <>
+        <ShareEditorPage
+          conversation={shareConversation}
+          onBack={handleCloseShareEditor}
+          panelOpen={sharePanelOpen}
+          onTogglePanel={() => setSharePanelOpen((v) => !v)}
+          sidebar={sidebarElement}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={toggleSidebar}
+        />
+        {/* App-level overlays (settings, search) still mount above the
+            share editor's PageLayout. */}
+        {showSettings && (
+          <SettingsPanel
+            onClose={() => { setShowSettings(false); refreshAgents() }}
+            initialTab={settingsTab}
+            claudeCount={status?.claudeSessions ?? null}
+            codexCount={status?.codexSessions ?? null}
+            geminiCount={status?.geminiSessions ?? null}
+            themeEditor={themeEditor}
+            onThemeEditorChange={setThemeEditor}
+          />
+        )}
+        <SearchOverlay
+          open={searchOverlayOpen}
+          initialQuery={query}
+          scope={searchScope}
+          scopeProjectName={activeProjectName}
+          scopeProjectKey={activeProjectKey}
+          defaultScope={activeProjectKey ? 'project' : 'all'}
+          mode={searchMode}
+          {...(hasAgents ? { onModeChange: setSearchMode } : {})}
+          {...(hasAgents ? {
+            agentSelector: (
+              <AgentSelector
+                agents={availableAgents}
+                activeAgent={aiAgent}
+                onSelect={setAiAgent}
+              />
+            )
+          } : {})}
+          onClose={handleSearchClose}
+          onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
+          onCommit={handleSearchCommit}
+          onOpenResult={handleOpenResultFromOverlay}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
-      <AppTopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} />
+      <AppTopBar
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={toggleSidebar}
+      />
       <div className="flex flex-1 min-h-0">
       <div
         className={[
@@ -604,9 +702,7 @@ export default function App() {
       </div>
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
-        {isShareEditorView && shareConversation ? (
-          <ShareEditorPage conversation={shareConversation} onBack={handleCloseShareEditor} />
-        ) : isSharesView ? (
+        {isSharesView ? (
           <SharesPage onOpenDraft={handleOpenDraft} />
         ) : isHomeMode ? (
           <LibraryLanding
