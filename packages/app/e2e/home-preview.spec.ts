@@ -15,7 +15,7 @@ test.afterAll(async () => {
 async function openOverlayAndType(ctx: AppContext, query: string) {
   const overlay = ctx.window.locator('[data-testid="search-overlay"]')
   if (!(await overlay.isVisible().catch(() => false))) {
-    await ctx.window.locator('[data-testid="search-trigger"]').first().click()
+    await ctx.window.locator('[data-testid="sidebar-search"]').first().click()
   }
   const input = ctx.window.locator('[data-testid="search-overlay-input"]')
   await expect(input).toBeVisible({ timeout: 3000 })
@@ -63,7 +63,7 @@ test('clicking an overlay result jumps to message with flash highlight', async (
 test('overlay footer shows keyboard hints', async () => {
   const overlay = ctx.window.locator('[data-testid="search-overlay"]')
   if (!(await overlay.isVisible().catch(() => false))) {
-    await ctx.window.locator('[data-testid="search-trigger"]').first().click()
+    await ctx.window.locator('[data-testid="sidebar-search"]').first().click()
   }
   await expect(overlay).toBeVisible({ timeout: 3000 })
 
@@ -83,7 +83,7 @@ test('overlay footer shows keyboard hints', async () => {
 test('arrow-down navigation keeps the active item in view at the bottom', async () => {
   const overlay = ctx.window.locator('[data-testid="search-overlay"]')
   if (!(await overlay.isVisible().catch(() => false))) {
-    await ctx.window.locator('[data-testid="search-trigger"]').first().click()
+    await ctx.window.locator('[data-testid="sidebar-search"]').first().click()
   }
   await expect(overlay).toBeVisible({ timeout: 3000 })
 
