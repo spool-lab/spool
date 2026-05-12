@@ -15,7 +15,7 @@ type FormatDef = {
 
 const FORMATS: FormatDef[] = [
   { k: 'png', l: 'PNG image', b: 'Download PNG', s: '3× pixel ratio · social-feed friendly' },
-  { k: 'pdf', l: 'PDF', b: 'Download PDF', s: 'Single page · print-ready' },
+  { k: 'pdf', l: 'PDF', b: 'Download PDF', s: 'A4 paginated · print-ready' },
   { k: 'spool', l: 'Spool file', b: 'Download .spool', s: 'Editable in Spool · keeps your styling' },
 ]
 
