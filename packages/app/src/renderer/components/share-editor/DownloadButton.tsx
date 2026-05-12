@@ -70,7 +70,7 @@ export function DownloadButton({ saving, onPng, onPdf, onSpool }: Props) {
   }
 
   return (
-    <div ref={rootRef} className="relative flex" data-testid="share-editor-download">
+    <div ref={rootRef} className="relative flex flex-none" data-testid="share-editor-download">
       <button
         type="button"
         onClick={trigger}

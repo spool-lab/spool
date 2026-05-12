@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ShareDraftListItem } from '@spool-lab/core'
+import type { ShareDraftListItem, ShareDraftRow } from '@spool-lab/core'
 
 interface UseShareDraftsResult {
   drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
+  /** Delete a draft. Optimistically drops it from the local list, then
+   *  asks main to DELETE from the share_drafts table. Returns the full
+   *  row that was deleted so callers can offer Undo. */
+  removeDraft: (draftId: string) => Promise<ShareDraftRow | null>
+  /** Re-insert a previously-deleted draft via upsert. Used by Undo. */
+  restoreDraft: (row: ShareDraftRow) => Promise<void>
 }
 
 /**
@@ -37,5 +43,33 @@ export function useShareDrafts(opts: { limit?: number } = {}): UseShareDraftsRes
     void refresh()
   }, [refresh])
 
-  return { drafts, loading, error, refresh }
+  const removeDraft = useCallback(async (draftId: string): Promise<ShareDraftRow | null> => {
+    // Fetch the full row first so the caller can offer Undo with the
+    // snapshot intact. listShareDrafts omits snapshot_json on purpose.
+    const full = await window.spool.shareDraft.get(draftId)
+    if (!full) return null
+    setDrafts(prev => prev.filter(d => d.draft_id !== draftId))
+    try {
+      await window.spool.shareDraft.delete(draftId)
+      return full
+    } catch (err) {
+      // Roll back the optimistic remove if the delete itself failed.
+      void refresh()
+      throw err
+    }
+  }, [refresh])
+
+  const restoreDraft = useCallback(async (row: ShareDraftRow): Promise<void> => {
+    await window.spool.shareDraft.upsert({
+      draft_id: row.draft_id,
+      source_kind: row.source_kind,
+      source_origin: row.source_origin,
+      title: row.title,
+      snapshot_json: row.snapshot_json,
+      preview_json: row.preview_json,
+    })
+    await refresh()
+  }, [refresh])
+
+  return { drafts, loading, error, refresh, removeDraft, restoreDraft }
 }

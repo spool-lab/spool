@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { Download, PanelRight } from 'lucide-react'
+import { Download, PanelRight, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   TEMPLATE_RATIO,
@@ -66,6 +66,7 @@ export default function ShareEditorPage({
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   // Autosave opts changes back into share_drafts. Debounced so a
@@ -190,6 +191,17 @@ export default function ShareEditorPage({
     setPdfPreview(null)
   }, [pdfPreview])
 
+  const handleDelete = useCallback(async () => {
+    try {
+      await window.spool.shareDraft.delete(draftId)
+    } catch (err) {
+      console.error('Delete share draft failed:', err)
+      toast.error('Could not delete draft')
+      return
+    }
+    onBack()
+  }, [draftId, onBack])
+
   const exportSpoolFile = useCallback(async () => {
     // Same pre-pick discipline as PNG; JSON.stringify is fast but
     // saveBlob's picker call still needs the user gesture.
@@ -216,7 +228,7 @@ export default function ShareEditorPage({
   }, [beginSaving, conversation, opts])
 
   const topBarContent = (
-    <div className="flex-1 min-w-0 flex items-center gap-3 px-3">
+    <div className="flex-1 min-w-0 flex items-center gap-2 px-3">
       <button
         type="button"
         onClick={onBack}
@@ -228,7 +240,7 @@ export default function ShareEditorPage({
           <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      <div className="flex-1 min-w-0 flex items-baseline gap-2">
+      <div className="min-w-0 flex items-baseline gap-2">
         <h1
           className="min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate"
           title={conversation.title}
@@ -236,12 +248,25 @@ export default function ShareEditorPage({
           {conversation.title}
         </h1>
         <span
-          className="min-w-0 text-[11px] text-warm-faint dark:text-dark-muted truncate"
+          className="min-w-0 text-[11px] text-warm-faint dark:text-dark-muted truncate whitespace-nowrap"
           title={meta}
         >
           {meta}
         </span>
       </div>
+      <EditorDeleteChip
+        confirming={confirmingDelete}
+        onClick={() => {
+          if (confirmingDelete) {
+            setConfirmingDelete(false)
+            void handleDelete()
+          } else {
+            setConfirmingDelete(true)
+          }
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+      <div className="flex-1" />
       <DownloadButton
         saving={saveState === 'saving'}
         onPng={() => { void exportPng() }}
@@ -317,5 +342,74 @@ export default function ShareEditorPage({
         </div>
       </div>
     </PageLayout>
+  )
+}
+
+/**
+ * Click-twice delete affordance in the editor top bar. Resting: a small
+ * trash button. First click expands it into a "Delete?" pill with
+ * destructive color. Second click fires onClick. Escape, mouse-leave,
+ * or clicking outside cancels the primed state.
+ */
+/**
+ * Click-twice delete affordance in the editor top bar. The outer wrapper
+ * reserves a fixed 24×24 slot so neighbouring elements never move. When
+ * primed, the inner span absolutely-positions itself and grows
+ * rightward into a "Delete?" pill that overlays whatever sits beside it
+ * — temporary visual occlusion is acceptable here; layout reflow is not.
+ */
+function EditorDeleteChip({
+  confirming,
+  onClick,
+  onCancel,
+}: {
+  confirming: boolean
+  onClick: () => void
+  onCancel: () => void
+}) {
+  const wrapRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (!confirming) return
+    function onDown(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) onCancel()
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [confirming, onCancel])
+
+  return (
+    <button
+      ref={wrapRef}
+      type="button"
+      data-testid="share-editor-delete"
+      data-confirming={confirming ? '' : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      onMouseLeave={() => {
+        if (confirming) onCancel()
+      }}
+      aria-label={confirming ? 'Click again to confirm delete' : 'Delete draft'}
+      title={confirming ? 'Click again to confirm' : 'Delete draft'}
+      className={`flex-none inline-flex items-center justify-center h-6 rounded cursor-pointer select-none transition-[width,padding,background-color,color] duration-150 text-[11.5px] font-medium tracking-[-0.005em] whitespace-nowrap overflow-hidden ${
+        confirming
+          ? 'w-[60px] px-2.5 bg-[color:var(--color-status-error)] dark:bg-[color:var(--color-status-error-dark)] text-white shadow-[0_1px_3px_rgba(0,0,0,0.18)]'
+          : 'w-6 text-warm-faint dark:text-dark-muted hover:text-[color:var(--color-status-error)] dark:hover:text-[color:var(--color-status-error-dark)] hover:bg-[color:var(--color-status-error)]/8 dark:hover:bg-[color:var(--color-status-error-dark)]/12'
+      }`}
+    >
+      {confirming ? 'Delete' : <Trash2 size={13} strokeWidth={1.75} />}
+    </button>
   )
 }
