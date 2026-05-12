@@ -60,7 +60,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto pt-3 pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
+      <div className="flex-1 overflow-y-auto pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {recentSessions === null ? (
           <SessionRowsSkeleton count={6} />
         ) : totalSessions === 0 ? (
@@ -72,10 +72,9 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
             {pinnedSessions.length > 0 && (
               <CollapsibleSection
                 label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`}
-                accent
                 testId="library-pinned"
               >
-                <div className="bg-accent/[0.02] dark:bg-accent-dark/[0.02]">
+                <div>
                   {pinnedSessions.map(session => (
                     <SessionRow
                       key={session.sessionUuid}

@@ -165,6 +165,30 @@ export default function App() {
       .catch(console.error)
   }, [])
 
+  // Auto-collapse the left sidebar while the share editor is open —
+  // the editor already shows a right panel, so leaving both rails
+  // expanded leaves very little room for the preview. The user's
+  // previous sidebar state is restored on exit; the persisted
+  // preference on disk is intentionally untouched.
+  const sidebarRestoreRef = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (view === 'share-editor') {
+      if (sidebarRestoreRef.current === null) {
+        sidebarRestoreRef.current = sidebarCollapsed
+        if (!sidebarCollapsed) setSidebarCollapsed(true)
+      }
+    } else if (sidebarRestoreRef.current !== null) {
+      const restore = sidebarRestoreRef.current
+      const stillCollapsed = sidebarCollapsed
+      sidebarRestoreRef.current = null
+      // Only restore the saved state if the user didn't override it
+      // while editing — if they manually re-opened the sidebar during
+      // the editor session, honor that explicit choice.
+      if (stillCollapsed) setSidebarCollapsed(restore)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
+
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev

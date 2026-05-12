@@ -61,7 +61,7 @@ function DraftsList({
   }
   return (
     <ul
-      className="grid gap-5 px-6 py-6"
+      className="grid gap-5 px-6 pt-3 pb-6"
       style={{ gridTemplateColumns: `repeat(auto-fill, ${CARD_W}px)` }}
     >
       {drafts.map((draft) => (
