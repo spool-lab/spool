@@ -61,7 +61,7 @@ function DraftsList({
   }
   return (
     <ul
-      className="grid gap-5 px-6 pt-3 pb-6"
+      className="grid gap-5 px-6 pt-3 pb-6 justify-center"
       style={{ gridTemplateColumns: `repeat(auto-fill, ${CARD_W}px)` }}
     >
       {drafts.map((draft) => (
@@ -73,7 +73,7 @@ function DraftsList({
   )
 }
 
-const CARD_W = 170
+const CARD_W = 150
 const FALLBACK_RATIO = { w: 720, h: 960 }
 
 function DraftCard({
