@@ -13,10 +13,10 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
-import Menu from './Menu.js'
 import PageLayout from './PageLayout.js'
 import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
+import { DownloadButton } from './share-editor/DownloadButton.js'
 
 type Props = {
   conversation: Conversation
@@ -183,7 +183,7 @@ export default function ShareEditorPage({
   }, [beginSaving, conversation, opts])
 
   const topBarContent = (
-    <div className="flex-1 min-w-0 flex items-center gap-3 px-3 py-1.5">
+    <div className="flex-1 min-w-0 flex items-center gap-3 px-3">
       <button
         type="button"
         onClick={onBack}
@@ -209,40 +209,33 @@ export default function ShareEditorPage({
           {meta}
         </span>
       </div>
-      <Menu
-        align="right"
-        testId="share-editor-export"
-        trigger={({ open, toggle }) => (
-          <button
-            type="button"
-            onClick={toggle}
-            title="Export"
-            aria-label="Export"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            disabled={saveState === 'saving'}
-            className="flex-none inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-text dark:text-dark-text bg-warm-surface dark:bg-dark-surface hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Download size={12} strokeWidth={1.8} />
-            <span>{saveState === 'saving' ? 'Exporting…' : 'Export'}</span>
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden>
-              <path d="M1.5 3L4 5.5L6.5 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
-        items={[
-          { label: 'Save as image (PNG)', onSelect: () => { void exportPng() } },
-          { label: 'Save as PDF', onSelect: () => { void exportPdf() } },
-          { label: 'Save as .spool file', onSelect: () => { void exportSpoolFile() } },
-        ]}
+      <DownloadButton
+        saving={saveState === 'saving'}
+        onPng={() => { void exportPng() }}
+        onPdf={() => { void exportPdf() }}
+        onSpool={() => { void exportSpoolFile() }}
       />
+      {/* Always mounted so toggling panelOpen doesn't snap-shift the
+          Download button. The button's width, leading margin, and
+          opacity all animate in sync with the right panel's 200ms
+          width transition. When the panel is open the button shrinks
+          to zero width and the negative margin absorbs the parent's
+          gap-3 so Download sits flush against the right column. */}
       <button
         type="button"
         onClick={onTogglePanel}
-        title={panelOpen ? 'Hide style panel' : 'Show style panel'}
-        aria-label={panelOpen ? 'Hide style panel' : 'Show style panel'}
-        aria-pressed={!panelOpen}
-        className="flex-none inline-flex items-center justify-center w-7 h-7 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        title="Show style panel"
+        aria-label="Show style panel"
+        aria-pressed={false}
+        aria-hidden={panelOpen}
+        tabIndex={panelOpen ? -1 : 0}
+        style={{
+          width: panelOpen ? 0 : 28,
+          marginLeft: panelOpen ? -12 : 0,
+          opacity: panelOpen ? 0 : 1,
+          transition: 'width 200ms ease-out, margin-left 200ms ease-out, opacity 200ms ease-out',
+        }}
+        className="flex-none inline-flex items-center justify-center h-7 overflow-hidden rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text"
       >
         <PanelRight size={15} strokeWidth={1.75} />
       </button>
@@ -255,7 +248,7 @@ export default function ShareEditorPage({
       sidebarCollapsed={sidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       topBar={topBarContent}
-      rightPanel={<ControlPanel opts={opts} setOpts={setOpts} />}
+      rightPanel={<ControlPanel opts={opts} setOpts={setOpts} onClose={onTogglePanel} />}
       rightPanelOpen={panelOpen}
     >
       <div className="flex flex-col h-full" data-testid="share-editor-page">

@@ -50,7 +50,7 @@ export default function Sidebar({ activeIdentityKey, onSelectProject, onSelectHo
       data-testid="sidebar"
       className="w-60 flex-none bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
-      <nav className="px-2 pt-3 pb-2 flex-none flex flex-col gap-0.5" aria-label="Primary">
+      <nav className="px-2 pt-1 pb-2 flex-none flex flex-col gap-0.5" aria-label="Primary">
         {onSelectHome && (
           <NavRow
             testId="sidebar-library"
