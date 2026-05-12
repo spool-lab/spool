@@ -13,7 +13,7 @@ type Props = {
 export function TemplateThumb({ id, accent, paper, border, text, muted, surface }: Props) {
   const baseStyle: React.CSSProperties = {
     width: 48,
-    height: 38,
+    height: 44,
     borderRadius: 2,
     background: paper,
     border: `1px solid ${border}`,

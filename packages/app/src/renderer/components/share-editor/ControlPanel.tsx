@@ -74,13 +74,13 @@ export function ControlPanel({ opts, setOpts }: Props) {
                 />
                 <div className="flex-1 min-w-0">
                   <div
-                    className={`text-[13px] font-medium ${
+                    className={`text-xs font-medium leading-tight ${
                       active ? 'text-accent dark:text-accent-dark' : 'text-warm-text dark:text-dark-text'
                     }`}
                   >
                     {tpl.name}
                   </div>
-                  <div className="text-[10.5px] text-warm-muted dark:text-dark-muted font-mono leading-snug mt-0.5 truncate">
+                  <div className="text-[10px] text-warm-muted dark:text-dark-muted font-mono leading-tight line-clamp-2">
                     {tpl.blurb}
                   </div>
                 </div>
