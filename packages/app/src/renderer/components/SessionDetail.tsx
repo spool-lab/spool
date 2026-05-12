@@ -107,10 +107,17 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   useEffect(() => {
     let cancelled = false
-    window.spool.getPinnedUuids()
-      .then(uuids => { if (!cancelled) setPinned(uuids.includes(sessionUuid)) })
-      .catch(() => { if (!cancelled) setPinned(false) })
-    return () => { cancelled = true }
+    function refresh() {
+      window.spool.getPinnedUuids()
+        .then(uuids => { if (!cancelled) setPinned(uuids.includes(sessionUuid)) })
+        .catch(() => { if (!cancelled) setPinned(false) })
+    }
+    refresh()
+    window.addEventListener('spool:pin-change', refresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener('spool:pin-change', refresh)
+    }
   }, [sessionUuid])
 
   useEffect(() => {

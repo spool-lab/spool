@@ -83,6 +83,12 @@ export default function ProjectView({
     return () => { cancelled = true }
   }, [identityKey, sortOrder, activeSources, reloadKey])
 
+  useEffect(() => {
+    function bump() { setReloadKey(k => k + 1) }
+    window.addEventListener('spool:pin-change', bump)
+    return () => window.removeEventListener('spool:pin-change', bump)
+  }, [])
+
   function handlePinChange(sessionUuid: string, pinned: boolean) {
     if (pinned) {
       const candidate = sessions?.find(s => s.sessionUuid === sessionUuid)
