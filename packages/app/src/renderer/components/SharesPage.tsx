@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Newspaper, Trash2 } from 'lucide-react'
+import { Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
+import NewDraftPicker from './NewDraftPicker.js'
 import type { ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
@@ -17,6 +18,7 @@ import { getSessionSourceColor } from '../../shared/sessionSources.js'
 type Props = {
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
   onImportSpool?: ((file: File) => void | Promise<void>) | undefined
+  onStartNewDraft?: ((sessionUuid: string) => void | Promise<void>) | undefined
 }
 
 /**
@@ -25,9 +27,17 @@ type Props = {
  * "Coming in a future update" placeholder reads as a broken promise.
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
-export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
+export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft }: Props) {
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const handleOpenPicker = useCallback(() => setPickerOpen(true), [])
+  const handleClosePicker = useCallback(() => setPickerOpen(false), [])
+  const handlePickSession = useCallback((uuid: string) => {
+    setPickerOpen(false)
+    void onStartNewDraft?.(uuid)
+  }, [onStartNewDraft])
 
   const onImport = useCallback(
     (file: File) => onImportSpool?.(file),
@@ -70,9 +80,22 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
   return (
     <div className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
       {isDragActive && <SpoolDropOverlay />}
-      {hasDrafts && (
-        <div className="flex-none px-6 pt-1.5 pb-3 font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-          Drafts · {drafts.length}
+      {(hasDrafts || onStartNewDraft) && (
+        <div className="flex-none flex items-center justify-between gap-3 px-6 pt-1.5 pb-3">
+          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+            {hasDrafts ? <>Drafts · {drafts.length}</> : null}
+          </span>
+          {onStartNewDraft && (
+            <button
+              type="button"
+              data-testid="shares-new-draft"
+              onClick={handleOpenPicker}
+              className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-xs font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+            >
+              <Plus size={12} strokeWidth={2} aria-hidden />
+              <span>New draft</span>
+            </button>
+          )}
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -84,6 +107,9 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
           onDeleteDraft={handleDelete}
         />
       </div>
+      {pickerOpen && onStartNewDraft && (
+        <NewDraftPicker onSelect={handlePickSession} onClose={handleClosePicker} />
+      )}
     </div>
   )
 }

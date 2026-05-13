@@ -863,6 +863,7 @@ export default function App() {
           <SharesPage
             onOpenDraft={handleOpenDraft}
             {...(FEATURES.share ? { onImportSpool: handleImportSpoolFile } : {})}
+            {...(FEATURES.share ? { onStartNewDraft: handleStartShareFromUuid } : {})}
           />
         ) : isHomeMode ? (
           <LibraryLanding
