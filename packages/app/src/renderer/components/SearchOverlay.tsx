@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { FragmentResult, Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
+import Hint from './Hint.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import SegmentedPill from './SegmentedPill.js'
 import { bucketSessionsByDate } from './LibraryLanding.js'
 import type { SearchMode } from './SearchBar.js'
+import { snippetToStrongHtml } from '../lib/snippet.js'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -162,7 +164,7 @@ export default function SearchOverlay({
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm"
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-xl rounded-xl border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface shadow-xl overflow-hidden">
+      <div className="w-full max-w-xl rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3">
           <SearchIcon />
           <input
@@ -245,15 +247,19 @@ export default function SearchOverlay({
                                 aria-selected={active}
                                 onMouseEnter={() => setActiveIndex(idx)}
                                 onClick={() => onOpenResult(session.sessionUuid, undefined, '')}
-                                className={`px-4 py-2 cursor-pointer flex items-center gap-2 ${
+                                className={`flex items-start gap-3 px-4 py-2 cursor-pointer transition-colors duration-75 ${
                                   active ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
                                 }`}
                               >
-                                <SourceBadge source={session.source} />
-                                <span className="flex-1 truncate text-sm text-warm-text dark:text-dark-text">
-                                  {session.title?.trim() || '(no title)'}
-                                </span>
-                                <span className="flex-none text-[11px] text-warm-faint dark:text-dark-muted">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <SourceBadge source={session.source} />
+                                    <span className="flex-1 min-w-0 text-sm text-warm-text dark:text-dark-text truncate">
+                                      {session.title?.trim() || '(no title)'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="flex-none font-mono text-[11px] leading-[20px] text-warm-faint dark:text-dark-muted tabular-nums">
                                   {formatRelativeDate(session.startedAt)}
                                 </span>
                               </li>
@@ -283,21 +289,25 @@ export default function SearchOverlay({
                   aria-selected={index === activeIndex}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => onOpenResult(result.sessionUuid, result.messageId, query)}
-                  className={`px-4 py-2.5 cursor-pointer ${
+                  className={`flex items-start gap-3 px-4 py-2 cursor-pointer transition-colors duration-75 ${
                     index === activeIndex ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <SourceBadge source={result.source} />
-                    <span className="text-xs text-warm-muted dark:text-dark-muted truncate flex-1">
-                      {result.project.split('/').pop() ?? result.project}
-                    </span>
-                    <span className="text-[11px] text-warm-faint flex-none">{formatRelativeDate(result.startedAt)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <SourceBadge source={result.source} />
+                      <span className="flex-1 min-w-0 text-sm text-warm-text dark:text-dark-text truncate">
+                        {result.sessionTitle?.trim() || '(no title)'}
+                      </span>
+                    </div>
+                    <div
+                      className="mt-0.5 pl-1.5 text-[11px] text-warm-faint dark:text-dark-muted truncate [&_strong]:font-medium [&_strong]:text-accent dark:[&_strong]:text-accent-dark"
+                      dangerouslySetInnerHTML={{ __html: snippetToStrongHtml(result.snippet) }}
+                    />
                   </div>
-                  <p
-                    className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: snippetWithStrong(result.snippet) }}
-                  />
+                  <span className="flex-none font-mono text-[11px] leading-[20px] text-warm-faint dark:text-dark-muted tabular-nums">
+                    {formatRelativeDate(result.startedAt)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -334,22 +344,6 @@ export default function SearchOverlay({
         </div>
       </div>
     </div>
-  )
-}
-
-function Hint({ keys, label }: { keys: string[]; label: string }) {
-  return (
-    <span className="flex items-center gap-1">
-      {keys.map((k, i) => (
-        <kbd
-          key={i}
-          className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted"
-        >
-          {k}
-        </kbd>
-      ))}
-      <span>{label}</span>
-    </span>
   )
 }
 
@@ -412,6 +406,3 @@ function SparklesIcon() {
   )
 }
 
-function snippetWithStrong(snippet: string): string {
-  return snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
-}

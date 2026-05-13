@@ -6,6 +6,7 @@ import Menu from './Menu.js'
 import { SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import { getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
+import { snippetToStrongHtml } from '../lib/snippet.js'
 
 type FragmentRowResult = FragmentResult & { kind: 'fragment' }
 
@@ -137,7 +138,7 @@ function FragmentRow({
   onCopySessionId: (source: FragmentResult['source']) => void
   onShareSession?: (uuid: string) => void
 }) {
-  const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
+  const snippet = snippetToStrongHtml(result.snippet)
   const date = formatRelativeDate(result.startedAt)
   const project = result.project.split('/').pop() ?? result.project
   const title = result.sessionTitle?.trim() || '(untitled session)'

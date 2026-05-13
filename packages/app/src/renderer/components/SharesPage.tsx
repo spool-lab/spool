@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Newspaper, Trash2 } from 'lucide-react'
+import { Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
+import NewDraftPicker from './NewDraftPicker.js'
 import type { ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
@@ -17,6 +18,7 @@ import { getSessionSourceColor } from '../../shared/sessionSources.js'
 type Props = {
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
   onImportSpool?: ((file: File) => void | Promise<void>) | undefined
+  onStartNewDraft?: ((sessionUuid: string) => void | Promise<void>) | undefined
 }
 
 /**
@@ -25,9 +27,17 @@ type Props = {
  * "Coming in a future update" placeholder reads as a broken promise.
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
-export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
+export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft }: Props) {
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const handleOpenPicker = useCallback(() => setPickerOpen(true), [])
+  const handleClosePicker = useCallback(() => setPickerOpen(false), [])
+  const handlePickSession = useCallback((uuid: string) => {
+    setPickerOpen(false)
+    void onStartNewDraft?.(uuid)
+  }, [onStartNewDraft])
 
   const onImport = useCallback(
     (file: File) => onImportSpool?.(file),
@@ -71,8 +81,22 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
     <div className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
       {isDragActive && <SpoolDropOverlay />}
       {hasDrafts && (
-        <div className="flex-none px-6 pt-1.5 pb-3 font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-          Drafts · {drafts.length}
+        <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
+          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+            {hasDrafts ? <>Drafts · {drafts.length}</> : null}
+          </span>
+          {onStartNewDraft && (
+            <button
+              type="button"
+              data-testid="shares-new-draft"
+              onClick={handleOpenPicker}
+              title="Start a draft from a session"
+              aria-label="Start a draft from a session"
+              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              <Plus size={13} strokeWidth={1.6} aria-hidden />
+            </button>
+          )}
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -82,8 +106,12 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
           error={error}
           onOpenDraft={onOpenDraft}
           onDeleteDraft={handleDelete}
+          {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
         />
       </div>
+      {pickerOpen && onStartNewDraft && (
+        <NewDraftPicker onSelect={handlePickSession} onClose={handleClosePicker} />
+      )}
     </div>
   )
 }
@@ -108,12 +136,14 @@ function DraftsList({
   error,
   onOpenDraft,
   onDeleteDraft,
+  onStartNewDraft,
 }: {
   drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
   onDeleteDraft: (draft: ShareDraftListItem) => void
+  onStartNewDraft?: (() => void) | undefined
 }) {
   const [skeletonCount] = useState(readSkeletonCount)
   // Defer skeleton render by 150ms so sub-threshold loads (local sqlite is
@@ -150,7 +180,20 @@ function DraftsList({
       <FeaturedEmptyState
         icon={<Newspaper size={22} strokeWidth={1.5} />}
         title="No shares yet"
-        hint="Start a share from a session, a search result, or an AI answer — drafts you create land here, ready to keep editing."
+        hint="Start a share from any session or search result — drafts you create land here, ready to keep editing."
+        {...(onStartNewDraft ? {
+          action: (
+            <button
+              type="button"
+              data-testid="shares-empty-start"
+              onClick={onStartNewDraft}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+            >
+              <Plus size={14} strokeWidth={2} aria-hidden />
+              <span>Start a draft</span>
+            </button>
+          ),
+        } : {})}
       />
     )
   }

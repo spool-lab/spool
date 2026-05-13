@@ -4,10 +4,12 @@ export function FeaturedEmptyState({
   icon,
   title,
   hint,
+  action,
 }: {
   icon: ReactNode
   title: string
   hint: ReactNode
+  action?: ReactNode
 }) {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-6">
@@ -23,6 +25,7 @@ export function FeaturedEmptyState({
       <p className="text-sm leading-relaxed text-warm-muted dark:text-dark-muted max-w-[360px]">
         {hint}
       </p>
+      {action && <div className="mt-6">{action}</div>}
     </div>
   )
 }
