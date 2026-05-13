@@ -319,7 +319,7 @@ export default function ShareEditorPage({
       sidebarCollapsed={sidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       topBar={topBarContent}
-      rightPanel={<ControlPanel opts={opts} setOpts={setOpts} />}
+      rightPanel={<ControlPanel convo={conversation} opts={opts} setOpts={setOpts} />}
       rightPanelOpen={panelOpen}
     >
       <div className="flex flex-col h-full" data-testid="share-editor-page">

@@ -96,6 +96,7 @@ export function Chat({ convo, opts }: Props) {
               {isUser ? (
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <div
+                    data-turn-body
                     style={{
                       maxWidth: '74%',
                       background: t.surface,
@@ -119,7 +120,7 @@ export function Chat({ convo, opts }: Props) {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div data-turn-body style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span
                       aria-hidden

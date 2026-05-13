@@ -4,11 +4,15 @@ import {
   PAPERS,
   TEMPLATES,
   TYPEFACES,
+  type Conversation,
   type EditorOpts,
   type Paper,
   type Typeface,
 } from '@spool/share-kit'
 import { TemplateThumb } from './TemplateThumb.js'
+import { TurnSelector } from './TurnSelector.js'
+
+type View = 'style' | 'messages'
 
 // Curated subset of share-kit's option sets so the panel feels
 // editorial-curated rather than "every variation we've ever shipped".
@@ -24,12 +28,14 @@ const TYPEFACE_CHOICES = TYPEFACES.filter((t) => (TYPEFACE_IDS as Set<string>).h
 const COLORWAY_CHOICES = COLORWAYS.filter((c) => (COLORWAY_IDS as Set<string>).has(c.id))
 
 type Props = {
+  convo: Conversation
   opts: EditorOpts
   setOpts: (next: EditorOpts) => void
 }
 
-export function ControlPanel({ opts, setOpts }: Props) {
+export function ControlPanel({ convo, opts, setOpts }: Props) {
   const [advancedOpen, setAdvancedOpen] = useState(true)
+  const [view, setView] = useState<View>('style')
   const currentColor = COLORWAY_CHOICES.find((c) => c.id === opts.colorway) ?? COLORWAY_CHOICES[0]!
   const currentPaper = PAPER_CHOICES.find((p) => p.id === opts.paper) ?? PAPER_CHOICES[0]!
   const currentTypeface = TYPEFACE_CHOICES.find((t) => t.id === opts.typeface) ?? TYPEFACE_CHOICES[0]!
@@ -38,8 +44,22 @@ export function ControlPanel({ opts, setOpts }: Props) {
     <div className="w-full h-full p-2 pt-0">
     <aside
       data-testid="share-editor-style-panel"
-      className="w-full h-full bg-warm-bg dark:bg-dark-bg overflow-y-auto scrollbar-none flex flex-col rounded-[10px] border border-warm-border dark:border-dark-border"
+      className="w-full h-full bg-warm-bg dark:bg-dark-bg flex flex-col rounded-[10px] border border-warm-border dark:border-dark-border overflow-hidden"
     >
+      <div className="flex-none px-3 pt-3 pb-2">
+        <div
+          role="tablist"
+          aria-label="Panel view"
+          className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-warm-surface dark:bg-dark-surface"
+        >
+          <ViewTab active={view === 'style'} onClick={() => setView('style')}>Style</ViewTab>
+          <ViewTab active={view === 'messages'} onClick={() => setView('messages')}>Messages</ViewTab>
+        </div>
+      </div>
+      {view === 'messages' ? (
+        <TurnSelector convo={convo} opts={opts} setOpts={setOpts} />
+      ) : (
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
       <div className="px-4 pt-3 pb-4">
         <div className="flex items-baseline justify-between mb-3">
           <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
@@ -170,8 +190,36 @@ export function ControlPanel({ opts, setOpts }: Props) {
           onChange={(v) => setOpts({ ...opts, showColophon: v })}
         />
       </Collapsible>
+      </div>
+      )}
     </aside>
     </div>
+  )
+}
+
+function ViewTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      onClick={onClick}
+      aria-selected={active}
+      className={`h-6 px-2.5 rounded text-[11.5px] font-medium transition-colors ${
+        active
+          ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-[0_1px_1px_rgba(0,0,0,0.2)]'
+          : 'bg-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 

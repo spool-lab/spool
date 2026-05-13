@@ -95,7 +95,7 @@ export function Atelier({ convo, opts }: Props) {
             {opts.showGaps && segments.gapBefore[i]! > 0 && (
               <GapMarker count={segments.gapBefore[i]!} tokens={t} accent={accent} />
             )}
-            <div style={{ marginBottom: gap }}>
+            <div data-turn-body style={{ marginBottom: gap }}>
               <div
                 style={{
                   fontFamily: tf,
