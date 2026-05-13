@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SquareTerminal, Share2 } from 'lucide-react'
+import { SquareTerminal, Share2, MoreHorizontal, ChevronRight, Copy } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
@@ -306,20 +306,18 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 aria-label="More actions"
                 className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="5" cy="12" r="1.5" />
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="19" cy="12" r="1.5" />
-                </svg>
+                <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
               </button>
             )}
             items={[
               {
                 label: 'Copy session ID',
+                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopySessionId() },
               },
               ...(resumeCommandAvailable ? [{
                 label: commandCopied ? 'Copied!' : 'Copy resume command',
+                icon: <ChevronRight size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
             ]}

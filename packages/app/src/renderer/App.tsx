@@ -133,7 +133,7 @@ export default function App() {
     }
   }, [])
 
-  const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[]) => {
+  const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[], returnView: View = 'session') => {
     const draftId = sessionDraftId(session.sessionUuid)
     // If the user has shared this session before, reopen their saved
     // draft (their edits to template / paper / typeface / etc. are in
@@ -177,7 +177,7 @@ export default function App() {
       conversation,
       opts,
     })
-    setShareEditorReturnView('session')
+    setShareEditorReturnView(returnView)
     setView('share-editor')
   }, [enterShareEditor, sidebarCollapsed])
 
@@ -188,11 +188,11 @@ export default function App() {
         console.error('Cannot share — session not found:', sessionUuid)
         return
       }
-      await handleStartShareFromSession(result.session, result.messages)
+      await handleStartShareFromSession(result.session, result.messages, view)
     } catch (err) {
       console.error('Failed to load session for share:', err)
     }
-  }, [handleStartShareFromSession])
+  }, [handleStartShareFromSession, view])
 
   const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
     // The list query intentionally omits snapshot_json — fetch the
@@ -697,6 +697,7 @@ export default function App() {
       pinnedSortOrder={pinnedSortOrder}
       onPinnedSortOrderChange={handlePinnedSortChange}
       onCopySessionId={handleCopySessionId}
+      {...(FEATURES.share ? { onShareSession: handleStartShareFromUuid } : {})}
       onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
     />
   )
@@ -816,6 +817,7 @@ export default function App() {
         pinnedSortOrder={pinnedSortOrder}
         onPinnedSortOrderChange={handlePinnedSortChange}
         onCopySessionId={handleCopySessionId}
+        {...(FEATURES.share ? { onShareSession: handleStartShareFromUuid } : {})}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
       </div>
@@ -835,11 +837,12 @@ export default function App() {
             }}
             onOpenSession={handleOpenSession}
             onCopySessionId={handleCopySessionId}
+            {...(FEATURES.share ? { onShare: handleStartShareFromUuid } : {})}
           />
         ) : (
           <>
             {!showProjectView && view !== 'session' && !!query.trim() && (
-              <div className="flex items-center gap-3 px-6 pt-6 pb-3 flex-none">
+              <div className="flex items-center gap-3 px-6 pt-1.5 pb-3 flex-none">
                 <button
                   type="button"
                   onClick={handleClearResults}
@@ -886,6 +889,7 @@ export default function App() {
                   onSortOrderChange={handleProjectSortChange}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
+                  {...(FEATURES.share ? { onShare: handleStartShareFromUuid } : {})}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">

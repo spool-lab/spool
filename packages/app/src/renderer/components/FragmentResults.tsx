@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Share2 } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
 import { SourceBadge } from './Badges.js'
@@ -155,22 +154,12 @@ function FragmentRow({
           {title}
         </h3>
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        {onShareSession && (
-          <button
-            type="button"
-            aria-label="Share session"
-            title="Share session"
-            onClick={(event) => {
-              event.stopPropagation()
-              onShareSession(result.sessionUuid)
-            }}
-            className="flex-none self-center inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            data-testid="fragment-share"
-          >
-            <Share2 size={14} strokeWidth={1.5} aria-hidden />
-          </button>
-        )}
-        <ContinueActions result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
+        <ContinueActions
+          result={result}
+          onOpenSession={onOpenSession}
+          onCopySessionId={onCopySessionId}
+          {...(onShareSession ? { onShare: () => onShareSession(result.sessionUuid) } : {})}
+        />
       </div>
 
       <div className="text-xs text-warm-muted dark:text-dark-muted mb-1.5 truncate">

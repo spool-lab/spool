@@ -6,6 +6,7 @@ type Props = {
   onSelectProject: (identityKey: string) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
+  onShare?: (uuid: string) => void
 }
 
 type DateBucket = {
@@ -13,7 +14,7 @@ type DateBucket = {
   sessions: Session[]
 }
 
-export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props) {
+export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare }: Props) {
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[] | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -90,6 +91,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
                       onPinChange={handlePinChange}
                       onOpenSession={onOpenSession}
                       onCopySessionId={onCopySessionId}
+                      {...(onShare ? { onShare } : {})}
                     />
                   ))}
                 </div>
@@ -112,6 +114,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId }: Props
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
+                    {...(onShare ? { onShare } : {})}
                   />
                 ))}
               </CollapsibleSection>
