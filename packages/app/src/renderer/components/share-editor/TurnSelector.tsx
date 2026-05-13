@@ -168,19 +168,6 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 aria-label={`Jump to message ${i + 1}`}
                 className="flex-1 min-w-0 flex items-center gap-3 text-left"
               >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    turn.role === 'assistant'
-                      ? ''
-                      : 'bg-warm-text dark:bg-dark-text'
-                  }`}
-                  style={
-                    turn.role === 'assistant'
-                      ? { backgroundColor: opts.accentHex }
-                      : undefined
-                  }
-                  aria-hidden="true"
-                />
                 <span className="font-mono text-[11px] tabular-nums text-warm-faint dark:text-dark-faint shrink-0">
                   {padIndex(i + 1, total)}
                 </span>
