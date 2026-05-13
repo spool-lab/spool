@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { Download, PanelRight, Pencil, Trash2 } from 'lucide-react'
+import { Download, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   TEMPLATE_RATIO,
@@ -18,6 +18,7 @@ import PageLayout from './PageLayout.js'
 import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
 import { DownloadButton } from './share-editor/DownloadButton.js'
+import Menu from './Menu.js'
 import { buildPreviewDocument } from '../lib/compose-from-session.js'
 
 type Props = {
@@ -113,11 +114,6 @@ export default function ShareEditorPage({
     if (!pdfPreview) return
     return () => URL.revokeObjectURL(pdfPreview.url)
   }, [pdfPreview])
-
-  const meta = useMemo(() => {
-    const wordLabel = `${conversation.wordCount.toLocaleString()} ${conversation.wordCount === 1 ? 'word' : 'words'}`
-    return `${conversation.createdAt} · ${wordLabel}`
-  }, [conversation])
 
   // Force React to commit the "Exporting…" state and let the browser
   // paint before kicking off rasterization. Without this, batched
@@ -249,13 +245,13 @@ export default function ShareEditorPage({
         onClick={onBack}
         aria-label="Back"
         title="Back"
-        className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      <div className="min-w-0 flex-1 flex items-center gap-2">
+      <div className="min-w-0 flex items-center gap-1.5">
         <h1
           data-testid="share-editor-title"
           title={title.trim() || 'Untitled'}
@@ -263,37 +259,35 @@ export default function ShareEditorPage({
         >
           {title.trim() || 'Untitled'}
         </h1>
-        <button
-          type="button"
-          onClick={() => setRenaming(true)}
-          aria-label="Rename draft"
-          title="Rename draft"
-          data-testid="share-editor-rename"
-          className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-        >
-          <Pencil size={13} strokeWidth={1.75} aria-hidden />
-        </button>
-        <span
-          className="min-w-0 text-[11px] text-warm-faint dark:text-dark-muted truncate whitespace-nowrap"
-          title={meta}
-        >
-          {meta}
-        </span>
+        <Menu
+          align="left"
+          testId="share-editor-more"
+          trigger={({ toggle }) => (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label="More options"
+              title="More options"
+              className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
+            </button>
+          )}
+          items={[
+            {
+              label: 'Rename draft',
+              icon: <Pencil size={13} strokeWidth={1.6} aria-hidden />,
+              onSelect: () => setRenaming(true),
+            },
+            {
+              label: 'Delete draft',
+              icon: <Trash2 size={13} strokeWidth={1.6} aria-hidden />,
+              onSelect: () => setConfirmingDelete(true),
+            },
+          ]}
+        />
       </div>
-      {/* Reset-to-original slot — PR5 will render <ResetButton /> here. */}
-      <div data-testid="share-editor-reset-slot" className="flex-none" />
-      <EditorDeleteChip
-        confirming={confirmingDelete}
-        onClick={() => {
-          if (confirmingDelete) {
-            setConfirmingDelete(false)
-            void handleDelete()
-          } else {
-            setConfirmingDelete(true)
-          }
-        }}
-        onCancel={() => setConfirmingDelete(false)}
-      />
+      <div className="flex-1" />
       <DownloadButton
         saving={saveState === 'saving'}
         onPng={() => { void exportPng() }}
@@ -373,6 +367,16 @@ export default function ShareEditorPage({
           initialTitle={title}
           onSave={setTitle}
           onClose={() => setRenaming(false)}
+        />
+      )}
+      {confirmingDelete && (
+        <DeleteDraftModal
+          title={title.trim() || 'Untitled'}
+          onConfirm={async () => {
+            setConfirmingDelete(false)
+            await handleDelete()
+          }}
+          onClose={() => setConfirmingDelete(false)}
         />
       )}
     </PageLayout>
@@ -480,70 +484,87 @@ function RenameDraftModal({
 }
 
 /**
- * Click-twice delete affordance in the editor top bar. Resting: a small
- * trash button. First click expands it into a "Delete?" pill with
- * destructive color. Second click fires onClick. Escape, mouse-leave,
- * or clicking outside cancels the primed state.
+ * Confirm-delete modal for the editor. Replaces the older click-twice
+ * in-place delete chip — for editor surfaces the user is about to
+ * navigate away from the deleted thing, so an explicit modal with a
+ * destructive button reads more clearly than a primed-pill confirm.
+ * Chrome mirrors RenameDraftModal: warm-bg backdrop blur + warm-bg panel,
+ * 440px max width. Esc + click-outside + Cancel close without deleting;
+ * Enter (or clicking the focused Delete) confirms.
  */
-/**
- * Click-twice delete affordance in the editor top bar. The outer wrapper
- * reserves a fixed 24×24 slot so neighbouring elements never move. When
- * primed, the inner span absolutely-positions itself and grows
- * rightward into a "Delete?" pill that overlays whatever sits beside it
- * — temporary visual occlusion is acceptable here; layout reflow is not.
- */
-function EditorDeleteChip({
-  confirming,
-  onClick,
-  onCancel,
+function DeleteDraftModal({
+  title,
+  onConfirm,
+  onClose,
 }: {
-  confirming: boolean
-  onClick: () => void
-  onCancel: () => void
+  title: string
+  onConfirm: () => void | Promise<void>
+  onClose: () => void
 }) {
-  const wrapRef = useRef<HTMLButtonElement | null>(null)
+  const deleteRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
-    if (!confirming) return
-    function onDown(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) onCancel()
+    deleteRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [confirming, onCancel])
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
-    <button
-      ref={wrapRef}
-      type="button"
-      data-testid="share-editor-delete"
-      data-confirming={confirming ? '' : undefined}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      onMouseLeave={() => {
-        if (confirming) onCancel()
-      }}
-      aria-label={confirming ? 'Click again to confirm delete' : 'Delete draft'}
-      title={confirming ? 'Click again to confirm' : 'Delete draft'}
-      className={`flex-none inline-flex items-center justify-center h-6 rounded cursor-pointer select-none transition-[width,padding,background-color,color] duration-150 text-[11.5px] font-medium tracking-[-0.005em] whitespace-nowrap overflow-hidden ${
-        confirming
-          ? 'w-[60px] px-2.5 bg-[color:var(--color-status-error)] dark:bg-[color:var(--color-status-error-dark)] text-white shadow-[0_1px_3px_rgba(0,0,0,0.18)]'
-          : 'w-6 text-warm-faint dark:text-dark-muted hover:text-[color:var(--color-status-error)] dark:hover:text-[color:var(--color-status-error-dark)] hover:bg-[color:var(--color-status-error)]/8 dark:hover:bg-[color:var(--color-status-error-dark)]/12'
-      }`}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-draft-title"
+      data-testid="delete-draft-modal"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[20vh] animate-in fade-in duration-150"
     >
-      {confirming ? 'Delete' : <Trash2 size={13} strokeWidth={1.75} />}
-    </button>
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-full max-w-[440px] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+      >
+        <div className="px-5 pt-5 pb-4">
+          <h2 id="delete-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
+            Delete draft?
+          </h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-warm-muted dark:text-dark-muted">
+            This will permanently remove “{title}” from your Shares. This cannot be undone —
+            autosave is already off for this draft once you confirm.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 pb-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            Cancel
+          </button>
+          <button
+            ref={deleteRef}
+            type="button"
+            data-testid="delete-draft-confirm"
+            onClick={() => { void onConfirm() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void onConfirm()
+              }
+            }}
+            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-[color:var(--color-status-error)] dark:bg-[color:var(--color-status-error-dark)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-status-error)]/40"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

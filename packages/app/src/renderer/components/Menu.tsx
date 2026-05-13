@@ -106,13 +106,23 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
                 item.onSelect()
                 setOpen(false)
               }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
+              className={`group w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
                 item.active
                   ? 'text-accent dark:text-accent-dark bg-accent/10 dark:bg-accent-dark/10'
                   : 'text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {item.icon && <span className="flex-none w-3.5 h-3.5 flex items-center justify-center">{item.icon}</span>}
+              {item.icon && (
+                <span
+                  className={`flex-none w-3.5 h-3.5 flex items-center justify-center transition-colors ${
+                    item.active
+                      ? ''
+                      : 'text-warm-faint dark:text-dark-muted group-hover:text-warm-text dark:group-hover:text-dark-text'
+                  }`}
+                >
+                  {item.icon}
+                </span>
+              )}
               <span className="flex-1 truncate">{item.label}</span>
             </button>
           ))}
