@@ -162,19 +162,21 @@ function FragmentRow({
         />
       </div>
 
-      <div className="text-xs text-warm-muted dark:text-dark-muted mb-1.5 truncate">
-        {project}
-        {result.profileLabel && <span> · {result.profileLabel}</span>}
-        {result.matchCount > 1 && (
-          <span data-testid="match-count"> · {result.matchCount} matches</span>
-        )}
-      </div>
+      <div className="pl-1.5">
+        <div className="text-xs text-warm-muted dark:text-dark-muted mb-1.5 truncate">
+          {project}
+          {result.profileLabel && <span> · {result.profileLabel}</span>}
+          {result.matchCount > 1 && (
+            <span data-testid="match-count"> · {result.matchCount} matches</span>
+          )}
+        </div>
 
-      <p
-        className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
-        onClick={(e) => e.stopPropagation()}
-        dangerouslySetInnerHTML={{ __html: snippet }}
-      />
+        <p
+          className="font-mono text-xs text-warm-text dark:text-dark-text leading-relaxed [&>strong]:font-semibold [&>strong]:text-accent dark:[&>strong]:text-accent-dark select-text cursor-text"
+          onClick={(e) => e.stopPropagation()}
+          dangerouslySetInnerHTML={{ __html: snippet }}
+        />
+      </div>
     </div>
   )
 }
