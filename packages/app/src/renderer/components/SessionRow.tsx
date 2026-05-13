@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SquareTerminal, MoreHorizontal, Copy, Loader2, Share2 } from 'lucide-react'
+import { SquareTerminal, MoreHorizontal, Copy, Loader2, BookText } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
@@ -112,8 +112,8 @@ export default function SessionRow({ session, pinned = false, showProject = fals
             )}
             items={[
               ...(onShare ? [{
-                label: 'Share session',
-                icon: <Share2 size={14} strokeWidth={1.6} aria-hidden />,
+                label: 'Open in share editor',
+                icon: <BookText size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => onShare(session.sessionUuid),
               }] : []),
               {

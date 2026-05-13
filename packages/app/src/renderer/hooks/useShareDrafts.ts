@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ShareDraftListItem, ShareDraftRow } from '@spool-lab/core'
+import { FEATURES } from '../featureFlags.js'
 
 interface UseShareDraftsResult {
   drafts: ShareDraftListItem[]
@@ -72,4 +73,31 @@ export function useShareDrafts(opts: { limit?: number } = {}): UseShareDraftsRes
   }, [refresh])
 
   return { drafts, loading, error, refresh, removeDraft, restoreDraft }
+}
+
+/**
+ * Cheap count of share drafts whose `source_kind = 'spool-session'` and
+ * origin matches the given session uuid. Used by the ShareSourceChip on
+ * SessionDetail to show that a session already has drafts at a glance.
+ *
+ * Fetches once per `sessionUuid` change; callers don't need to worry
+ * about render-loop refetches. Returns 0 when the share feature flag
+ * is off, and skips the IPC entirely in that case.
+ */
+export function useDraftCountForSession(sessionUuid: string): number {
+  const [count, setCount] = useState(0)
+
+  useEffect(() => {
+    if (!FEATURES.share) {
+      setCount(0)
+      return
+    }
+    let cancelled = false
+    window.spool.shareDraft.countBySession(sessionUuid)
+      .then((n) => { if (!cancelled) setCount(n) })
+      .catch(() => { if (!cancelled) setCount(0) })
+    return () => { cancelled = true }
+  }, [sessionUuid])
+
+  return count
 }

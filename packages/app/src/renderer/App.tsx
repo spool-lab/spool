@@ -919,7 +919,9 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
-                  {...(FEATURES.share ? { onShare: handleStartShareFromSession } : {})}
+                  {...(FEATURES.share ? {
+                    onShare: handleStartShareFromSession,
+                  } : {})}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView

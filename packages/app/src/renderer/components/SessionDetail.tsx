@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SquareTerminal, Share2, MoreHorizontal, Copy } from 'lucide-react'
+import { SquareTerminal, BookText, MoreHorizontal, Copy } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
+import { FEATURES } from '../featureFlags.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { useIsDark } from '../hooks/useIsDark.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
+import { useDraftCountForSession } from '../hooks/useShareDrafts.js'
 import { extractRenderedText } from '../markdown/extractRenderedText.js'
 
 type Props = {
@@ -37,6 +39,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
   const isDark = useIsDark()
+  const hasDraft = useDraftCountForSession(sessionUuid) > 0
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
 
@@ -277,11 +280,15 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             <button
               data-testid="detail-share"
               onClick={() => onShare(session, messages)}
-              title="Create a share from this session"
-              aria-label="Create a share from this session"
-              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              title={hasDraft ? 'Open draft' : 'Open in share editor'}
+              aria-label={hasDraft ? 'Open share draft' : 'Open in share editor'}
+              className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                hasDraft
+                  ? 'text-accent dark:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
+                  : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
+              }`}
             >
-              <Share2 size={13} strokeWidth={1.6} aria-hidden />
+              <BookText size={13} strokeWidth={1.6} aria-hidden />
             </button>
           )}
 
@@ -291,7 +298,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             disabled={resuming}
             title={resuming ? 'Opening…' : 'Resume in Terminal'}
             aria-label={resuming ? 'Opening…' : 'Resume in Terminal'}
-            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
           </button>
@@ -304,7 +311,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 type="button"
                 onClick={toggle}
                 aria-label="More actions"
-                className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
                 <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
               </button>
