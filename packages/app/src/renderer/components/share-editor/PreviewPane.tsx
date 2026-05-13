@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { MoreHorizontal } from 'lucide-react'
 import {
   TemplateRender,
   TEMPLATE_RATIO,
@@ -288,28 +289,71 @@ type ZoomControlProps = {
 function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
   const minPercent = ZOOM_STEPS[0]! * 100
   const maxPercent = ZOOM_STEPS[ZOOM_STEPS.length - 1]! * 100
+  const [expanded, setExpanded] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  // Collapse on outside click + Escape. Don't trap focus — the user
+  // should be free to click anywhere else on the canvas and the
+  // controls just tuck away.
+  useEffect(() => {
+    if (!expanded) return
+    function onDown(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setExpanded(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [expanded])
+
+  // One container, always there. Collapsed state shows just the ⋯
+  // trigger. Expanded state grows leftward (since the bar is right-
+  // anchored), keeping the ⋯ at the same pixel position — no jitter
+  // at the user's click point. Bg stays so the trigger is visible
+  // against the dark backdrop, but it's a quiet warm-surface tint
+  // rather than a high-contrast pill.
   return (
     <div
+      ref={rootRef}
       data-pan-ignore
-      className="absolute right-4 bottom-4 z-20 flex items-center gap-0.5 px-1 h-7 rounded-md bg-warm-surface dark:bg-dark-surface shadow-sm text-[11px] text-warm-text dark:text-dark-text"
+      className="absolute right-4 bottom-4 z-20 flex items-center gap-0 h-5 rounded bg-warm-surface dark:bg-dark-surface text-[10.5px] text-warm-text dark:text-dark-text"
     >
-      <ZoomBtn label="−" onClick={onOut} ariaLabel="Zoom out" disabled={percent <= minPercent} />
-      <span className="min-w-[34px] text-center select-none text-warm-text dark:text-dark-text tabular-nums">
-        {percent}%
-      </span>
-      <ZoomBtn label="+" onClick={onIn} ariaLabel="Zoom in" disabled={percent >= maxPercent} />
+      {expanded && (
+        <>
+          <ZoomBtn label="−" onClick={onOut} ariaLabel="Zoom out" disabled={percent <= minPercent} />
+          <span className="min-w-[26px] text-center select-none text-warm-text dark:text-dark-text tabular-nums">
+            {percent}%
+          </span>
+          <ZoomBtn label="+" onClick={onIn} ariaLabel="Zoom in" disabled={percent >= maxPercent} />
+          <button
+            type="button"
+            onClick={onFit}
+            aria-label="Zoom to fit"
+            aria-pressed={isFit}
+            className={`px-1.5 h-5 rounded transition-colors ${
+              isFit
+                ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
+                : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
+            }`}
+          >
+            Fit
+          </button>
+        </>
+      )}
       <button
         type="button"
-        onClick={onFit}
-        aria-label="Zoom to fit"
-        aria-pressed={isFit}
-        className={`px-2 h-5 rounded transition-colors ${
-          isFit
-            ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
-            : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
-        }`}
+        onClick={() => setExpanded((v) => !v)}
+        aria-label={expanded ? 'Hide zoom controls' : 'Zoom controls'}
+        aria-expanded={expanded}
+        title="Zoom controls"
+        className="w-5 h-5 grid place-items-center rounded text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
-        Fit
+        <MoreHorizontal size={11} strokeWidth={1.75} aria-hidden />
       </button>
     </div>
   )
@@ -332,7 +376,7 @@ function ZoomBtn({
       onClick={onClick}
       aria-label={ariaLabel}
       disabled={disabled}
-      className={`w-5 h-5 grid place-items-center rounded text-[13px] leading-none ${
+      className={`w-5 h-5 grid place-items-center rounded text-[12px] leading-none ${
         disabled
           ? 'text-warm-faint dark:text-dark-muted cursor-default'
           : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 cursor-pointer'
