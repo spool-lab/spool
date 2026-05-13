@@ -42,7 +42,7 @@ export interface Conversation {
 
 export type Template = 'atelier' | 'letter' | 'transcript' | 'interview' | 'chat'
 export type Paper = 'bone' | 'snow' | 'linen' | 'graphite' | 'ink'
-export type Typeface = 'inter' | 'geist' | 'instrument-serif' | 'hanken-grotesk'
+export type Typeface = 'inter' | 'geist' | 'fraunces' | 'hanken-grotesk'
 export type Density = 'compact' | 'relaxed'
 
 export interface PaperTokens {
@@ -164,9 +164,9 @@ export const TYPEFACES: TypefaceDef[] = [
     sample: 'Aa',
   },
   {
-    id: 'instrument-serif',
-    name: 'Instrument Serif',
-    family: "'Instrument Serif', 'Georgia', serif",
+    id: 'fraunces',
+    name: 'Fraunces',
+    family: "'Fraunces Variable', 'Fraunces', 'Georgia', serif",
     sample: 'Aa',
   },
   {
