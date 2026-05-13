@@ -12,11 +12,11 @@ import { TemplateThumb } from './TemplateThumb.js'
 
 // Curated subset of share-kit's option sets so the panel feels
 // editorial-curated rather than "every variation we've ever shipped".
-// share-kit still exports the full lists (5 each) for spool.share web
-// and other hosts that may want broader range.
+// share-kit still exports the full lists for spool.share web and other
+// hosts that may want broader range.
 const TEMPLATE_IDS = new Set(['chat', 'letter', 'atelier', 'interview'] as const)
 const PAPER_IDS = new Set(['bone', 'snow', 'graphite', 'ink'] as const)
-const TYPEFACE_IDS = new Set(['geist', 'grotesk', 'instrument', 'garamond'] as const)
+const TYPEFACE_IDS = new Set(['inter', 'geist', 'instrument-serif', 'hanken-grotesk'] as const)
 const COLORWAY_IDS = new Set(['amber', 'iris', 'moss', 'ink'] as const)
 const TEMPLATE_CHOICES = TEMPLATES.filter((t) => (TEMPLATE_IDS as Set<string>).has(t.id))
 const PAPER_CHOICES = PAPERS.filter((p) => (PAPER_IDS as Set<string>).has(p.id))
@@ -177,7 +177,7 @@ export function ControlPanel({ opts, setOpts }: Props) {
 
 function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="px-4 pt-3 pb-4">
+    <div className="px-4 pt-1.5 pb-4">
       <div className="flex items-baseline justify-between mb-3">
         <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
           {label}
@@ -208,7 +208,7 @@ function Collapsible({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full text-left px-4 py-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
+        className="w-full text-left px-4 pt-2 pb-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
       >
         <span className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted">
           {label}
@@ -291,7 +291,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next: Typeface) => void }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-2.5">
       {TYPEFACE_CHOICES.map((tf) => {
         const active = tf.id === value
         return (
@@ -301,14 +301,14 @@ function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next:
             onClick={() => onChange(tf.id)}
             title={tf.name}
             aria-label={tf.name}
-            className={`flex-1 h-10 rounded-md flex items-center justify-center transition-colors focus:outline-none border ${
+            className={`w-11 h-8 rounded-md flex items-center justify-center transition-colors focus:outline-none border ${
               active
                 ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent dark:border-accent-dark'
                 : 'bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border hover:border-warm-faint/50 dark:hover:border-dark-muted/50'
             }`}
           >
             <span
-              className={`text-[16px] leading-none ${
+              className={`text-[12px] font-semibold leading-none ${
                 active ? 'text-accent dark:text-accent-dark' : 'text-warm-text/85 dark:text-dark-text/85'
               }`}
               style={{ fontFamily: tf.family, letterSpacing: '-0.02em' }}

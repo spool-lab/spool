@@ -3,7 +3,10 @@ import { mixHex } from './colorUtils.js'
 
 function fontStack(custom: string, fallback: string): string {
   const t = custom.trim()
-  if (!t || t.toLowerCase() === 'geist variable' || t.toLowerCase() === 'geist') return fallback
+  const lower = t.toLowerCase()
+  if (!t || lower === 'inter variable' || lower === 'inter' || lower === 'geist variable' || lower === 'geist') {
+    return fallback
+  }
   if (/^["']/.test(t)) return `${t}, ${fallback}`
   if (t.includes(',')) return `${t}, ${fallback}`
   return `'${t}', ${fallback}`
@@ -86,7 +89,7 @@ export function applyEditorTheme(state: ThemeEditorStateV1): void {
   const active = isDark ? state.dark : state.light
   root.style.setProperty(
     '--font-sans',
-    fontStack(active.uiFont, `'Geist Variable', system-ui, sans-serif`),
+    fontStack(active.uiFont, `'Inter Variable', system-ui, sans-serif`),
   )
   root.style.setProperty(
     '--font-mono',
