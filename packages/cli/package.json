@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/cli",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "private": false,
   "type": "module",
   "bin": {
