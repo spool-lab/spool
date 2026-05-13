@@ -3,6 +3,7 @@ import { Newspaper, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
+import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
 import type { ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
@@ -447,41 +448,6 @@ function CorruptDraftCard({
           }}
         />
       )}
-    </div>
-  )
-}
-
-function FeaturedEmptyState({
-  icon,
-  title,
-  hint,
-}: {
-  icon: ReactNode
-  title: string
-  hint: string
-}) {
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6">
-      <div
-        className="w-14 h-14 rounded-full flex items-center justify-center mb-5 bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted"
-        aria-hidden="true"
-      >
-        {icon}
-      </div>
-      <h2 className="text-xl font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text mb-2">
-        {title}
-      </h2>
-      <p className="text-sm leading-relaxed text-warm-muted dark:text-dark-muted max-w-[360px]">
-        {hint}
-      </p>
-    </div>
-  )
-}
-
-function SmallEmptyState({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-center px-6 py-16 text-sm text-warm-muted dark:text-dark-muted text-center">
-      {children}
     </div>
   )
 }
