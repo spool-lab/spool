@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Library as LibraryIcon } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
+import { FeaturedEmptyState } from './EmptyState.js'
 
 type Props = {
   onSelectProject: (identityKey: string) => void
@@ -71,9 +73,15 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         {recentSessions === null ? (
           <SessionRowsSkeleton count={6} />
         ) : totalSessions === 0 ? (
-          <p className="px-6 py-6 text-sm text-warm-faint dark:text-dark-muted">
-            No sessions yet. Run <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code> to index your AI sessions.
-          </p>
+          <FeaturedEmptyState
+            icon={<LibraryIcon size={22} strokeWidth={1.5} />}
+            title="No sessions yet"
+            hint={
+              <>
+                Run <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code> to index your AI sessions and they'll appear here.
+              </>
+            }
+          />
         ) : (
           <>
             {pinnedSessions.length > 0 && (
