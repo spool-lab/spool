@@ -291,7 +291,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next: Typeface) => void }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-2.5">
       {TYPEFACE_CHOICES.map((tf) => {
         const active = tf.id === value
         return (
@@ -301,14 +301,14 @@ function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next:
             onClick={() => onChange(tf.id)}
             title={tf.name}
             aria-label={tf.name}
-            className={`flex-1 h-10 rounded-md flex items-center justify-center transition-colors focus:outline-none border ${
+            className={`w-11 h-8 rounded-md flex items-center justify-center transition-colors focus:outline-none border ${
               active
                 ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent dark:border-accent-dark'
                 : 'bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border hover:border-warm-faint/50 dark:hover:border-dark-muted/50'
             }`}
           >
             <span
-              className={`text-[16px] leading-none ${
+              className={`text-[12px] font-semibold leading-none ${
                 active ? 'text-accent dark:text-accent-dark' : 'text-warm-text/85 dark:text-dark-text/85'
               }`}
               style={{ fontFamily: tf.family, letterSpacing: '-0.02em' }}
