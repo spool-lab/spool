@@ -43,6 +43,7 @@ dist-electron/
 
 # Native binaries (rebuilt per-platform via electron-rebuild)
 build/
+!packages/app/build/
 *.node
 
 # Compiled artifacts that may end up in src/ by mistake

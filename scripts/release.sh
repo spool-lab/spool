@@ -2,9 +2,10 @@
 set -euo pipefail
 
 # Bumps version, tags, pushes, and dispatches the CI Release workflow.
-# Build + artifact upload happen in GitHub Actions so the release is never
-# signed with a local Apple Development cert (which is tied to specific
-# device UDIDs and would crash for everyone else). See .github/workflows/release.yml.
+# Build + sign + notarize + artifact upload run in GitHub Actions using the
+# Developer ID Application cert and app-specific password stored as repo
+# secrets (CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+# APPLE_TEAM_ID). See .github/workflows/release.yml.
 #
 # Usage:
 #   ./scripts/release.sh              # patch bump (0.3.8 → 0.3.9)

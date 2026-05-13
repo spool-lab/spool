@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
 import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, Share2 } from 'lucide-react'
 import PinIcon from './PinIcon.js'
@@ -244,6 +244,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         )}
       </div>
 
+      <UpdateBanner />
       <SidebarStatus
         syncStatus={syncStatus ?? null}
         status={status ?? null}
@@ -330,6 +331,140 @@ function SidebarStatus({
         </button>
       )}
     </div>
+  )
+}
+
+type UpdateStatus = {
+  status: 'available' | 'downloading' | 'ready' | 'error'
+  version?: string | undefined
+  percent?: number | undefined
+}
+
+function UpdateBanner() {
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
+  // Tracks the last status that wasn't 'error' so we can decide whether
+  // an error event interrupted a user-visible action (download in
+  // progress) — silent failures during background checks shouldn't
+  // surface a banner from nowhere.
+  const lastStatusRef = useRef<UpdateStatus['status'] | null>(null)
+  const [errorDismissed, setErrorDismissed] = useState(false)
+
+  useEffect(() => {
+    if (!window.spool?.onUpdateStatus) return
+    const off = window.spool.onUpdateStatus((data) => {
+      if (data.status === 'error') {
+        if (lastStatusRef.current === 'downloading') {
+          setUpdate({ status: 'error' })
+        } else {
+          setUpdate(null)
+        }
+        return
+      }
+      lastStatusRef.current = data.status
+      setErrorDismissed(false)
+      setUpdate(data)
+    })
+    return () => { off() }
+  }, [])
+
+  if (!update) return null
+  if (update.status === 'error' && errorDismissed) return null
+
+  const isDownloading = update.status === 'downloading'
+  const isError = update.status === 'error'
+  const isAction = update.status === 'available' || update.status === 'ready' || isError
+
+  const onClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (update.status === 'available') void window.spool?.downloadUpdate()
+    else if (update.status === 'ready') void window.spool?.installUpdate()
+    else if (isError) void window.spool?.downloadUpdate()
+  }
+
+  const label =
+    update.status === 'available' ? `Update available${update.version ? ` · v${update.version}` : ''}` :
+    update.status === 'ready' ? 'Restart to update' :
+    isError ? 'Update failed — retry' :
+    update.percent != null ? `Downloading update… ${update.percent}%` : 'Downloading update…'
+
+  const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
+
+  const icon =
+    update.status === 'available' ? (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ) : update.status === 'ready' ? (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <polyline points="23 4 23 10 17 10" />
+        <polyline points="1 20 1 14 7 14" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+    ) : isError ? (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    ) : (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none animate-spin">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+    )
+
+  if (isDownloading) {
+    return (
+      <div data-testid={`update-banner-${update.status}`} className={`${baseRow} text-warm-muted dark:text-dark-muted`}>
+        {icon}
+        <span className="flex-1 min-w-0 truncate">{label}</span>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div data-testid="update-banner-error" className={`${baseRow} pr-1 text-warm-muted dark:text-dark-muted`}>
+        <button
+          type="button"
+          data-testid="update-banner-error-retry"
+          onClick={onClick}
+          title="Retry download"
+          aria-label="Retry update download"
+          className="flex-1 min-w-0 flex items-center gap-2 -mx-1 px-1 rounded hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors"
+        >
+          {icon}
+          <span className="flex-1 min-w-0 truncate text-left">{label}</span>
+        </button>
+        <button
+          type="button"
+          data-testid="update-banner-error-dismiss"
+          onClick={(e) => { e.stopPropagation(); setErrorDismissed(true) }}
+          title="Dismiss"
+          aria-label="Dismiss update error"
+          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      data-testid={`update-banner-${update.status}`}
+      onClick={onClick}
+      title={label}
+      className={`${baseRow} text-left w-auto hover:brightness-95 dark:hover:brightness-110 transition-[filter]`}
+    >
+      {icon}
+      <span className="flex-1 min-w-0 truncate">{label}</span>
+    </button>
   )
 }
 
