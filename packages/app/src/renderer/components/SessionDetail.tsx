@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SquareTerminal, Share2, MoreHorizontal, ChevronRight, Copy } from 'lucide-react'
+import { SquareTerminal, Share2, MoreHorizontal, Copy } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
@@ -317,7 +317,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               },
               ...(resumeCommandAvailable ? [{
                 label: commandCopied ? 'Copied!' : 'Copy resume command',
-                icon: <ChevronRight size={14} strokeWidth={1.6} aria-hidden />,
+                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
             ]}
