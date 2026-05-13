@@ -63,19 +63,6 @@ export interface PaperDef {
 
 export const PAPERS: PaperDef[] = [
   {
-    id: 'bone',
-    name: 'Bone',
-    tokens: {
-      paper: '#F6F5EF',
-      text: '#1C1C18',
-      muted: '#6B6B60',
-      faint: '#ADADAA',
-      border: 'rgba(28,28,24,0.12)',
-      surface: '#EEEEE9',
-      accentBg: '#FFF3E8',
-    },
-  },
-  {
     id: 'snow',
     name: 'Snow',
     tokens: {
@@ -85,6 +72,19 @@ export const PAPERS: PaperDef[] = [
       faint: '#B0B0AD',
       border: 'rgba(28,28,24,0.08)',
       surface: '#F4F4F2',
+      accentBg: '#FFF3E8',
+    },
+  },
+  {
+    id: 'bone',
+    name: 'Bone',
+    tokens: {
+      paper: '#F6F5EF',
+      text: '#1C1C18',
+      muted: '#6B6B60',
+      faint: '#ADADAA',
+      border: 'rgba(28,28,24,0.12)',
+      surface: '#EEEEE9',
       accentBg: '#FFF3E8',
     },
   },
@@ -260,8 +260,8 @@ export const TEMPLATE_RATIO: Record<Template, { w: number; h: number }> = {
 
 export const DEFAULT_OPTS: EditorOpts = {
   template: 'chat',
-  paper: 'bone',
-  typeface: 'geist',
+  paper: 'snow',
+  typeface: 'inter',
   colorway: 'amber',
   accentHex: '#C85A00',
   density: 'compact',

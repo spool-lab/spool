@@ -177,7 +177,7 @@ export function ControlPanel({ opts, setOpts }: Props) {
 
 function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="px-4 pt-3 pb-4">
+    <div className="px-4 pt-1.5 pb-4">
       <div className="flex items-baseline justify-between mb-3">
         <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
           {label}
@@ -208,7 +208,7 @@ function Collapsible({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full text-left px-4 py-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
+        className="w-full text-left px-4 pt-2 pb-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
       >
         <span className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted">
           {label}
