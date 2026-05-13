@@ -4,10 +4,8 @@
 // PDF: clone the artifact into a print-only host and call window.print().
 //      The browser's Save-as-PDF path keeps text as real text (selectable,
 //      searchable, copyable), which embedding a PNG into pdf-lib cannot.
-//
-// (Markdown export was intentionally dropped from this port; MD cannot
-//  faithfully carry tool calls, redaction overlays, or audit chips.
-//  Revisit in a later phase if real demand surfaces.)
+// Markdown lives in ../storage/markdown-file.ts — text-only, honors
+// the editor's content opts (selection, redact, gaps).
 //
 // Save UX: when the browser supports File System Access API
 // (`showSaveFilePicker`), we surface a native save dialog so the user
