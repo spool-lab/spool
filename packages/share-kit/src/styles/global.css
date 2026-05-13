@@ -1,10 +1,12 @@
 @import 'tailwindcss';
 @import './fonts.css';
-@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/geist';
+@import '@fontsource/geist-mono/latin-400.css';
+@import '@fontsource/geist-mono/latin-500.css';
 @import '@fontsource/instrument-serif/400.css';
 @import '@fontsource/instrument-serif/400-italic.css';
-@import '@fontsource-variable/fraunces';
-@import '@fontsource-variable/eb-garamond';
+@import '@fontsource-variable/hanken-grotesk';
 @import './tokens.css';
 
 @theme {

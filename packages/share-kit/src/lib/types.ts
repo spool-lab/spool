@@ -42,7 +42,7 @@ export interface Conversation {
 
 export type Template = 'atelier' | 'letter' | 'transcript' | 'interview' | 'chat'
 export type Paper = 'bone' | 'snow' | 'linen' | 'graphite' | 'ink'
-export type Typeface = 'geist' | 'grotesk' | 'instrument' | 'fraunces' | 'garamond'
+export type Typeface = 'inter' | 'geist' | 'instrument-serif' | 'hanken-grotesk'
 export type Density = 'compact' | 'relaxed'
 
 export interface PaperTokens {
@@ -152,33 +152,27 @@ export interface TypefaceDef {
 
 export const TYPEFACES: TypefaceDef[] = [
   {
+    id: 'inter',
+    name: 'Inter',
+    family: "'Inter Variable', 'Inter', system-ui, sans-serif",
+    sample: 'Aa',
+  },
+  {
     id: 'geist',
     name: 'Geist',
-    family: "'Geist', system-ui, sans-serif",
+    family: "'Geist Variable', 'Geist', system-ui, sans-serif",
     sample: 'Aa',
   },
   {
-    id: 'grotesk',
-    name: 'Space Grotesk',
-    family: "'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif",
-    sample: 'Aa',
-  },
-  {
-    id: 'instrument',
+    id: 'instrument-serif',
     name: 'Instrument Serif',
     family: "'Instrument Serif', 'Georgia', serif",
     sample: 'Aa',
   },
   {
-    id: 'fraunces',
-    name: 'Fraunces',
-    family: "'Fraunces Variable', 'Fraunces', 'Georgia', serif",
-    sample: 'Aa',
-  },
-  {
-    id: 'garamond',
-    name: 'EB Garamond',
-    family: "'EB Garamond Variable', 'EB Garamond', 'Georgia', serif",
+    id: 'hanken-grotesk',
+    name: 'Hanken Grotesk',
+    family: "'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif",
     sample: 'Aa',
   },
 ]
@@ -289,6 +283,9 @@ export function normalizeOpts(raw: unknown): EditorOpts {
   const merged = { ...DEFAULT_OPTS, ...((raw as Partial<EditorOpts>) ?? {}) }
   if (!TEMPLATES.some((t) => t.id === merged.template)) {
     merged.template = DEFAULT_OPTS.template
+  }
+  if (!TYPEFACES.some((t) => t.id === merged.typeface)) {
+    merged.typeface = DEFAULT_OPTS.typeface
   }
   return merged
 }
