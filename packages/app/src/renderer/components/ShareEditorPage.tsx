@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { Download, PanelRight, Trash2 } from 'lucide-react'
+import { Download, PanelRight, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   TEMPLATE_RATIO,
@@ -67,6 +67,14 @@ export default function ShareEditorPage({
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // Draft title state. Mirrors share_drafts.title; we override
+  // conversation.title at save time so the snapshot stays in sync.
+  // Renamed via a modal (the Pencil button next to the title opens it).
+  // Empty strings persist as-is during the edit but resolve to a sane
+  // fallback ("Untitled") at render time so the Shares grid never shows
+  // a blank card label.
+  const [title, setTitle] = useState<string>(conversation.title)
+  const [renaming, setRenaming] = useState(false)
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   // Autosave opts changes back into share_drafts. Debounced so a
@@ -84,18 +92,20 @@ export default function ShareEditorPage({
       return
     }
     const handle = window.setTimeout(() => {
-      const doc = buildSpoolDocument(conversation, opts)
+      const effectiveTitle = title.trim() || 'Untitled'
+      const convoWithTitle = { ...conversation, title: effectiveTitle }
+      const doc = buildSpoolDocument(convoWithTitle, opts)
       void window.spool?.shareDraft?.upsert({
         draft_id: draftId,
         source_kind: sourceKind,
         source_origin: sourceOrigin,
-        title: conversation.title,
+        title: effectiveTitle,
         snapshot_json: JSON.stringify(doc),
         preview_json: JSON.stringify(buildPreviewDocument(doc)),
       }).catch((err) => console.error('Autosave share draft failed:', err))
     }, 400)
     return () => window.clearTimeout(handle)
-  }, [opts, conversation, draftId, sourceKind, sourceOrigin])
+  }, [opts, conversation, draftId, sourceKind, sourceOrigin, title])
 
   // Revoke the in-memory blob: URL when the preview modal closes so we
   // don't leak the PDF buffer for the rest of the session.
@@ -241,17 +251,28 @@ export default function ShareEditorPage({
         title="Back"
         className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
-        <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      <div className="min-w-0 flex items-baseline gap-2">
+      <div className="min-w-0 flex-1 flex items-center gap-2">
         <h1
+          data-testid="share-editor-title"
+          title={title.trim() || 'Untitled'}
           className="min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate"
-          title={conversation.title}
         >
-          {conversation.title}
+          {title.trim() || 'Untitled'}
         </h1>
+        <button
+          type="button"
+          onClick={() => setRenaming(true)}
+          aria-label="Rename draft"
+          title="Rename draft"
+          data-testid="share-editor-rename"
+          className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        >
+          <Pencil size={13} strokeWidth={1.75} aria-hidden />
+        </button>
         <span
           className="min-w-0 text-[11px] text-warm-faint dark:text-dark-muted truncate whitespace-nowrap"
           title={meta}
@@ -259,6 +280,8 @@ export default function ShareEditorPage({
           {meta}
         </span>
       </div>
+      {/* Reset-to-original slot — PR5 will render <ResetButton /> here. */}
+      <div data-testid="share-editor-reset-slot" className="flex-none" />
       <EditorDeleteChip
         confirming={confirmingDelete}
         onClick={() => {
@@ -271,7 +294,6 @@ export default function ShareEditorPage({
         }}
         onCancel={() => setConfirmingDelete(false)}
       />
-      <div className="flex-1" />
       <DownloadButton
         saving={saveState === 'saving'}
         onPng={() => { void exportPng() }}
@@ -284,9 +306,9 @@ export default function ShareEditorPage({
         title={panelOpen ? 'Hide style panel' : 'Show style panel'}
         aria-label={panelOpen ? 'Hide style panel' : 'Show style panel'}
         aria-pressed={panelOpen}
-        className="flex-none inline-flex items-center justify-center w-7 h-7 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
-        <PanelRight size={15} strokeWidth={1.75} />
+        <PanelRight size={13} strokeWidth={1.75} />
       </button>
     </div>
   )
@@ -346,7 +368,114 @@ export default function ShareEditorPage({
           />
         </div>
       </div>
+      {renaming && (
+        <RenameDraftModal
+          initialTitle={title}
+          onSave={setTitle}
+          onClose={() => setRenaming(false)}
+        />
+      )}
     </PageLayout>
+  )
+}
+
+/**
+ * Rename-draft modal — opens from the Pencil button next to the title.
+ * Centered overlay matching the rest of the cmdk-family surfaces
+ * (warm-bg backdrop blur + warm-bg panel). Esc cancels, Enter saves,
+ * click outside cancels. Empty title is allowed; the caller resolves
+ * the empty fallback ("Untitled") at render time.
+ */
+function RenameDraftModal({
+  initialTitle,
+  onSave,
+  onClose,
+}: {
+  initialTitle: string
+  onSave: (next: string) => void
+  onClose: () => void
+}) {
+  const [value, setValue] = useState(initialTitle)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const commit = () => {
+    onSave(value)
+    onClose()
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rename-draft-title"
+      data-testid="rename-draft-modal"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[20vh] animate-in fade-in duration-150"
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-full max-w-[440px] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+      >
+        <div className="px-5 pt-5 pb-4">
+          <h2 id="rename-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
+            Rename draft
+          </h2>
+          <p className="mt-1 text-xs text-warm-faint dark:text-dark-muted">
+            Shown on the share card and in your Shares list.
+          </p>
+        </div>
+        <div className="px-5 pb-4">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commit()
+              }
+            }}
+            aria-label="Draft title"
+            data-testid="rename-draft-input"
+            className="w-full h-9 px-3 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted focus:outline-none focus:ring-1 focus:ring-warm-border2 dark:focus:ring-dark-border2"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 pb-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={commit}
+            data-testid="rename-draft-save"
+            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -210,7 +210,7 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
     ),
     hr: () => <hr style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.2, margin: '10px 0' }} />,
     a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => (
-      <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}` }}>
+      <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}`, overflowWrap: 'anywhere' }}>
         {children}
       </a>
     ),
