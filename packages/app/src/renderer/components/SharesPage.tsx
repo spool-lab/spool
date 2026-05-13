@@ -32,9 +32,16 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
     (file: File) => onImportSpool?.(file),
     [onImportSpool],
   )
+  const onRejectDrop = useCallback((files: File[]) => {
+    const name = files[0]?.name
+    toast.error(`Couldn't import ${name ?? 'file'}`, {
+      description: 'Only .spool files are supported.',
+    })
+  }, [])
   const { isDragActive, dragHandlers } = useSpoolDrop({
     enabled: Boolean(onImportSpool),
     onImport,
+    onReject: onRejectDrop,
   })
 
   const handleDelete = useCallback(async (draft: ShareDraftListItem) => {
@@ -48,14 +55,14 @@ export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
           onClick: () => {
             void restoreDraft(full).catch((err) => {
               console.error('Restore share draft failed:', err)
-              toast.error('Could not restore draft')
+              toast.error("Couldn't restore draft")
             })
           },
         },
       })
     } catch (err) {
       console.error('Delete share draft failed:', err)
-      toast.error('Could not delete draft')
+      toast.error("Couldn't delete draft")
     }
   }, [removeDraft, restoreDraft])
 

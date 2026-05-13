@@ -148,9 +148,9 @@ export default function ShareEditorPage({
       console.error('Export to PNG failed:', err)
       setSaveState('error')
       if (err instanceof PngTooTallError) {
-        toast.error('Conversation too tall for PNG — try PDF export.')
+        toast.error("Couldn't export PNG", { description: 'Conversation too tall — try PDF instead.' })
       } else {
-        toast.error('Export failed — see console for details')
+        toast.error("Couldn't export PNG", { description: 'See console for details.' })
       }
     }
   }, [beginSaving, conversation, opts.template])
@@ -172,7 +172,7 @@ export default function ShareEditorPage({
     } catch (err) {
       console.error('Export to PDF failed:', err)
       setSaveState('error')
-      toast.error('Export failed — see console for details')
+      toast.error("Couldn't export PDF", { description: 'See console for details.' })
     }
   }, [beginSaving, conversation, opts.template])
 
@@ -184,11 +184,16 @@ export default function ShareEditorPage({
       ext: '.pdf',
     })
     if (slot.kind === 'cancelled') return
-    const res = await fetch(pdfPreview.url)
-    const blob = await res.blob()
-    await writeToSlot(slot, blob, pdfPreview.filename)
-    toast.success(`Saved ${pdfPreview.filename}`)
-    setPdfPreview(null)
+    try {
+      const res = await fetch(pdfPreview.url)
+      const blob = await res.blob()
+      await writeToSlot(slot, blob, pdfPreview.filename)
+      toast.success(`Saved ${pdfPreview.filename}`)
+      setPdfPreview(null)
+    } catch (err) {
+      console.error('Save PDF failed:', err)
+      toast.error("Couldn't save PDF", { description: 'See console for details.' })
+    }
   }, [pdfPreview])
 
   const handleDelete = useCallback(async () => {
@@ -196,7 +201,7 @@ export default function ShareEditorPage({
       await window.spool.shareDraft.delete(draftId)
     } catch (err) {
       console.error('Delete share draft failed:', err)
-      toast.error('Could not delete draft')
+      toast.error("Couldn't delete draft")
       return
     }
     onBack()
@@ -223,7 +228,7 @@ export default function ShareEditorPage({
     } catch (err) {
       console.error('Export to .spool failed:', err)
       setSaveState('error')
-      toast.error('Export failed — see console for details')
+      toast.error("Couldn't export .spool", { description: 'See console for details.' })
     }
   }, [beginSaving, conversation, opts])
 
