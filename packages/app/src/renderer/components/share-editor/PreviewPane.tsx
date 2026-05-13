@@ -153,6 +153,49 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
     setZoom('fit')
   }
 
+  // ⌘= / ⌘+ / ⌘- / ⌘0 — drive the same zoom state as the on-screen
+  // ZoomControl. Mounted only while the share editor is on screen (the
+  // editor view is itself FEATURES.share-gated upstream), and skipped
+  // when focus is in a typing context so users editing copy in the
+  // control panel don't trip the shortcuts. preventDefault on a match
+  // so Chromium / Electron doesn't apply its own browser-level zoom.
+  //
+  // The handler reads the live scale via a ref so a single listener
+  // covers all renders without churning on every zoom change. ⌘+ also
+  // ships as the Shift-modified form of ⌘= on US layouts — we accept
+  // both with-and-without Shift here.
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+  useEffect(() => {
+    const isTypingTarget = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false
+      const tag = el.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.altKey) return
+      if (isTypingTarget(e.target)) return
+      // e.key handles shifted "+" too; e.code covers numeric-row "=" and
+      // numpad equivalents so the shortcut works regardless of layout.
+      const isIn = e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd'
+      const isOut = e.key === '-' || e.code === 'Minus' || e.code === 'NumpadSubtract'
+      const isFit = e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0'
+      if (!isIn && !isOut && !isFit) return
+      // Disallow Shift on - and 0 so we don't intercept unrelated chords.
+      if ((isOut || isFit) && e.shiftKey) return
+      e.preventDefault()
+      if (isIn) setZoom(nextZoomStep(scaleRef.current, 1))
+      else if (isOut) setZoom(nextZoomStep(scaleRef.current, -1))
+      else {
+        setFitScale(measureFit())
+        setZoom('fit')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setZoom, measureFit])
+
   // Stash the live ratio onto the forwarded ref's parent target via
   // useImperativeHandle pattern — but since we just need the unscaled
   // 720px node for export, we forward the ref directly to innerRef
