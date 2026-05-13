@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import {
   TEMPLATE_RATIO,
   buildSpoolDocument,
+  buildMarkdownDocument,
+  markdownFilenameFor,
   openSaveSlot,
   writeToSlot,
   rasterizeToPngBlob,
@@ -213,6 +215,29 @@ export default function ShareEditorPage({
     onBack()
   }, [draftId, onBack])
 
+  const exportMarkdown = useCallback(async () => {
+    const filename = markdownFilenameFor(conversation)
+    const slot = await openSaveSlot(filename, {
+      description: 'Markdown document',
+      mime: 'text/markdown',
+      ext: '.md',
+    })
+    if (slot.kind === 'cancelled') return
+
+    await beginSaving()
+    try {
+      const md = buildMarkdownDocument(conversation, opts)
+      const blob = new Blob([md], { type: 'text/markdown' })
+      await writeToSlot(slot, blob, filename)
+      setSaveState('idle')
+      toast.success(`Saved ${filename}`)
+    } catch (err) {
+      console.error('Export to Markdown failed:', err)
+      setSaveState('error')
+      toast.error("Couldn't export Markdown", { description: 'See console for details.' })
+    }
+  }, [beginSaving, conversation, opts])
+
   const exportSpoolFile = useCallback(async () => {
     // Same pre-pick discipline as PNG; JSON.stringify is fast but
     // saveBlob's picker call still needs the user gesture.
@@ -290,9 +315,12 @@ export default function ShareEditorPage({
       <div className="flex-1" />
       <DownloadButton
         saving={saveState === 'saving'}
-        onPng={() => { void exportPng() }}
-        onPdf={() => { void exportPdf() }}
-        onSpool={() => { void exportSpoolFile() }}
+        onExport={(fmt) => {
+          if (fmt === 'png') void exportPng()
+          else if (fmt === 'pdf') void exportPdf()
+          else if (fmt === 'md') void exportMarkdown()
+          else void exportSpoolFile()
+        }}
       />
       <button
         type="button"

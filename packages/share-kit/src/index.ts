@@ -75,6 +75,13 @@ export {
   readSpoolFile,
 } from './lib/storage/spool-file'
 
+// Markdown export ─────────────────────────────────────────────────
+export {
+  buildMarkdownDocument,
+  downloadMarkdownFile,
+  markdownFilenameFor,
+} from './lib/storage/markdown-file'
+
 // ─── Parsers (Phase 1 — accepts public ChatGPT/Claude/Gemini share URLs) ──
 export { parseShareUrl, detectPlatform, ParseError } from './lib/parsers'
 export type { ParseErrorReason } from './lib/parsers'

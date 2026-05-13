@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 
-export type ExportFormat = 'png' | 'pdf' | 'spool'
+export type ExportFormat = 'png' | 'pdf' | 'md' | 'spool'
 
 type FormatDef = {
   k: ExportFormat
@@ -16,6 +16,7 @@ type FormatDef = {
 const FORMATS: FormatDef[] = [
   { k: 'png', l: 'PNG image', b: 'Download PNG', s: '3× pixel ratio · social-feed friendly' },
   { k: 'pdf', l: 'PDF', b: 'Download PDF', s: 'A4 paginated · print-ready' },
+  { k: 'md', l: 'Markdown', b: 'Download .md', s: 'Plain text · Obsidian / GitHub friendly' },
   { k: 'spool', l: 'Spool file', b: 'Download .spool', s: 'Editable in Spool · keeps your styling' },
 ]
 
@@ -24,18 +25,16 @@ const STORAGE_KEY = 'spool:share:lastFormat'
 function loadInitial(): ExportFormat {
   if (typeof window === 'undefined') return 'pdf'
   const raw = window.localStorage.getItem(STORAGE_KEY)
-  if (raw === 'png' || raw === 'pdf' || raw === 'spool') return raw
+  if (FORMATS.some(f => f.k === raw)) return raw as ExportFormat
   return 'pdf'
 }
 
 type Props = {
   saving: boolean
-  onPng: () => void
-  onPdf: () => void
-  onSpool: () => void
+  onExport: (fmt: ExportFormat) => void
 }
 
-export function DownloadButton({ saving, onPng, onPdf, onSpool }: Props) {
+export function DownloadButton({ saving, onExport }: Props) {
   const [format, setFormat] = useState<ExportFormat>(loadInitial)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -64,9 +63,7 @@ export function DownloadButton({ saving, onPng, onPdf, onSpool }: Props) {
 
   const trigger = () => {
     if (saving) return
-    if (format === 'png') onPng()
-    else if (format === 'pdf') onPdf()
-    else onSpool()
+    onExport(format)
   }
 
   return (
