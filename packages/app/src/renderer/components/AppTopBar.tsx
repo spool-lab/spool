@@ -47,10 +47,10 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
             title={sidebarCollapsed ? 'Show sidebar (⌘B)' : 'Hide sidebar (⌘B)'}
             aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
             aria-pressed={sidebarCollapsed}
-            className="flex-none inline-flex items-center justify-center w-7 h-7 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+            className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
             style={noDragStyle}
           >
-            <PanelLeft size={15} strokeWidth={1.75} />
+            <PanelLeft size={13} strokeWidth={1.75} />
           </button>
         </div>
         <div
