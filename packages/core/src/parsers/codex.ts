@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { closeSync, openSync, readSync } from 'node:fs'
 import { basename } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import type { ParseSessionResult, ParsedSession, ParsedMessage } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -10,6 +11,8 @@ interface CodexRecord {
 }
 
 export const CODEX_INDEX_VERSION = 'codex-v5-filter-internal-assessment-and-approval-session-search-fts'
+
+const READ_CHUNK_SIZE = 1024 * 1024
 
 const INTERNAL_CODEX_SESSION_MARKERS = [
   'The following is the Codex agent history whose request action you are assessing',
@@ -25,8 +28,6 @@ const INTERNAL_CODEX_SESSION_MARKERS = [
 ] as const
 
 export function loadCodexSession(filePath: string): ParseSessionResult {
-  const raw = readFileSync(filePath, 'utf8')
-  const lines = raw.split('\n').filter(l => l.trim().length > 0)
   const eventMessages: ParsedMessage[] = []
   const responseMessages: ParsedMessage[] = []
   let sessionUuid = ''
@@ -38,7 +39,7 @@ export function loadCodexSession(filePath: string): ParseSessionResult {
   const fileMatch = basename(filePath).match(/rollout-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/)
   if (fileMatch?.[1]) sessionUuid = fileMatch[1]
 
-  for (const line of lines) {
+  for (const line of readNonEmptyLines(filePath)) {
     let record: CodexRecord
     try {
       record = JSON.parse(line) as CodexRecord
@@ -176,6 +177,33 @@ export function loadCodexSession(filePath: string): ParseSessionResult {
       endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
       messages,
     },
+  }
+}
+
+function* readNonEmptyLines(filePath: string): Iterable<string> {
+  const fd = openSync(filePath, 'r')
+  const buffer = Buffer.allocUnsafe(READ_CHUNK_SIZE)
+  const decoder = new StringDecoder('utf8')
+  let pending = ''
+
+  try {
+    while (true) {
+      const bytesRead = readSync(fd, buffer, 0, buffer.length, null)
+      if (bytesRead === 0) break
+
+      pending += decoder.write(buffer.subarray(0, bytesRead))
+      const lines = pending.split('\n')
+      pending = lines.pop() ?? ''
+
+      for (const line of lines) {
+        if (line.trim().length > 0) yield line
+      }
+    }
+
+    pending += decoder.end()
+    if (pending.trim().length > 0) yield pending
+  } finally {
+    closeSync(fd)
   }
 }
 

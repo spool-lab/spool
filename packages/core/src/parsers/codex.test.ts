@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { writeFileSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -94,5 +94,41 @@ describe('parseCodexSession', () => {
     ])
 
     expect(parseCodexSession(fp)).toBeNull()
+  })
+
+  it('parses sessions when whole-file string reads exceed the V8 string limit', async () => {
+    const fp = writeTmpSession([
+      {
+        timestamp: '2026-04-05T12:30:00Z',
+        type: 'session_meta',
+        payload: { id: 'large-session', cwd: '/tmp/project' },
+      },
+      {
+        timestamp: '2026-04-05T12:30:01Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'Index a very large Codex session.' },
+      },
+    ])
+
+    vi.resetModules()
+    vi.doMock('node:fs', async importOriginal => {
+      const fs = await importOriginal<typeof import('node:fs')>()
+      return {
+        ...fs,
+        readFileSync: vi.fn(() => {
+          throw new Error('Cannot create a string longer than 0x1fffffe8 characters')
+        }),
+      }
+    })
+
+    try {
+      const { parseCodexSession: parseWithMockedFs } = await import('./codex.js')
+      const parsed = parseWithMockedFs(fp)
+      expect(parsed?.title).toBe('Index a very large Codex session.')
+      expect(parsed?.messages).toHaveLength(1)
+    } finally {
+      vi.doUnmock('node:fs')
+      vi.resetModules()
+    }
   })
 })
