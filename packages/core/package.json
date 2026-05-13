@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/core",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
