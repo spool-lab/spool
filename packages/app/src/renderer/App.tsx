@@ -230,7 +230,7 @@ export default function App() {
       }, 'shares')
     } catch (err) {
       console.error('Failed to persist imported .spool draft:', err)
-      toast.error(`Couldn't import ${file.name}`, { description: 'Saving the draft failed' })
+      toast.error(`Couldn't import ${file.name}`, { description: 'Saving the draft failed.' })
     }
   }, [openShareEditor])
 
@@ -671,15 +671,14 @@ export default function App() {
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
-    toast('Session ID copied', {
+    toast.success('Copied session ID', {
       id: 'resume-command',
       description: (
         <span>
-          Write{' '}
+          Paste after{' '}
           <code className="rounded bg-warm-bg dark:bg-dark-bg px-1.5 py-0.5 font-mono text-[11px]">
             {command}
-          </code>{' '}
-          then paste the id to resume this session
+          </code>
         </span>
       ),
     })

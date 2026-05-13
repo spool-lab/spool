@@ -48,11 +48,11 @@ export default function AppToaster() {
             'bg-warm-surface dark:bg-dark-surface2',
             'ring-warm-border dark:ring-dark-border',
           ].join(' '),
-          icon: 'flex-none flex items-center justify-center',
+          icon: 'flex-none flex items-center justify-center self-start mt-[2px]',
           content: 'flex flex-col gap-0.5 min-w-0 flex-1',
           title: 'text-[13px] font-normal leading-snug tracking-[-0.005em] truncate',
           description:
-            'text-[12px] leading-snug text-warm-muted dark:text-dark-muted',
+            'text-[12px] leading-snug text-warm-muted dark:text-dark-muted line-clamp-2 break-all',
           actionButton: [
             'shrink-0 self-center',
             'px-2.5 py-1 rounded-md',
