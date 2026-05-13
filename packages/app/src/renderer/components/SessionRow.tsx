@@ -68,7 +68,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
             {title}
           </span>
         </div>
-        <p className="text-xs text-warm-faint dark:text-dark-muted truncate">
+        <p className="pl-1.5 text-xs text-warm-faint dark:text-dark-muted truncate">
           {showProject && (
             <>
               <span className="text-warm-muted dark:text-dark-muted">{session.projectDisplayName}</span>
