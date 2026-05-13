@@ -160,3 +160,29 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Brief highlight applied to a share-editor turn after the user clicks
+ * jump-to-message in the TurnSelector. Replaces a smooth-scroll
+ * animation (which over long distances felt sluggish) with an instant
+ * snap + an overlay flash so the user gets a confirmation that they
+ * arrived. Implemented as a `::after` overlay so the bubble's own
+ * background / border / shadow are left untouched (animating
+ * background-color directly was clobbering the user bubble's surface
+ * fill at the end of the keyframe). */
+@keyframes spool-share-jump-flash {
+  0%   { opacity: 0.22; }
+  60%  { opacity: 0.16; }
+  100% { opacity: 0; }
+}
+[data-spool-share-flash] [data-turn-body] {
+  position: relative;
+}
+[data-spool-share-flash] [data-turn-body]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #F07020;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: spool-share-jump-flash 1600ms ease-out forwards;
+}

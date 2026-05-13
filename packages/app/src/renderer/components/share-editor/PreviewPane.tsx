@@ -210,6 +210,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
     <div className="relative flex-1 min-w-0 flex">
       <div
         ref={scrollRef}
+        data-share-preview-scroll
         onMouseDown={beginPan}
         style={scrollCursor ? { cursor: scrollCursor } : undefined}
         className="flex-1 overflow-auto scrollbar-none relative bg-warm-bg dark:bg-dark-bg cursor-grab"

@@ -87,7 +87,7 @@ export function Transcript({ convo, opts }: Props) {
             {opts.showGaps && segments.gapBefore[i]! > 0 && (
               <GapMarker count={segments.gapBefore[i]!} tokens={t} accent={accent} variant="block" />
             )}
-            <div style={{ display: 'flex', gap: 14 }}>
+            <div data-turn-body style={{ display: 'flex', gap: 14 }}>
               <div style={{ width: 68, flexShrink: 0, paddingTop: 2 }}>
                 <div
                   style={{

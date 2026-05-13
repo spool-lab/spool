@@ -123,38 +123,40 @@ export function Letter({ convo, opts }: Props) {
                 <GapMarker count={segments.gapBefore[i]!} tokens={t} accent={accent} />
               </div>
             )}
-            <div
-              style={{
-                fontFamily: tf,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: turn.role === 'user' ? accent : t.muted,
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <span
+            <div data-turn-body>
+              <div
                 style={{
-                  width: turn.role === 'user' ? 10 : 4,
-                  height: 2,
-                  background: turn.role === 'user' ? accent : t.muted,
-                  opacity: turn.role === 'user' ? 1 : 0.5,
-                  flexShrink: 0,
+                  fontFamily: tf,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: turn.role === 'user' ? accent : t.muted,
+                  marginBottom: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
+              >
+                <span
+                  style={{
+                    width: turn.role === 'user' ? 10 : 4,
+                    height: 2,
+                    background: turn.role === 'user' ? accent : t.muted,
+                    opacity: turn.role === 'user' ? 1 : 0.5,
+                    flexShrink: 0,
+                  }}
+                />
+                {turn.role === 'user' ? (turn.author ?? 'User').replace(/[\[\]]/g, '') : convo.sourceLabel}
+              </div>
+              <Body
+                text={turn.body}
+                redact={opts.redact ? redactList : undefined}
+                sansFont={tf}
+                accent={accent}
+                accentBg={t.accentBg}
               />
-              {turn.role === 'user' ? (turn.author ?? 'User').replace(/[\[\]]/g, '') : convo.sourceLabel}
             </div>
-            <Body
-              text={turn.body}
-              redact={opts.redact ? redactList : undefined}
-              sansFont={tf}
-              accent={accent}
-              accentBg={t.accentBg}
-            />
           </div>
         ))}
       </div>

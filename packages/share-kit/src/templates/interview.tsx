@@ -99,7 +99,7 @@ export function Interview({ convo, opts }: Props) {
             <div key={turn.origIndex} data-turn-index={turn.origIndex} style={{ scrollMarginTop: 40 }}>
               {showGap && <GapMarker count={segments.gapBefore[i]!} tokens={t} accent={accent} />}
               {isUser ? (
-                <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
+                <div data-turn-body style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
                   <div
                     style={{
                       flexShrink: 0,
@@ -135,7 +135,7 @@ export function Interview({ convo, opts }: Props) {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
+                <div data-turn-body style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
                   <div
                     style={{
                       flexShrink: 0,
