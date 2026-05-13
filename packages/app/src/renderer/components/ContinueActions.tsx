@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreHorizontal, Eye, SquareTerminal, Share2, Copy, ChevronRight, Loader2 } from 'lucide-react'
+import { MoreHorizontal, Eye, SquareTerminal, Share2, Copy, Loader2 } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -61,7 +61,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
     }] : []),
     ...(resumeCommand ? [{
       label: copiedCommand ? 'Copied resume command' : 'Copy resume command',
-      icon: <ChevronRight size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
+      icon: <Copy size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: () => { void handleCopyCommand() },
     }] : []),
     {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, ChevronRight, Copy, Loader2, Share2 } from 'lucide-react'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, Share2 } from 'lucide-react'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -518,7 +518,7 @@ function PinnedRow({
             },
             ...(resumeCommand ? [{
               label: 'Copy resume command',
-              icon: <ChevronRight size={14} strokeWidth={1.6} aria-hidden />,
+              icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleCopyCommand() },
             }] : []),
             {

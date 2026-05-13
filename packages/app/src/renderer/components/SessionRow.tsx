@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SquareTerminal, MoreHorizontal, ChevronRight, Copy, Loader2, Share2 } from 'lucide-react'
+import { SquareTerminal, MoreHorizontal, Copy, Loader2, Share2 } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
@@ -126,7 +126,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
               },
               ...(resumeCommand ? [{
                 label: 'Copy resume command',
-                icon: <ChevronRight size={14} strokeWidth={1.6} aria-hidden />,
+                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
               {
