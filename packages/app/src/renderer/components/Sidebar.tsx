@@ -348,11 +348,17 @@ function UpdateBanner() {
   // surface a banner from nowhere.
   const lastStatusRef = useRef<UpdateStatus['status'] | null>(null)
   const [errorDismissed, setErrorDismissed] = useState(false)
+  // Optimistic UI: render the user-initiated next step immediately on click
+  // (download takes 0.5–2s to emit its first progress event; install fires
+  // app-quit but the renderer still wants instant acknowledgement). Cleared
+  // when the real status event arrives.
+  const [pending, setPending] = useState<'preparing' | 'restarting' | null>(null)
 
   useEffect(() => {
     if (!window.spool?.onUpdateStatus) return
     const off = window.spool.onUpdateStatus((data) => {
       if (data.status === 'error') {
+        setPending(null)
         if (lastStatusRef.current === 'downloading') {
           setUpdate({ status: 'error' })
         } else {
@@ -362,41 +368,53 @@ function UpdateBanner() {
       }
       lastStatusRef.current = data.status
       setErrorDismissed(false)
+      setPending(null)
       setUpdate(data)
     })
     return () => { off() }
   }, [])
 
-  if (!update) return null
-  if (update.status === 'error' && errorDismissed) return null
+  if (!update && !pending) return null
+  if (update?.status === 'error' && errorDismissed && !pending) return null
 
-  const isDownloading = update.status === 'downloading'
-  const isError = update.status === 'error'
-  const isAction = update.status === 'available' || update.status === 'ready' || isError
+  const effectiveStatus =
+    pending === 'preparing' ? 'downloading' :
+    pending === 'restarting' ? 'restarting' :
+    update?.status ?? null
+
+  const isPassive = effectiveStatus === 'downloading' || effectiveStatus === 'restarting'
+  const isError = effectiveStatus === 'error'
 
   const onClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (update.status === 'available') void window.spool?.downloadUpdate()
-    else if (update.status === 'ready') void window.spool?.installUpdate()
-    else if (isError) void window.spool?.downloadUpdate()
+    if (pending) return // already kicked off
+    if (update?.status === 'available' || update?.status === 'error') {
+      setPending('preparing')
+      void window.spool?.downloadUpdate()
+    } else if (update?.status === 'ready') {
+      setPending('restarting')
+      void window.spool?.installUpdate()
+    }
   }
 
   const label =
-    update.status === 'available' ? `Update available${update.version ? ` · v${update.version}` : ''}` :
-    update.status === 'ready' ? 'Restart to update' :
-    isError ? 'Update failed — retry' :
-    update.percent != null ? `Downloading update… ${update.percent}%` : 'Downloading update…'
+    pending === 'preparing' ? 'Preparing download…' :
+    pending === 'restarting' ? 'Restarting…' :
+    update?.status === 'available' ? `Update available${update.version ? ` · v${update.version}` : ''}` :
+    update?.status === 'ready' ? 'Restart to update' :
+    update?.status === 'error' ? 'Update failed — retry' :
+    update?.percent != null ? `Downloading update… ${update.percent}%` : 'Downloading update…'
 
-  const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
+  const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text transition-all duration-150'
 
   const icon =
-    update.status === 'available' ? (
+    effectiveStatus === 'available' ? (
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
-    ) : update.status === 'ready' ? (
+    ) : effectiveStatus === 'ready' ? (
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
         <polyline points="23 4 23 10 17 10" />
         <polyline points="1 20 1 14 7 14" />
@@ -414,9 +432,9 @@ function UpdateBanner() {
       </svg>
     )
 
-  if (isDownloading) {
+  if (isPassive) {
     return (
-      <div data-testid={`update-banner-${update.status}`} className={`${baseRow} text-warm-muted dark:text-dark-muted`}>
+      <div data-testid={`update-banner-${effectiveStatus}`} className={`${baseRow} text-warm-muted dark:text-dark-muted`}>
         {icon}
         <span className="flex-1 min-w-0 truncate">{label}</span>
       </div>
@@ -432,7 +450,7 @@ function UpdateBanner() {
           onClick={onClick}
           title="Retry download"
           aria-label="Retry update download"
-          className="flex-1 min-w-0 flex items-center gap-2 -mx-1 px-1 rounded hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors"
+          className="flex-1 min-w-0 flex items-center gap-2 -mx-1 px-1 rounded cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.04] active:bg-black/[0.08] dark:active:bg-white/[0.08] active:scale-[0.99] transition-all duration-150"
         >
           {icon}
           <span className="flex-1 min-w-0 truncate text-left">{label}</span>
@@ -443,7 +461,7 @@ function UpdateBanner() {
           onClick={(e) => { e.stopPropagation(); setErrorDismissed(true) }}
           title="Dismiss"
           aria-label="Dismiss update error"
-          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-faint dark:text-dark-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded cursor-pointer text-warm-faint dark:text-dark-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-warm-text dark:hover:text-dark-text active:bg-black/[0.1] dark:active:bg-white/[0.1] active:scale-[0.95] transition-all duration-150"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -457,10 +475,10 @@ function UpdateBanner() {
   return (
     <button
       type="button"
-      data-testid={`update-banner-${update.status}`}
+      data-testid={`update-banner-${effectiveStatus}`}
       onClick={onClick}
       title={label}
-      className={`${baseRow} text-left w-auto hover:brightness-95 dark:hover:brightness-110 transition-[filter]`}
+      className={`${baseRow} text-left w-auto cursor-pointer hover:brightness-95 dark:hover:brightness-110 active:brightness-90 dark:active:brightness-115 active:scale-[0.99]`}
     >
       {icon}
       <span className="flex-1 min-w-0 truncate">{label}</span>
