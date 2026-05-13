@@ -80,8 +80,8 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
   return (
     <div className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
       {isDragActive && <SpoolDropOverlay />}
-      {(hasDrafts || onStartNewDraft) && (
-        <div className="flex-none flex items-center justify-between gap-3 px-6 pt-1.5 pb-3">
+      {hasDrafts && (
+        <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
           <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
             {hasDrafts ? <>Drafts · {drafts.length}</> : null}
           </span>
@@ -90,10 +90,11 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
               type="button"
               data-testid="shares-new-draft"
               onClick={handleOpenPicker}
-              className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-xs font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+              title="Start a draft from a session"
+              aria-label="Start a draft from a session"
+              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
-              <Plus size={12} strokeWidth={2} aria-hidden />
-              <span>New draft</span>
+              <Plus size={13} strokeWidth={1.6} aria-hidden />
             </button>
           )}
         </div>
@@ -105,6 +106,7 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
           error={error}
           onOpenDraft={onOpenDraft}
           onDeleteDraft={handleDelete}
+          {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
         />
       </div>
       {pickerOpen && onStartNewDraft && (
@@ -134,12 +136,14 @@ function DraftsList({
   error,
   onOpenDraft,
   onDeleteDraft,
+  onStartNewDraft,
 }: {
   drafts: ShareDraftListItem[]
   loading: boolean
   error: string | null
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
   onDeleteDraft: (draft: ShareDraftListItem) => void
+  onStartNewDraft?: (() => void) | undefined
 }) {
   const [skeletonCount] = useState(readSkeletonCount)
   // Defer skeleton render by 150ms so sub-threshold loads (local sqlite is
@@ -176,7 +180,20 @@ function DraftsList({
       <FeaturedEmptyState
         icon={<Newspaper size={22} strokeWidth={1.5} />}
         title="No shares yet"
-        hint="Start a share from a session, a search result, or an AI answer — drafts you create land here, ready to keep editing."
+        hint="Start a share from any session or search result — drafts you create land here, ready to keep editing."
+        {...(onStartNewDraft ? {
+          action: (
+            <button
+              type="button"
+              data-testid="shares-empty-start"
+              onClick={onStartNewDraft}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+            >
+              <Plus size={14} strokeWidth={2} aria-hidden />
+              <span>Start a draft</span>
+            </button>
+          ),
+        } : {})}
       />
     )
   }
