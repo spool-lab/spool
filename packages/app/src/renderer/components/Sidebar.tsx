@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, Share2 } from 'lucide-react'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, BookText } from 'lucide-react'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -657,8 +657,8 @@ function PinnedRow({
           )}
           items={[
             ...(onShare ? [{
-              label: 'Share session',
-              icon: <Share2 size={14} strokeWidth={1.6} aria-hidden />,
+              label: 'Open in share editor',
+              icon: <BookText size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => onShare(session.sessionUuid),
             }] : []),
             {

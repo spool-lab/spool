@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreHorizontal, Eye, SquareTerminal, Share2, Copy, Loader2 } from 'lucide-react'
+import { MoreHorizontal, Eye, SquareTerminal, BookText, Copy, Loader2 } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -47,8 +47,8 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
       onSelect: () => onOpenSession(result.sessionUuid, result.messageId),
     },
     ...(onShare ? [{
-      label: 'Share session',
-      icon: <Share2 size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
+      label: 'Open in share editor',
+      icon: <BookText size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: onShare,
     }] : []),
     ...(resumeCommand ? [{
