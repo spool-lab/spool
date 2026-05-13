@@ -861,7 +861,10 @@ export default function App() {
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isSharesView ? (
-          <SharesPage onOpenDraft={handleOpenDraft} />
+          <SharesPage
+            onOpenDraft={handleOpenDraft}
+            {...(FEATURES.share ? { onImportSpool: handleImportSpoolFile } : {})}
+          />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {
@@ -875,7 +878,6 @@ export default function App() {
             onOpenSession={handleOpenSession}
             onCopySessionId={handleCopySessionId}
             {...(FEATURES.share ? { onShare: handleStartShareFromUuid } : {})}
-            {...(FEATURES.share ? { onImportSpool: handleImportSpoolFile } : {})}
           />
         ) : (
           <>

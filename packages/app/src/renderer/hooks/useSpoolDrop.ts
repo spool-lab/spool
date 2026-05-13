@@ -3,9 +3,10 @@ import { useCallback, useRef, useState, type DragEvent } from 'react'
 type Options = {
   enabled: boolean
   onImport: (file: File) => void | Promise<void>
+  onReject?: (files: File[]) => void
 }
 
-export function useSpoolDrop({ enabled, onImport }: Options) {
+export function useSpoolDrop({ enabled, onImport, onReject }: Options) {
   const [isDragActive, setIsDragActive] = useState(false)
   // dragenter / dragleave fire per nested element; depth counter tells
   // us when the drag has truly left the target.
@@ -52,8 +53,9 @@ export function useSpoolDrop({ enabled, onImport }: Options) {
       const files = Array.from(event.dataTransfer?.files ?? [])
       const spool = files.find((f) => f.name.toLowerCase().endsWith('.spool'))
       if (spool) void onImport(spool)
+      else if (files.length > 0) onReject?.(files)
     },
-    [enabled, onImport],
+    [enabled, onImport, onReject],
   )
 
   return {

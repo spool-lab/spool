@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Newspaper, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
+import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import type { ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
@@ -14,6 +15,7 @@ import { getSessionSourceColor } from '../../shared/sessionSources.js'
 
 type Props = {
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
+  onImportSpool?: ((file: File) => void | Promise<void>) | undefined
 }
 
 /**
@@ -22,9 +24,18 @@ type Props = {
  * "Coming in a future update" placeholder reads as a broken promise.
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
-export default function SharesPage({ onOpenDraft }: Props) {
+export default function SharesPage({ onOpenDraft, onImportSpool }: Props) {
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
+
+  const onImport = useCallback(
+    (file: File) => onImportSpool?.(file),
+    [onImportSpool],
+  )
+  const { isDragActive, dragHandlers } = useSpoolDrop({
+    enabled: Boolean(onImportSpool),
+    onImport,
+  })
 
   const handleDelete = useCallback(async (draft: ShareDraftListItem) => {
     try {
@@ -49,7 +60,8 @@ export default function SharesPage({ onOpenDraft }: Props) {
   }, [removeDraft, restoreDraft])
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
+      {isDragActive && <SpoolDropOverlay />}
       {hasDrafts && (
         <div className="flex-none px-6 pt-1.5 pb-3 font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
           Drafts · {drafts.length}
@@ -64,6 +76,20 @@ export default function SharesPage({ onOpenDraft }: Props) {
           onDeleteDraft={handleDelete}
         />
       </div>
+    </div>
+  )
+}
+
+function SpoolDropOverlay() {
+  return (
+    <div
+      data-testid="shares-spool-drop-overlay"
+      aria-hidden
+      className="absolute inset-2 z-20 pointer-events-none flex items-center justify-center rounded-[10px] border border-dashed border-accent/70 dark:border-accent-dark/70 bg-accent-bg/60 dark:bg-accent-bg-dark/60 backdrop-blur-[1px]"
+    >
+      <p className="text-sm font-medium text-accent dark:text-accent-dark">
+        Drop <span className="font-mono">.spool</span> to import
+      </p>
     </div>
   )
 }
