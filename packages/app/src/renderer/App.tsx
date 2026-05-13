@@ -16,8 +16,9 @@ import AppToaster from './components/AppToaster.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
-import { buildSpoolDocument, DEFAULT_OPTS, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
-import type { Message, Session, ShareDraftListItem } from '@spool-lab/core'
+import { draftIdForImport } from './lib/import-spool.js'
+import { buildSpoolDocument, DEFAULT_OPTS, readSpoolFile, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
+import type { Message, Session, ShareDraftListItem, ShareDraftSourceKind } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
 import { DEFAULT_SIDEBAR_SORT_ORDER, type SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -102,7 +103,7 @@ export default function App() {
    *  upsert autosaves back into share_drafts. Cleared on Back. */
   type ShareEditorBundle = {
     draftId: string
-    sourceKind: 'spool-session' | 'pasted-url' | 'imported-file' | 'imported-jsonl'
+    sourceKind: ShareDraftSourceKind
     sourceOrigin: string | null
     conversation: Conversation
     opts: EditorOpts
@@ -132,6 +133,13 @@ export default function App() {
       sidebarRestoreRef.current = null
     }
   }, [])
+
+  const openShareEditor = useCallback((bundle: ShareEditorBundle, returnView: View) => {
+    enterShareEditor(sidebarCollapsed)
+    setShareEditor(bundle)
+    setShareEditorReturnView(returnView)
+    setView('share-editor')
+  }, [enterShareEditor, sidebarCollapsed])
 
   const handleStartShareFromSession = useCallback(async (session: Session, messages: Message[], returnView: View = 'session') => {
     const draftId = sessionDraftId(session.sessionUuid)
@@ -169,17 +177,14 @@ export default function App() {
       conversation = composeFromSession(session, messages)
       opts = DEFAULT_OPTS
     }
-    enterShareEditor(sidebarCollapsed)
-    setShareEditor({
+    openShareEditor({
       draftId,
       sourceKind: 'spool-session',
       sourceOrigin: session.sessionUuid,
       conversation,
       opts,
-    })
-    setShareEditorReturnView(returnView)
-    setView('share-editor')
-  }, [enterShareEditor, sidebarCollapsed])
+    }, returnView)
+  }, [openShareEditor])
 
   const handleStartShareFromUuid = useCallback(async (sessionUuid: string) => {
     try {
@@ -194,6 +199,41 @@ export default function App() {
     }
   }, [handleStartShareFromSession, view])
 
+  const handleImportSpoolFile = useCallback(async (file: File) => {
+    let doc: SpoolDocument
+    try {
+      doc = await readSpoolFile(file)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not read file'
+      toast.error(`Couldn't import ${file.name}`, { description: message })
+      return
+    }
+    try {
+      const opts: EditorOpts = { ...DEFAULT_OPTS, ...(doc.opts ?? {}) }
+      const normalized: SpoolDocument = { ...doc, opts }
+      const normalizedJson = JSON.stringify(normalized)
+      const draftId = await draftIdForImport(normalizedJson)
+      await window.spool?.shareDraft?.upsert({
+        draft_id: draftId,
+        source_kind: 'imported-file',
+        source_origin: file.name,
+        title: normalized.conversation.title,
+        snapshot_json: normalizedJson,
+        preview_json: JSON.stringify(buildPreviewDocument(normalized)),
+      })
+      openShareEditor({
+        draftId,
+        sourceKind: 'imported-file',
+        sourceOrigin: file.name,
+        conversation: normalized.conversation,
+        opts,
+      }, 'shares')
+    } catch (err) {
+      console.error('Failed to persist imported .spool draft:', err)
+      toast.error(`Couldn't import ${file.name}`, { description: 'Saving the draft failed' })
+    }
+  }, [openShareEditor])
+
   const handleOpenDraft = useCallback(async (draft: ShareDraftListItem) => {
     // The list query intentionally omits snapshot_json — fetch the
     // full row before parsing so the editor gets the complete
@@ -205,20 +245,17 @@ export default function App() {
         return
       }
       const doc = JSON.parse(full.snapshot_json) as SpoolDocument
-      enterShareEditor(sidebarCollapsed)
-      setShareEditor({
+      openShareEditor({
         draftId: draft.draft_id,
         sourceKind: draft.source_kind,
         sourceOrigin: draft.source_origin,
         conversation: doc.conversation,
         opts: { ...DEFAULT_OPTS, ...(doc.opts ?? {}) },
-      })
-      setShareEditorReturnView('shares')
-      setView('share-editor')
+      }, 'shares')
     } catch (err) {
       console.error('Failed to parse draft snapshot:', err)
     }
-  }, [enterShareEditor, sidebarCollapsed])
+  }, [openShareEditor])
 
   const handleCloseShareEditor = useCallback(() => {
     setShareEditor(null)
@@ -824,7 +861,10 @@ export default function App() {
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isSharesView ? (
-          <SharesPage onOpenDraft={handleOpenDraft} />
+          <SharesPage
+            onOpenDraft={handleOpenDraft}
+            {...(FEATURES.share ? { onImportSpool: handleImportSpoolFile } : {})}
+          />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {
