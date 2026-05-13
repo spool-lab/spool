@@ -25,6 +25,9 @@ importers:
       '@agentclientprotocol/sdk':
         specifier: ^0.17.1
         version: 0.17.1(zod@4.3.6)
+      '@fontsource-variable/fraunces':
+        specifier: ^5.2.9
+        version: 5.2.9
       '@fontsource-variable/geist':
         specifier: ^5.2.8
         version: 5.2.8
@@ -37,9 +40,6 @@ importers:
       '@fontsource/geist-mono':
         specifier: ^5.2.7
         version: 5.2.7
-      '@fontsource/instrument-serif':
-        specifier: ^5.2.5
-        version: 5.2.8
       '@spool-lab/core':
         specifier: workspace:*
         version: link:../core
@@ -1073,6 +1073,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@fontsource-variable/fraunces@5.2.9':
+    resolution: {integrity: sha512-Y6IjunlN9Ni723np+GIgAaKzCDBrPRrqNi01TZxHs5wtHYROWFM9W6yiT+/gGwSjWIRD18oX17kD/BRWekc/Lw==}
+
   '@fontsource-variable/geist@5.2.8':
     resolution: {integrity: sha512-cJ6m9e+8MQ5dCYJsLylfZrgBh6KkG4bOLckB35Tr9J/EqdkEM6QllH5PxqP1dhTvFup+HtMRPuz9xOjxXJggxw==}
 
@@ -1084,9 +1087,6 @@ packages:
 
   '@fontsource/geist-mono@5.2.7':
     resolution: {integrity: sha512-xVPVFISJg/K0VVd+aQN0Y7X/sw9hUcJPyDWFJ5GpyU3bHELhoRsJkPSRSHXW32mOi0xZCUQDOaPj1sqIFJ1FGg==}
-
-  '@fontsource/instrument-serif@5.2.8':
-    resolution: {integrity: sha512-s+bkz+syj2rO00Rmq9g0P+PwuLig33DR1xDR8pTWmovH1pUjwnncrFk++q9mmOex8fUQ7oW80gPpPDaw7V1MMw==}
 
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
@@ -5934,6 +5934,8 @@ snapshots:
   '@esbuild/win32-x64@0.27.3':
     optional: true
 
+  '@fontsource-variable/fraunces@5.2.9': {}
+
   '@fontsource-variable/geist@5.2.8': {}
 
   '@fontsource-variable/hanken-grotesk@5.2.8': {}
@@ -5941,8 +5943,6 @@ snapshots:
   '@fontsource-variable/inter@5.2.8': {}
 
   '@fontsource/geist-mono@5.2.7': {}
-
-  '@fontsource/instrument-serif@5.2.8': {}
 
   '@gar/promisify@1.1.3': {}
 

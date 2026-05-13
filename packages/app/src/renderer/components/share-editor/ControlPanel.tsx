@@ -16,7 +16,7 @@ import { TemplateThumb } from './TemplateThumb.js'
 // hosts that may want broader range.
 const TEMPLATE_IDS = new Set(['chat', 'letter', 'atelier', 'interview'] as const)
 const PAPER_IDS = new Set(['bone', 'snow', 'graphite', 'ink'] as const)
-const TYPEFACE_IDS = new Set(['inter', 'geist', 'instrument-serif', 'hanken-grotesk'] as const)
+const TYPEFACE_IDS = new Set(['inter', 'geist', 'fraunces', 'hanken-grotesk'] as const)
 const COLORWAY_IDS = new Set(['amber', 'iris', 'moss', 'ink'] as const)
 const TEMPLATE_CHOICES = TEMPLATES.filter((t) => (TEMPLATE_IDS as Set<string>).has(t.id))
 const PAPER_CHOICES = PAPERS.filter((p) => (PAPER_IDS as Set<string>).has(p.id))
