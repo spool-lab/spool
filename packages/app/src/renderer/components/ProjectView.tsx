@@ -14,6 +14,7 @@ type Props = {
   onSortOrderChange: (next: ProjectSessionSortOrder) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
+  onShare?: (uuid: string) => void
 }
 
 export default function ProjectView({
@@ -22,6 +23,7 @@ export default function ProjectView({
   onSortOrderChange,
   onOpenSession,
   onCopySessionId,
+  onShare,
 }: Props) {
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
@@ -331,6 +333,7 @@ export default function ProjectView({
                       onPinChange={handlePinChange}
                       onOpenSession={onOpenSession}
                       onCopySessionId={onCopySessionId}
+                      {...(onShare ? { onShare } : {})}
                     />
                   ))}
                 </div>
@@ -356,6 +359,7 @@ export default function ProjectView({
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
+                    {...(onShare ? { onShare } : {})}
                   />
                 ))}
               </div>
@@ -368,6 +372,7 @@ export default function ProjectView({
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
+                    {...(onShare ? { onShare } : {})}
                   />
                 ))}
               </div>
@@ -380,6 +385,7 @@ export default function ProjectView({
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
+                    {...(onShare ? { onShare } : {})}
                   />
                 ))}
               </CollapsibleSection>
@@ -392,6 +398,7 @@ export default function ProjectView({
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
+                    {...(onShare ? { onShare } : {})}
                   />
                 ))}
               </div>
@@ -412,6 +419,7 @@ function DirectoryGroupSection({
   onPinChange,
   onOpenSession,
   onCopySessionId,
+  onShare,
 }: {
   cwd: string
   projectDisplayPath: string | null
@@ -421,6 +429,7 @@ function DirectoryGroupSection({
   onPinChange: (uuid: string, pinned: boolean) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
+  onShare?: (uuid: string) => void
 }) {
   const { name } = formatCwdLabel(cwd, projectDisplayPath)
   const count = sessions.length
@@ -464,6 +473,7 @@ function DirectoryGroupSection({
               onPinChange={onPinChange}
               onOpenSession={onOpenSession}
               onCopySessionId={onCopySessionId}
+              {...(onShare ? { onShare } : {})}
             />
           ))}
         </div>

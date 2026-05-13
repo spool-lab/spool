@@ -15,9 +15,10 @@ type Props = {
   onOpenSession: (uuid: string, messageId?: number) => void
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
+  onShareSession?: (uuid: string) => void
 }
 
-export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId }: Props) {
+export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, onShareSession }: Props) {
   const [activeFilter, setActiveFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
 
@@ -109,6 +110,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
               result={result}
               onOpenSession={onOpenSession}
               onCopySessionId={onCopySessionId}
+              {...(onShareSession ? { onShareSession } : {})}
             />
           ))}
         </div>
@@ -128,10 +130,12 @@ function FragmentRow({
   result,
   onOpenSession,
   onCopySessionId,
+  onShareSession,
 }: {
   result: FragmentRowResult
   onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
+  onShareSession?: (uuid: string) => void
 }) {
   const snippet = result.snippet.replace(/<mark>/g, '<strong>').replace(/<\/mark>/g, '</strong>')
   const date = formatRelativeDate(result.startedAt)
@@ -150,7 +154,12 @@ function FragmentRow({
           {title}
         </h3>
         <span className="text-xs text-warm-faint dark:text-dark-muted flex-none">{date}</span>
-        <ContinueActions result={result} onOpenSession={onOpenSession} onCopySessionId={onCopySessionId} />
+        <ContinueActions
+          result={result}
+          onOpenSession={onOpenSession}
+          onCopySessionId={onCopySessionId}
+          {...(onShareSession ? { onShare: () => onShareSession(result.sessionUuid) } : {})}
+        />
       </div>
 
       <div className="text-xs text-warm-muted dark:text-dark-muted mb-1.5 truncate">

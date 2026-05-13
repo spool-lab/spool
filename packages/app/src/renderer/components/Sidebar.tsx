@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal } from 'lucide-react'
+import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, ChevronRight, Copy, Loader2, Share2 } from 'lucide-react'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -36,9 +36,10 @@ type Props = {
   pinnedSortOrder?: PinnedSortOrder
   onPinnedSortOrderChange?: (next: PinnedSortOrder) => void
   onCopySessionId?: (source: SessionSource) => void
+  onShareSession?: (uuid: string) => void
 }
 
-export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId }: Props) {
+export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [pinned, setPinned] = useState<Session[] | null>(null)
@@ -160,6 +161,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                     active={session.sessionUuid === activeSessionUuid}
                     onClick={() => onSelectSession(session.sessionUuid)}
                     {...(onCopySessionId ? { onCopySessionId } : {})}
+                    {...(onShareSession ? { onShare: onShareSession } : {})}
                   />
                 ))}
               </div>
@@ -407,11 +409,13 @@ function PinnedRow({
   active,
   onClick,
   onCopySessionId,
+  onShare,
 }: {
   session: Session
   active: boolean
   onClick: () => void
   onCopySessionId?: (source: SessionSource) => void
+  onShare?: (uuid: string) => void
 }) {
   const [resuming, setResuming] = useState(false)
   const [unpinning, setUnpinning] = useState(false)
@@ -495,61 +499,37 @@ function PinnedRow({
               aria-expanded={open}
               className="inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-              </svg>
+              <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
             </button>
           )}
           items={[
+            ...(onShare ? [{
+              label: 'Share session',
+              icon: <Share2 size={14} strokeWidth={1.6} aria-hidden />,
+              onSelect: () => onShare(session.sessionUuid),
+            }] : []),
             {
               label: resuming ? 'Opening…' : 'Resume in Terminal',
-              icon: resuming ? <SpinnerIcon /> : <SquareTerminal size={14} strokeWidth={1.5} aria-hidden />,
+              icon: resuming
+                ? <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
+                : <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleResume() },
               disabled: resuming,
             },
             ...(resumeCommand ? [{
               label: 'Copy resume command',
-              icon: <TerminalGlyph />,
+              icon: <ChevronRight size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleCopyCommand() },
             }] : []),
             {
               label: 'Copy session ID',
-              icon: <CopyGlyph />,
+              icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleCopyId() },
             },
           ]}
         />
       </span>
     </div>
-  )
-}
-
-function TerminalGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 4.5L5 7L3 9.5" />
-      <path d="M6.5 10H11.5" />
-    </svg>
-  )
-}
-
-function CopyGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <rect x="5" y="5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9 5V3.5C9 2.67 8.33 2 7.5 2H3.5C2.67 2 2 2.67 2 3.5V7.5C2 8.33 2.67 9 3.5 9H5" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  )
-}
-
-function SpinnerIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" className="animate-spin" aria-hidden>
-      <circle cx="7" cy="7" r="5.25" stroke="currentColor" strokeWidth="1.5" fill="none" strokeOpacity="0.3" />
-      <path d="M7 1.75A5.25 5.25 0 0112.25 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    </svg>
   )
 }
 
