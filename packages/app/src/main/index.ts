@@ -1,6 +1,32 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, shell } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
+
+// Install global error handlers as the very first thing in the file. Node 22
+// defaults to --unhandled-rejections=strict, which means a single unhandled
+// rejection — anywhere in this process or any worker_threads child — aborts
+// the app with SIGTRAP (EXC_BREAKPOINT). Users see the macOS crash dialog
+// with no actionable information. With these handlers attached, the process
+// keeps running and we log enough context to diagnose later.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+  if (reason instanceof Error && reason.stack) console.error(reason.stack)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+  if (err instanceof Error && err.stack) console.error(err.stack)
+  try {
+    // Don't exit — UI surfaces that already loaded should keep working.
+    // The dialog is best-effort; if Electron itself isn't ready yet this
+    // throws, and we just log.
+    dialog.showErrorBox(
+      'Spool ran into an unexpected error',
+      `${err instanceof Error ? err.message : String(err)}\n\n` +
+        `Spool will keep running, but if you see this repeatedly please restart the app.`,
+    )
+  } catch { /* dialog unavailable — log already happened */ }
+})
+
 import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
