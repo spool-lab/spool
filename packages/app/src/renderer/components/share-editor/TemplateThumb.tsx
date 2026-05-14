@@ -63,30 +63,6 @@ export function TemplateThumb({ id, accent, paper, border, text, muted, surface 
       </div>
     )
   }
-  if (id === 'transcript') {
-    return (
-      <div style={baseStyle}>
-        {[accent, muted, accent].map((c, i) => (
-          <div key={i} style={{ display: 'flex', gap: 2 }}>
-            <div style={{ width: 8, height: 2, background: c, opacity: 0.7 }} />
-            <div
-              style={{
-                flex: 1,
-                borderLeft: `1px solid ${c}`,
-                paddingLeft: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-              }}
-            >
-              {bar('100%', 0.5)}
-              {i < 2 && bar('75%', 0.4)}
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
   if (id === 'chat') {
     return (
       <div style={baseStyle}>

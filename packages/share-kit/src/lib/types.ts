@@ -45,8 +45,8 @@ export interface Conversation {
   turns: Turn[]
 }
 
-export type Template = 'atelier' | 'letter' | 'transcript' | 'timeline' | 'chat'
-export type Paper = 'bone' | 'snow' | 'linen' | 'graphite' | 'ink'
+export type Template = 'atelier' | 'letter' | 'timeline' | 'chat'
+export type Paper = 'bone' | 'snow' | 'graphite' | 'ink'
 export type Typeface = 'inter' | 'geist' | 'fraunces' | 'hanken-grotesk'
 export type Density = 'compact' | 'relaxed'
 
@@ -91,19 +91,6 @@ export const PAPERS: PaperDef[] = [
       border: 'rgba(28,28,24,0.12)',
       surface: '#EEEEE9',
       accentBg: '#FFF3E8',
-    },
-  },
-  {
-    id: 'linen',
-    name: 'Linen',
-    tokens: {
-      paper: '#EBE5D5',
-      text: '#2A2620',
-      muted: '#6B6153',
-      faint: '#A69E8E',
-      border: 'rgba(42,38,32,0.14)',
-      surface: '#E2DBCA',
-      accentBg: '#FCEAD0',
     },
   },
   {
@@ -193,7 +180,7 @@ export function typefaceFamily(id: Typeface): string {
 }
 
 export interface Colorway {
-  id: 'amber' | 'iris' | 'moss' | 'walnut' | 'bone'
+  id: 'amber' | 'iris' | 'moss' | 'walnut'
   name: string
   swatch: string
 }
@@ -249,16 +236,13 @@ export const TEMPLATES: { id: Template; name: string; blurb: string }[] = [
   { id: 'chat', name: 'Chat', blurb: 'Messenger bubbles, native-app feel.' },
   { id: 'letter', name: 'Letter', blurb: 'Single-column, reading-first.' },
   { id: 'atelier', name: 'Atelier', blurb: 'Editorial two-column, serif-free.' },
-  { id: 'transcript', name: 'Transcript', blurb: 'Faithful chat-like flow.' },
   { id: 'timeline', name: 'Timeline', blurb: 'Rail of time with marker per turn.' },
 ]
 
 export const COLORWAYS: Colorway[] = [
   // Order is "warm → cool" so the picker reads as a structured palette
   // rather than a hue-jumping list: amber (warm orange) → walnut (warm
-  // brown) → moss (cool green) → iris (cool purple). Bone trails as the
-  // legacy/spool.share-only paper-toned option, not exposed in the app
-  // picker.
+  // brown) → moss (cool green) → iris (cool purple).
   { id: 'amber', name: 'Amber', swatch: '#C85A00' },
   // Walnut replaces Ink (2026-05-14) — Ink's near-black swatch
   // disappeared on dark papers (Graphite / Ink), and the accent it
@@ -270,13 +254,11 @@ export const COLORWAYS: Colorway[] = [
   { id: 'walnut', name: 'Walnut', swatch: '#8E6843' },
   { id: 'moss', name: 'Moss', swatch: '#4A6B3E' },
   { id: 'iris', name: 'Iris', swatch: '#7E6BB5' },
-  { id: 'bone', name: 'Bone', swatch: '#B8A98C' },
 ]
 
 export const TEMPLATE_RATIO: Record<Template, { w: number; h: number }> = {
   atelier: { w: 720, h: 960 },
   letter: { w: 720, h: 960 },
-  transcript: { w: 720, h: 960 },
   timeline: { w: 720, h: 960 },
   chat: { w: 720, h: 960 },
 }
@@ -307,13 +289,16 @@ export function normalizeOpts(raw: unknown): EditorOpts {
   if (!TEMPLATES.some((t) => t.id === merged.template)) {
     merged.template = DEFAULT_OPTS.template
   }
+  if (!PAPERS.some((p) => p.id === merged.paper)) {
+    merged.paper = DEFAULT_OPTS.paper
+  }
   if (!TYPEFACES.some((t) => t.id === merged.typeface)) {
     merged.typeface = DEFAULT_OPTS.typeface
   }
   // A legacy snapshot can still carry a since-retired colorway id (e.g.
-  // 'ink' from pre-v0.5.0). Coerce to the default + reset accentHex so
-  // the picker shows a valid current selection and the rendered accent
-  // doesn't keep a stale dark swatch on top of a dark paper.
+  // 'ink', 'bone' from pre-v0.5.0). Coerce to the default + reset
+  // accentHex so the picker shows a valid current selection and the
+  // rendered accent doesn't keep a stale swatch.
   const colorway = COLORWAYS.find((c) => c.id === merged.colorway)
   if (!colorway) {
     merged.colorway = DEFAULT_OPTS.colorway

@@ -10,7 +10,6 @@ import type { Conversation, EditorOpts, Template } from '@/lib/types'
 import { paperTokens } from '@/lib/types'
 import { Atelier } from './atelier'
 import { Letter } from './letter'
-import { Transcript } from './transcript'
 import { Timeline } from './timeline'
 import { Chat } from './chat'
 
@@ -46,8 +45,6 @@ function TemplateDispatch({ template, convo, opts }: Props) {
       return <Atelier convo={convo} opts={opts} />
     case 'letter':
       return <Letter convo={convo} opts={opts} />
-    case 'transcript':
-      return <Transcript convo={convo} opts={opts} />
     case 'timeline':
       return <Timeline convo={convo} opts={opts} />
     case 'chat':

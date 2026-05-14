@@ -16,7 +16,7 @@ import remarkGfm from 'remark-gfm'
 interface BodyProps {
   text: string
   redact?: string[] | undefined
-  /** Monospace content — used for the Atelier/Transcript bodies. */
+  /** Monospace content — used by Atelier's mono editorial body. */
   mono?: boolean | undefined
   /** Override the sans-serif family used for non-mono bodies. Letter
    *  passes the user's typeface here so serif choices actually show
@@ -30,7 +30,7 @@ interface BodyProps {
   accentBg: string
   /** Override the border color used for blockquotes and code blocks.
    *  When the outer container already carries an accent left border
-   *  (Transcript user), pass a muted color here so nested block
+   *  (e.g. an emphasized speaker block), pass a muted color here so nested block
    *  borders don't duplicate the outer rule. */
   blockBorder?: string | undefined
 }
