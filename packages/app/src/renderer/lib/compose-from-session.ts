@@ -87,6 +87,7 @@ export function composeFromSession(
     .map((m) => ({
       role: m.role as 'user' | 'assistant',
       body: m.contentText,
+      timestamp: m.timestamp,
     }))
 
   const wordCount = countWords(turns.map((t) => t.body).join(' '))

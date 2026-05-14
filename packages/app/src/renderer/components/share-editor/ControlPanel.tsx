@@ -18,10 +18,10 @@ type View = 'style' | 'messages'
 // editorial-curated rather than "every variation we've ever shipped".
 // share-kit still exports the full lists for spool.share web and other
 // hosts that may want broader range.
-const TEMPLATE_IDS = new Set(['chat', 'letter', 'atelier', 'interview'] as const)
+const TEMPLATE_IDS = new Set(['chat', 'letter', 'atelier', 'timeline'] as const)
 const PAPER_IDS = new Set(['bone', 'snow', 'graphite', 'ink'] as const)
 const TYPEFACE_IDS = new Set(['inter', 'geist', 'fraunces', 'hanken-grotesk'] as const)
-const COLORWAY_IDS = new Set(['amber', 'iris', 'moss', 'ink'] as const)
+const COLORWAY_IDS = new Set(['amber', 'iris', 'moss', 'walnut'] as const)
 const TEMPLATE_CHOICES = TEMPLATES.filter((t) => (TEMPLATE_IDS as Set<string>).has(t.id))
 const PAPER_CHOICES = PAPERS.filter((p) => (PAPER_IDS as Set<string>).has(p.id))
 const TYPEFACE_CHOICES = TYPEFACES.filter((t) => (TYPEFACE_IDS as Set<string>).has(t.id))

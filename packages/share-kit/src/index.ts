@@ -43,7 +43,7 @@ export { TemplateRender } from './templates'
 export { Atelier } from './templates/atelier'
 export { Letter } from './templates/letter'
 export { Transcript } from './templates/transcript'
-export { Interview } from './templates/interview'
+export { Timeline } from './templates/timeline'
 export { Chat } from './templates/chat'
 
 // ─── Template primitives (for hosts assembling custom layouts) ──

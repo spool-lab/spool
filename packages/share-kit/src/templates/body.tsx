@@ -154,6 +154,12 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
               padding: '1px 5px',
               borderRadius: 3,
               background: 'rgba(128,128,128,0.12)',
+              // Long unbreakable mono tokens (file paths, hashes) blow out
+              // of narrow columns — atelier's two-col layout is the worst
+              // offender. Break anywhere so the token stays inside its
+              // column at the cost of mid-word linebreaks.
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
             }}
           >
             {children}
@@ -161,7 +167,7 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
         )
       }
       return (
-        <code className={className} {...props} style={{ fontFamily: 'Geist Mono, monospace' }}>
+        <code className={className} {...props} style={{ fontFamily: 'Geist Mono, monospace', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
           {children}
         </code>
       )
@@ -179,6 +185,8 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
             lineHeight: 1.55,
             margin: '8px 0',
             whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
           }}
         >
           {children}

@@ -96,7 +96,7 @@ export function Transcript({ convo, opts }: Props) {
                     fontWeight: 500,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    color: turn.role === 'user' ? accent : t.muted,
+                    color: turn.role === 'user' ? t.muted : accent,
                   }}
                 >
                   {turn.role === 'user' ? (turn.author ?? 'User').replace(/[\[\]]/g, '') : convo.sourceLabel}
@@ -105,7 +105,7 @@ export function Transcript({ convo, opts }: Props) {
               <div
                 style={{
                   flex: 1,
-                  borderLeft: `1px solid ${turn.role === 'user' ? accent : t.border}`,
+                  borderLeft: `1px solid ${turn.role === 'user' ? t.border : accent}`,
                   paddingLeft: 14,
                 }}
               >

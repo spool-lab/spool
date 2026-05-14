@@ -78,7 +78,7 @@ export function DownloadButton({ saving, onExport }: Props) {
         className="inline-flex items-center gap-1.5 h-6 px-2 rounded-l text-xs font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <Download size={11} strokeWidth={1.8} />
-        <span>{saving ? 'Exporting…' : current.b}</span>
+        <span>{saving ? 'Downloading…' : current.b}</span>
       </button>
       <button
         type="button"
