@@ -40,6 +40,7 @@ dist-electron/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 
 # Native binaries (rebuilt per-platform via electron-rebuild)
 build/
@@ -59,3 +60,14 @@ playwright-report/
 # Superpowers (agent-generated plans/specs)
 .superpowers/
 docs/superpowers/
+
+# Demo capture artifacts (rebuilt per release video; not source)
+packages/app/artifacts/
+
+# Release video build outputs (per-release; never committed)
+# Source of truth is index.html + scripts. Assets (clips, audio, logos) are
+# regenerated/sourced per release, not stored in git.
+videos/*/assets/
+videos/*/renders/
+videos/*/.hyperframes/
+videos/*/node_modules/
