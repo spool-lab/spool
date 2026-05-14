@@ -10,6 +10,12 @@ import { upgradeWorktreeIdentities } from '../migrations/worktree-identity-upgra
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
 
+/**
+ * Latest schema version the running build knows how to migrate to.
+ * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
+ */
+export const LATEST_SCHEMA_VERSION = 11
+
 let _db: Database.Database | null = null
 let _wasNewDb = false
 let _initialUserVersion: number | null = null

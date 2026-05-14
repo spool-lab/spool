@@ -7,6 +7,7 @@ import { syncCommand } from './commands/sync.js'
 import { listCommand } from './commands/list.js'
 import { statusCommand } from './commands/status.js'
 import { showCommand } from './commands/show.js'
+import { doctorCommand } from './commands/doctor.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version: string }
@@ -21,5 +22,6 @@ program.addCommand(syncCommand)
 program.addCommand(listCommand)
 program.addCommand(statusCommand)
 program.addCommand(showCommand)
+program.addCommand(doctorCommand)
 
 program.parse()
