@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Download, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -80,6 +80,16 @@ export default function ShareEditorPage({
   const [renaming, setRenaming] = useState(false)
   const previewRef = useRef<HTMLDivElement | null>(null)
 
+  // The "live" conversation passed to the preview, exporters, and the
+  // autosave snapshot — has the renamed title merged in. Without this,
+  // the rename modal updates the topbar but the rendered template + all
+  // export paths keep the original `conversation.title`.
+  const effectiveTitle = title.trim() || 'Untitled'
+  const liveConversation = useMemo(
+    () => ({ ...conversation, title: effectiveTitle }),
+    [conversation, effectiveTitle],
+  )
+
   // Autosave opts changes back into share_drafts. Debounced so a
   // rapid sequence of clicks (e.g. paging through colorways) collapses
   // into one upsert. We skip the very first effect run — that one
@@ -88,27 +98,64 @@ export default function ShareEditorPage({
   // identity-checking opts keeps this robust even if a parent re-render
   // produces a new conversation/opts object reference with no actual
   // change in content.
+  //
+  // pendingRef holds the most recent un-flushed payload so the unmount
+  // / window-close handlers below can write it immediately rather than
+  // losing the last 400ms of edits when the user clicks Back or quits
+  // the app. The debounce timer also reads through this ref so a stale
+  // queued upsert turns into a no-op once another path (delete, flush)
+  // has cleared the pending state.
   const didMountRef = useRef(false)
+  type UpsertPayload = Parameters<NonNullable<NonNullable<typeof window.spool>['shareDraft']>['upsert']>[0]
+  const pendingRef = useRef<UpsertPayload | null>(null)
+  const flushPendingSave = useCallback(() => {
+    const payload = pendingRef.current
+    if (!payload) return
+    pendingRef.current = null
+    void window.spool?.shareDraft?.upsert(payload).catch((err) =>
+      console.error('Flush share draft autosave failed:', err),
+    )
+  }, [])
+
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true
       return
     }
+    const doc = buildSpoolDocument(liveConversation, opts)
+    const payload: UpsertPayload = {
+      draft_id: draftId,
+      source_kind: sourceKind,
+      source_origin: sourceOrigin,
+      title: effectiveTitle,
+      snapshot_json: JSON.stringify(doc),
+      preview_json: JSON.stringify(buildPreviewDocument(doc)),
+    }
+    pendingRef.current = payload
+
     const handle = window.setTimeout(() => {
-      const effectiveTitle = title.trim() || 'Untitled'
-      const convoWithTitle = { ...conversation, title: effectiveTitle }
-      const doc = buildSpoolDocument(convoWithTitle, opts)
-      void window.spool?.shareDraft?.upsert({
-        draft_id: draftId,
-        source_kind: sourceKind,
-        source_origin: sourceOrigin,
-        title: effectiveTitle,
-        snapshot_json: JSON.stringify(doc),
-        preview_json: JSON.stringify(buildPreviewDocument(doc)),
-      }).catch((err) => console.error('Autosave share draft failed:', err))
+      // Identity check guards against the window where another path
+      // (delete, explicit flush) has cleared / replaced the pending
+      // payload between scheduling and firing.
+      if (pendingRef.current === payload) {
+        flushPendingSave()
+      }
     }, 400)
     return () => window.clearTimeout(handle)
-  }, [opts, conversation, draftId, sourceKind, sourceOrigin, title])
+  }, [opts, liveConversation, draftId, sourceKind, sourceOrigin, effectiveTitle, flushPendingSave])
+
+  // Flush the pending autosave on component unmount — user clicked
+  // Back, navigated away, or the editor was replaced by another view.
+  // Without this, the 400ms debounce silently swallows the last edit
+  // because React's effect cleanup clears the timer before it fires.
+  //
+  // We intentionally do NOT also listen for beforeunload/pagehide:
+  // Electron may kill the renderer before the IPC reaches main, and
+  // installing the listeners would imply a guarantee we can't keep.
+  // App quit / OS sleep mid-edit will lose the last 400ms; acceptable.
+  useEffect(() => {
+    return () => flushPendingSave()
+  }, [flushPendingSave])
 
   // Revoke the in-memory blob: URL when the preview modal closes so we
   // don't leak the PDF buffer for the rest of the session.
@@ -136,7 +183,7 @@ export default function ShareEditorPage({
     // wait until after rasterization (~1-2s for a real conversation),
     // Chromium revokes the gesture and showSaveFilePicker rejects with
     // SecurityError.
-    const filename = filenameForExport(conversation, opts.template, 'png')
+    const filename = filenameForExport(liveConversation, opts.template, 'png')
     const slot = await openSaveSlot(filename, {
       description: 'PNG image',
       mime: 'image/png',
@@ -161,7 +208,7 @@ export default function ShareEditorPage({
         toast.error("Couldn't export PNG", { description: 'See console for details.' })
       }
     }
-  }, [beginSaving, conversation, opts.template])
+  }, [beginSaving, liveConversation, opts.template])
 
   const exportPdf = useCallback(async () => {
     const node = previewRef.current
@@ -169,7 +216,7 @@ export default function ShareEditorPage({
     await beginSaving()
     const width = TEMPLATE_RATIO[opts.template].w
     const height = node.scrollHeight
-    const filename = filenameForExport(conversation, opts.template, 'pdf')
+    const filename = filenameForExport(liveConversation, opts.template, 'pdf')
     try {
       const html = node.outerHTML
       const bytes = await window.spool.printToPdf(html, width, height)
@@ -182,7 +229,7 @@ export default function ShareEditorPage({
       setSaveState('error')
       toast.error("Couldn't export PDF", { description: 'See console for details.' })
     }
-  }, [beginSaving, conversation, opts.template])
+  }, [beginSaving, liveConversation, opts.template])
 
   const savePdfFromPreview = useCallback(async () => {
     if (!pdfPreview) return
@@ -205,6 +252,10 @@ export default function ShareEditorPage({
   }, [pdfPreview])
 
   const handleDelete = useCallback(async () => {
+    // Cancel any queued autosave first — otherwise the unmount-flush
+    // (or a still-queued setTimeout) would re-insert the row we're
+    // about to delete.
+    pendingRef.current = null
     try {
       await window.spool.shareDraft.delete(draftId)
     } catch (err) {
@@ -216,7 +267,7 @@ export default function ShareEditorPage({
   }, [draftId, onBack])
 
   const exportMarkdown = useCallback(async () => {
-    const filename = markdownFilenameFor(conversation)
+    const filename = markdownFilenameFor(liveConversation)
     const slot = await openSaveSlot(filename, {
       description: 'Markdown document',
       mime: 'text/markdown',
@@ -226,7 +277,7 @@ export default function ShareEditorPage({
 
     await beginSaving()
     try {
-      const md = buildMarkdownDocument(conversation, opts)
+      const md = buildMarkdownDocument(liveConversation, opts)
       const blob = new Blob([md], { type: 'text/markdown' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
@@ -236,12 +287,12 @@ export default function ShareEditorPage({
       setSaveState('error')
       toast.error("Couldn't export Markdown", { description: 'See console for details.' })
     }
-  }, [beginSaving, conversation, opts])
+  }, [beginSaving, liveConversation, opts])
 
   const exportSpoolFile = useCallback(async () => {
     // Same pre-pick discipline as PNG; JSON.stringify is fast but
     // saveBlob's picker call still needs the user gesture.
-    const filename = filenameForExport(conversation, opts.template, 'spool')
+    const filename = filenameForExport(liveConversation, opts.template, 'spool')
     const slot = await openSaveSlot(filename, {
       description: 'Spool Share document',
       mime: 'application/spool+json',
@@ -251,7 +302,7 @@ export default function ShareEditorPage({
 
     await beginSaving()
     try {
-      const doc = buildSpoolDocument(conversation, opts)
+      const doc = buildSpoolDocument(liveConversation, opts)
       const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/spool+json' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
@@ -261,7 +312,7 @@ export default function ShareEditorPage({
       setSaveState('error')
       toast.error("Couldn't export .spool", { description: 'See console for details.' })
     }
-  }, [beginSaving, conversation, opts])
+  }, [beginSaving, liveConversation, opts])
 
   const topBarContent = (
     <div className="flex-1 min-w-0 flex items-center gap-2 px-3">
@@ -341,7 +392,7 @@ export default function ShareEditorPage({
       sidebarCollapsed={sidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       topBar={topBarContent}
-      rightPanel={<ControlPanel convo={conversation} opts={opts} setOpts={setOpts} />}
+      rightPanel={<ControlPanel convo={liveConversation} opts={opts} setOpts={setOpts} />}
       rightPanelOpen={panelOpen}
     >
       <div className="flex flex-col h-full" data-testid="share-editor-page">
@@ -383,7 +434,7 @@ export default function ShareEditorPage({
         <div className="flex-1 min-h-0 flex">
           <PreviewPane
             ref={previewRef}
-            convo={conversation}
+            convo={liveConversation}
             opts={opts}
             zoom={zoom}
             setZoom={setZoom}
