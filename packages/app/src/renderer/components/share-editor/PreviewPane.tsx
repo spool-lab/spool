@@ -256,7 +256,16 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
                 willChange: 'transform',
               }}
             >
-              <div ref={setRefs} style={{ width: ratio.w, userSelect: 'text' }}>
+              <div
+                ref={setRefs}
+                data-testid="share-preview-render"
+                data-template={opts.template}
+                data-paper={opts.paper}
+                data-typeface={opts.typeface}
+                data-colorway={opts.colorway}
+                data-density={opts.density}
+                style={{ width: ratio.w, userSelect: 'text' }}
+              >
                 <TemplateRender template={opts.template} convo={convo} opts={opts} />
               </div>
             </div>

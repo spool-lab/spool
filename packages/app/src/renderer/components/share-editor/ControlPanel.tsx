@@ -52,8 +52,8 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
           aria-label="Panel view"
           className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-warm-surface dark:bg-dark-surface"
         >
-          <ViewTab active={view === 'style'} onClick={() => setView('style')}>Style</ViewTab>
-          <ViewTab active={view === 'messages'} onClick={() => setView('messages')}>Messages</ViewTab>
+          <ViewTab testId="share-editor-view-style" active={view === 'style'} onClick={() => setView('style')}>Style</ViewTab>
+          <ViewTab testId="share-editor-view-messages" active={view === 'messages'} onClick={() => setView('messages')}>Messages</ViewTab>
         </div>
       </div>
       {view === 'messages' ? (
@@ -76,6 +76,7 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
               <button
                 key={tpl.id}
                 type="button"
+                data-testid={`share-editor-template-${tpl.id}`}
                 onClick={() => setOpts({ ...opts, template: tpl.id })}
                 className={`flex items-center gap-2.5 text-left px-2.5 py-2 rounded-md border transition-colors focus:outline-none ${
                   active
@@ -126,6 +127,7 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
               <button
                 key={c.id}
                 type="button"
+                data-testid={`share-editor-colorway-${c.id}`}
                 onClick={() => setOpts({ ...opts, colorway: c.id, accentHex: c.swatch })}
                 title={c.name}
                 aria-label={c.name}
@@ -151,39 +153,44 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
         <div className="flex items-center justify-between py-2">
           <span className="text-[12px] text-warm-text/85 dark:text-dark-text/85">Density</span>
           <div className="flex gap-1">
-            <Chip active={opts.density === 'compact'} onClick={() => setOpts({ ...opts, density: 'compact' })}>
+            <Chip testId="share-editor-density-compact" active={opts.density === 'compact'} onClick={() => setOpts({ ...opts, density: 'compact' })}>
               Compact
             </Chip>
-            <Chip active={opts.density === 'relaxed'} onClick={() => setOpts({ ...opts, density: 'relaxed' })}>
+            <Chip testId="share-editor-density-relaxed" active={opts.density === 'relaxed'} onClick={() => setOpts({ ...opts, density: 'relaxed' })}>
               Relaxed
             </Chip>
           </div>
         </div>
         <Toggle
+          testId="share-editor-toggle-hideEmptyTurns"
           label="Hide empty turns"
           sub="Skip role headers with no content (tool-only assistant turns)"
           value={opts.hideEmptyTurns}
           onChange={(v) => setOpts({ ...opts, hideEmptyTurns: v })}
         />
         <Toggle
+          testId="share-editor-toggle-showGaps"
           label="Gap markers"
           sub="Show ⋯ where turns are skipped"
           value={opts.showGaps}
           onChange={(v) => setOpts({ ...opts, showGaps: v })}
         />
         <Toggle
+          testId="share-editor-toggle-avatars"
           label="Show source mark"
           sub="Small glyph next to assistant turns"
           value={opts.avatars}
           onChange={(v) => setOpts({ ...opts, avatars: v })}
         />
         <Toggle
+          testId="share-editor-toggle-showMasthead"
           label="Masthead"
           sub="Spool wordmark and template label on top"
           value={opts.showMasthead}
           onChange={(v) => setOpts({ ...opts, showMasthead: v })}
         />
         <Toggle
+          testId="share-editor-toggle-showColophon"
           label="Colophon"
           sub='"Stitched on Spool" footer'
           value={opts.showColophon}
@@ -201,10 +208,12 @@ function ViewTab({
   active,
   onClick,
   children,
+  testId,
 }: {
   active: boolean
   onClick: () => void
   children: React.ReactNode
+  testId?: string
 }) {
   return (
     <button
@@ -212,6 +221,7 @@ function ViewTab({
       role="tab"
       onClick={onClick}
       aria-selected={active}
+      {...(testId ? { 'data-testid': testId } : {})}
       className={`h-6 px-2.5 rounded text-[11.5px] font-medium transition-colors ${
         active
           ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-[0_1px_1px_rgba(0,0,0,0.2)]'
@@ -288,11 +298,13 @@ function Toggle({
   sub,
   value,
   onChange,
+  testId,
 }: {
   label: string
   sub?: string
   value: boolean
   onChange: (next: boolean) => void
+  testId?: string
 }) {
   return (
     <div className="flex items-center justify-between py-2 gap-3">
@@ -305,6 +317,7 @@ function Toggle({
         role="switch"
         aria-checked={value}
         onClick={() => onChange(!value)}
+        {...(testId ? { 'data-testid': testId } : {})}
         className={`relative flex-none w-8 h-[18px] rounded-full transition-colors focus:outline-none ${
           value ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border dark:bg-dark-border'
         }`}
@@ -320,11 +333,12 @@ function Toggle({
   )
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      {...(testId ? { 'data-testid': testId } : {})}
       className={`px-2 py-0.5 rounded text-[11.5px] border transition-colors focus:outline-none ${
         active
           ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent dark:border-accent-dark text-accent dark:text-accent-dark font-medium'
@@ -346,6 +360,7 @@ function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next:
           <button
             key={tf.id}
             type="button"
+            data-testid={`share-editor-typeface-${tf.id}`}
             onClick={() => onChange(tf.id)}
             title={tf.name}
             aria-label={tf.name}
@@ -379,6 +394,7 @@ function PaperPicker({ value, onChange }: { value: Paper; onChange: (next: Paper
           <button
             key={p.id}
             type="button"
+            data-testid={`share-editor-paper-${p.id}`}
             onClick={() => onChange(p.id)}
             title={p.name}
             aria-label={p.name}

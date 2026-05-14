@@ -12,6 +12,7 @@ export interface AppContext {
   app: ElectronApplication
   window: Page
   dbPath: string
+  env: Record<string, string>
   cleanup: () => Promise<void>
 }
 
@@ -59,9 +60,41 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
     app,
     window,
     dbPath: join(tmpDir, 'data', 'spool.db'),
+    env,
     cleanup: async () => {
       await app.close()
       rmSync(tmpDir, { recursive: true, force: true })
+    },
+  }
+}
+
+/**
+ * Close the app and re-launch reusing the same env (SPOOL_HOME, data dir,
+ * etc), so any persisted state survives. Returns a fresh AppContext that
+ * shares the same tmpDir + cleanup target. The caller is responsible for
+ * calling cleanup() on the returned context.
+ */
+export async function restartApp(ctx: AppContext): Promise<AppContext> {
+  await ctx.app.close()
+  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  if (process.platform === 'linux') args.unshift('--no-sandbox')
+  const app = await electron.launch({ args, cwd: APP_DIR, env: ctx.env })
+  const window = await app.firstWindow()
+  return {
+    app,
+    window,
+    dbPath: ctx.dbPath,
+    env: ctx.env,
+    cleanup: async () => {
+      await app.close()
+      // tmpDir cleanup uses the original env's SPOOL_DATA_DIR's grandparent,
+      // which is what ctx.cleanup also targets. Run the original cleanup
+      // path so the dir gets removed exactly once.
+      const dataDir = ctx.env['SPOOL_DATA_DIR']
+      if (dataDir) {
+        const tmpDir = dataDir.replace(/\/data$/, '')
+        rmSync(tmpDir, { recursive: true, force: true })
+      }
     },
   }
 }

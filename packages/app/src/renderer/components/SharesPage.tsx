@@ -78,7 +78,7 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
   }, [removeDraft, restoreDraft])
 
   return (
-    <div className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
+    <div data-testid="shares-page" className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
       {isDragActive && <SpoolDropOverlay />}
       {hasDrafts && (
         <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
