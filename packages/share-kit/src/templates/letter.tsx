@@ -131,7 +131,7 @@ export function Letter({ convo, opts }: Props) {
                   fontWeight: 600,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: turn.role === 'user' ? accent : t.muted,
+                  color: turn.role === 'user' ? t.muted : accent,
                   marginBottom: 8,
                   display: 'flex',
                   alignItems: 'center',
@@ -140,10 +140,10 @@ export function Letter({ convo, opts }: Props) {
               >
                 <span
                   style={{
-                    width: turn.role === 'user' ? 10 : 4,
+                    width: turn.role === 'user' ? 4 : 10,
                     height: 2,
-                    background: turn.role === 'user' ? accent : t.muted,
-                    opacity: turn.role === 'user' ? 1 : 0.5,
+                    background: turn.role === 'user' ? t.muted : accent,
+                    opacity: turn.role === 'user' ? 0.5 : 1,
                     flexShrink: 0,
                   }}
                 />

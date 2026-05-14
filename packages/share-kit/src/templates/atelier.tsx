@@ -84,6 +84,12 @@ export function Atelier({ convo, opts }: Props) {
           columnCount: 2,
           columnGap: 32,
           color: t.text,
+          // Atelier's narrow columns make long unbreakable tokens —
+          // file paths, URLs, hashes — push past the column edge and
+          // visually clip behind neighboring content. Force any token
+          // to break wherever it has to to stay within the column.
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
         }}
       >
         {segments.turns.map((turn, i) => (
@@ -103,7 +109,7 @@ export function Atelier({ convo, opts }: Props) {
                   fontWeight: 500,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: turn.role === 'user' ? accent : t.muted,
+                  color: turn.role === 'user' ? t.muted : accent,
                   marginBottom: 4,
                 }}
               >

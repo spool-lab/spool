@@ -17,7 +17,7 @@ import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId, buildPreviewDocument } from './lib/compose-from-session.js'
 import { draftIdForImport } from './lib/import-spool.js'
-import { buildSpoolDocument, DEFAULT_OPTS, readSpoolFile, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
+import { buildSpoolDocument, DEFAULT_OPTS, normalizeOpts, readSpoolFile, type Conversation, type EditorOpts, type SpoolDocument } from '@spool/share-kit'
 import type { Message, Session, ShareDraftListItem, ShareDraftSourceKind } from '@spool-lab/core'
 import { getSessionResumeCommandPrefix } from '../shared/resumeCommand.js'
 import { DEFAULT_SEARCH_SORT_ORDER, type SearchSortOrder } from '../shared/searchSort.js'
@@ -158,7 +158,7 @@ export default function App() {
         // EditorOpts field landed (e.g. colorway, density) doesn't
         // leave that field undefined and crash TEMPLATE_RATIO lookups
         // / PreviewPane's TemplateRender downstream.
-        opts = { ...DEFAULT_OPTS, ...(doc.opts ?? {}) }
+        opts = normalizeOpts(doc.opts)
       } else {
         conversation = composeFromSession(session, messages)
         opts = DEFAULT_OPTS
@@ -209,7 +209,7 @@ export default function App() {
       return
     }
     try {
-      const opts: EditorOpts = { ...DEFAULT_OPTS, ...(doc.opts ?? {}) }
+      const opts: EditorOpts = normalizeOpts(doc.opts)
       const normalized: SpoolDocument = { ...doc, opts }
       const normalizedJson = JSON.stringify(normalized)
       const draftId = await draftIdForImport(normalizedJson)
@@ -250,7 +250,7 @@ export default function App() {
         sourceKind: draft.source_kind,
         sourceOrigin: draft.source_origin,
         conversation: doc.conversation,
-        opts: { ...DEFAULT_OPTS, ...(doc.opts ?? {}) },
+        opts: normalizeOpts(doc.opts),
       }, 'shares')
     } catch (err) {
       console.error('Failed to parse draft snapshot:', err)

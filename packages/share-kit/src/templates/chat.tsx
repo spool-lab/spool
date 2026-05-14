@@ -144,7 +144,7 @@ export function Chat({ convo, opts }: Props) {
                         fontWeight: 600,
                         letterSpacing: '0.08em',
                         textTransform: 'uppercase',
-                        color: t.muted,
+                        color: accent,
                       }}
                     >
                       {convo.sourceLabel}
