@@ -21,7 +21,7 @@ import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
 import { DownloadButton } from './share-editor/DownloadButton.js'
 import Menu from './Menu.js'
-import { buildPreviewDocument } from '../lib/compose-from-session.js'
+import { buildPreviewDocument } from '@spool/share-kit'
 
 type Props = {
   /** Stable id of the share_drafts row to autosave into. */

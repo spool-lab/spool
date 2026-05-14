@@ -1,30 +1,5 @@
 import type { Session, Message, SessionSource } from '@spool-lab/core'
-import type { Conversation, Platform, SpoolDocument, Turn } from '@spool/share-kit'
-
-/** Number of turns the Shares-grid card thumbnail actually renders.
- *  Anything beyond this is fade-clipped, so storing them in
- *  preview_json is pure waste. */
-export const PREVIEW_TURN_COUNT = 6
-
-/**
- * Slim a SpoolDocument down to the fields the Shares grid card needs:
- * full opts (template / paper / typeface / colorway drive the
- * thumbnail), conversation metadata, and the first PREVIEW_TURN_COUNT
- * turns. The result is structurally a SpoolDocument so the grid can
- * feed it to TemplateRender unchanged — just smaller.
- *
- * Callers serialize the result into share_drafts.preview_json
- * alongside the full snapshot_json.
- */
-export function buildPreviewDocument(doc: SpoolDocument): SpoolDocument {
-  return {
-    ...doc,
-    conversation: {
-      ...doc.conversation,
-      turns: doc.conversation.turns.slice(0, PREVIEW_TURN_COUNT),
-    },
-  }
-}
+import type { Conversation, Platform, Turn } from '@spool/share-kit'
 
 /**
  * Stable per-session draft id. Re-opening the same Spool session always

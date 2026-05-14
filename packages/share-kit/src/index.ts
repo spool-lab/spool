@@ -82,6 +82,12 @@ export {
   markdownFilenameFor,
 } from './lib/storage/markdown-file'
 
+// Preview document (slim subset for thumbnail caches) ─────────────
+export {
+  buildPreviewDocument,
+  PREVIEW_TURN_COUNT,
+} from './lib/storage/preview-document'
+
 // ─── Parsers (Phase 1 — accepts public ChatGPT/Claude/Gemini share URLs) ──
 export { parseShareUrl, detectPlatform, ParseError } from './lib/parsers'
 export type { ParseErrorReason } from './lib/parsers'
