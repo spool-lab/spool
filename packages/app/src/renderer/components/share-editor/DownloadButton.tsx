@@ -70,6 +70,8 @@ export function DownloadButton({ saving, onExport }: Props) {
     <div ref={rootRef} className="relative flex flex-none" data-testid="share-editor-download">
       <button
         type="button"
+        data-testid="share-editor-download-trigger"
+        data-format={format}
         onClick={trigger}
         disabled={saving}
         title={`${current.b}  ⌘S`}
@@ -80,6 +82,7 @@ export function DownloadButton({ saving, onExport }: Props) {
       </button>
       <button
         type="button"
+        data-testid="share-editor-download-caret"
         onClick={() => setOpen(o => !o)}
         aria-label="Choose format"
         aria-haspopup="menu"
@@ -102,6 +105,7 @@ export function DownloadButton({ saving, onExport }: Props) {
               <button
                 key={f.k}
                 type="button"
+                data-testid={`share-editor-download-option-${f.k}`}
                 role="menuitemradio"
                 aria-checked={active}
                 onClick={() => { setFormat(f.k); setOpen(false) }}

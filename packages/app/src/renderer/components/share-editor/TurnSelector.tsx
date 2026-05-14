@@ -113,6 +113,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
         <span className="flex items-center gap-0.5">
           <button
             type="button"
+            data-testid="share-editor-turns-select-all"
             onClick={selectAll}
             title="Include all messages"
             aria-label="Include all messages"
@@ -122,6 +123,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
           </button>
           <button
             type="button"
+            data-testid="share-editor-turns-clear"
             onClick={clearAll}
             title="Exclude all messages"
             aria-label="Exclude all messages"
@@ -138,12 +140,17 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
           return (
             <li
               key={i}
+              data-testid="share-editor-turn-row"
+              data-row-turn-index={i}
+              data-included={included ? '' : undefined}
               className={`group flex items-center gap-3 pl-3 pr-4 py-1 transition-colors hover:bg-warm-surface dark:hover:bg-dark-surface ${
                 included ? '' : 'opacity-60'
               }`}
             >
               <button
                 type="button"
+                data-testid="share-editor-turn-toggle"
+                data-row-turn-index={i}
                 onClick={() => toggleTurn(i)}
                 title={included ? 'Click to exclude' : 'Click to include'}
                 aria-pressed={included}
@@ -163,6 +170,8 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
               </button>
               <button
                 type="button"
+                data-testid="share-editor-turn-jump"
+                data-row-turn-index={i}
                 onClick={() => jumpToTurn(i)}
                 title={previewTooltip(turn.body)}
                 aria-label={`Jump to message ${i + 1}`}
