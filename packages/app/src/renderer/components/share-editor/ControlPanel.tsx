@@ -14,18 +14,11 @@ import { TurnSelector } from './TurnSelector.js'
 
 type View = 'style' | 'messages'
 
-// Curated subset of share-kit's option sets so the panel feels
-// editorial-curated rather than "every variation we've ever shipped".
-// share-kit still exports the full lists for spool.share web and other
-// hosts that may want broader range.
-const TEMPLATE_IDS = new Set(['chat', 'letter', 'atelier', 'timeline'] as const)
-const PAPER_IDS = new Set(['bone', 'snow', 'graphite', 'ink'] as const)
-const TYPEFACE_IDS = new Set(['inter', 'geist', 'fraunces', 'hanken-grotesk'] as const)
-const COLORWAY_IDS = new Set(['amber', 'iris', 'moss', 'walnut'] as const)
-const TEMPLATE_CHOICES = TEMPLATES.filter((t) => (TEMPLATE_IDS as Set<string>).has(t.id))
-const PAPER_CHOICES = PAPERS.filter((p) => (PAPER_IDS as Set<string>).has(p.id))
-const TYPEFACE_CHOICES = TYPEFACES.filter((t) => (TYPEFACE_IDS as Set<string>).has(t.id))
-const COLORWAY_CHOICES = COLORWAYS.filter((c) => (COLORWAY_IDS as Set<string>).has(c.id))
+// share-kit's exported lists now match exactly what the app picker
+// shows — Phase 0 trimmed the extras (transcript template, linen paper,
+// bone colorway) once the picker stabilized on 4-of-each. If a future
+// surface wants a broader range, expose new options in share-kit and
+// pick a subset here again rather than maintaining parallel lists.
 
 type Props = {
   convo: Conversation
@@ -36,9 +29,9 @@ type Props = {
 export function ControlPanel({ convo, opts, setOpts }: Props) {
   const [advancedOpen, setAdvancedOpen] = useState(true)
   const [view, setView] = useState<View>('style')
-  const currentColor = COLORWAY_CHOICES.find((c) => c.id === opts.colorway) ?? COLORWAY_CHOICES[0]!
-  const currentPaper = PAPER_CHOICES.find((p) => p.id === opts.paper) ?? PAPER_CHOICES[0]!
-  const currentTypeface = TYPEFACE_CHOICES.find((t) => t.id === opts.typeface) ?? TYPEFACE_CHOICES[0]!
+  const currentColor = COLORWAYS.find((c) => c.id === opts.colorway) ?? COLORWAYS[0]!
+  const currentPaper = PAPERS.find((p) => p.id === opts.paper) ?? PAPERS[0]!
+  const currentTypeface = TYPEFACES.find((t) => t.id === opts.typeface) ?? TYPEFACES[0]!
 
   return (
     <div className="w-full h-full p-2 pt-0">
@@ -66,11 +59,11 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
             Template
           </div>
           <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">
-            {TEMPLATE_CHOICES.length} looks
+            {TEMPLATES.length} looks
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
-          {TEMPLATE_CHOICES.map((tpl) => {
+          {TEMPLATES.map((tpl) => {
             const active = opts.template === tpl.id
             return (
               <button
@@ -121,7 +114,7 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
 
       <Section label="Colorway" hint={currentColor.name}>
         <div className="flex items-center gap-3">
-          {COLORWAY_CHOICES.map((c) => {
+          {COLORWAYS.map((c) => {
             const active = opts.colorway === c.id
             return (
               <button
@@ -354,7 +347,7 @@ function Chip({ active, onClick, children, testId }: { active: boolean; onClick:
 function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next: Typeface) => void }) {
   return (
     <div className="flex gap-2.5">
-      {TYPEFACE_CHOICES.map((tf) => {
+      {TYPEFACES.map((tf) => {
         const active = tf.id === value
         return (
           <button
@@ -388,7 +381,7 @@ function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next:
 function PaperPicker({ value, onChange }: { value: Paper; onChange: (next: Paper) => void }) {
   return (
     <div className="flex gap-2.5">
-      {PAPER_CHOICES.map((p) => {
+      {PAPERS.map((p) => {
         const active = p.id === value
         return (
           <button

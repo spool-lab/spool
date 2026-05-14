@@ -1,9 +1,10 @@
 // Template: Letter — single-column, generous margins, literary.
 //
 // Complementary to the other templates:
-//   • Atelier = dense editorial two-column
-//   • Letter  = spacious single-column, reading-first
-//   • Transcript = chat flow
+//   • Atelier  = dense editorial two-column
+//   • Letter   = spacious single-column, reading-first
+//   • Chat     = bubble flow
+//   • Timeline = time-anchored rail
 //
 // Letter is the "cover letter / essay" look. Full conversation
 // rendered in one calm column. Accent color appears on the title's
