@@ -1,9 +1,6 @@
 # Composition
 
-The proven HyperFrames composition layout. Copy from
-`videos/launch-template/index.html` and customise per release; this doc
-explains *why* the template looks the way it does so you don't accidentally
-revert hard-won decisions.
+The proven HyperFrames composition layout. Copy from `videos/launch-template/index.html` and customise per release; this doc explains *why* the template looks the way it does so you don't accidentally revert hard-won decisions.
 
 ## Canvas + window dimensions
 
@@ -40,6 +37,7 @@ Camera = `transform-origin + scale` on the `.window`. The annotation rectangles 
 | Updater banner | Tight zoom (`scale: 1.28–1.5`) with origin on bottom-left sidebar (`10%, 85–95%`) |
 
 Avoid:
+
 - Smooth slow drifts during a scene — they read as "PowerPoint pan" not "trailer move". Zoom into a region, hold, cut.
 - "Pull back to neutral" before the outro — end on the feature focus, cut to the lockup.
 
@@ -59,30 +57,18 @@ The amber outline that says "look here". Lives inside `.window`. Coords are in `
 
 **Measuring annotation coords (do this fresh every release):**
 
-1. Pick a raw `.mov` frame where the feature is fully visible. Extract with
-   `ffmpeg -ss <t> -i <clip>.mov -frames:v 1 frame.png`.
-2. Crop the relevant region:
-   `ffmpeg -i frame.png -vf "crop=600:600:0:0" cropped.png` (adjust to where
-   the feature lives in the frame).
-3. Open the crop in any image viewer that shows pixel coords. Measure the
-   bounding box of the feature region in source pixels.
-4. Divide by the source frame dimensions (typically 2160×1480 for retina
-   recordings) to get `%`. Apply small internal padding (1% on left/right)
-   so the rectangle has breathing room.
+1. Pick a raw `.mov` frame where the feature is fully visible. Extract with `ffmpeg -ss <t> -i <clip>.mov -frames:v 1 frame.png`.
+2. Crop the relevant region: `ffmpeg -i frame.png -vf "crop=600:600:0:0" cropped.png` (adjust to where the feature lives in the frame).
+3. Open the crop in any image viewer that shows pixel coords. Measure the bounding box of the feature region in source pixels.
+4. Divide by the source frame dimensions (typically 2160×1480 for retina recordings) to get `%`. Apply small internal padding (1% on left/right) so the rectangle has breathing room.
 
-Symmetry matters — `left: 0.5%, width: 22%` will look unbalanced (touches
-sidebar left edge but stops short of right edge). Pick `left: 1%, width: 20%`
-for symmetric inset.
+Symmetry matters — `left: 0.5%, width: 22%` will look unbalanced (touches sidebar left edge but stops short of right edge). Pick `left: 1%, width: 20%` for symmetric inset.
 
 ## Annotation timing
 
-Fade the annotation in **after** the feature is fully visible in the clip,
-not when the clip starts. For example, if the `PINNED · N sessions` strip
-finishes populating at clip-time `2.5s`, the annotation should fade in at
-timeline `clip-start + 2.5s + 0.1s`. Earlier = empty rectangle on screen.
+Fade the annotation in **after** the feature is fully visible in the clip, not when the clip starts. For example, if the `PINNED · N sessions` strip finishes populating at clip-time `2.5s`, the annotation should fade in at timeline `clip-start + 2.5s + 0.1s`. Earlier = empty rectangle on screen.
 
-Fade out **with the scene**, not after. When the panel exits and the camera
-transitions, the annotation goes with them.
+Fade out **with the scene**, not after. When the panel exits and the camera transitions, the annotation goes with them.
 
 ## Beat sync
 
@@ -92,15 +78,10 @@ Run `ffmpeg -i bgm.mp3 -af "highpass=200,lowpass=4000,silencedetect=n=-30dB:d=0.
 - Camera punches — to a beat
 - Annotation fade-ins — slightly after a beat (so it lands as an answer to the beat, not on it)
 
-The video doesn't need to be tightly beat-locked — just lining up the major
-moments to phrase boundaries makes the whole thing feel intentional.
+The video doesn't need to be tightly beat-locked — just lining up the major moments to phrase boundaries makes the whole thing feel intentional.
 
 ## Panel + annotation animations
 
-Already encoded in the template as `panelIn()`, `panelOut()`, `zoomTo()`,
-`clipFade()` GSAP helpers. Don't rewrite them per release; just call them
-with new timing values.
+Already encoded in the template as `panelIn()`, `panelOut()`, `zoomTo()`, `clipFade()` GSAP helpers. Don't rewrite them per release; just call them with new timing values.
 
-Word-by-word stagger on `panel-headline` is the one place where motion is
-*allowed* to be slightly playful — keeps the text from feeling like a static
-slide.
+Word-by-word stagger on `panel-headline` is the one place where motion is *allowed* to be slightly playful — keeps the text from feeling like a static slide.

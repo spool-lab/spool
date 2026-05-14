@@ -1,27 +1,19 @@
 # Capture
 
-How to record the Spool Electron app as a native macOS window. Output is a
-`.mov` per feature, used as the source for each scene in the composition.
+How to record the Spool Electron app as a native macOS window. Output is a `.mov` per feature, used as the source for each scene in the composition.
 
 ## Why native window, not Playwright screenshots
 
-Playwright's `page.screenshot()` and `video` recording only capture the
-WebContents — no traffic lights, no rounded corners, no shadow. The
-composition shows the window-on-stage, so we need the real OS window.
+Playwright's `page.screenshot()` and `video` recording only capture the WebContents — no traffic lights, no rounded corners, no shadow. The composition shows the window-on-stage, so we need the real OS window.
 
-Solution: capture the rectangular region the macOS window occupies via
-`screencapture -R`. Use a Swift one-liner to find the Quartz window id
-matching the Electron process pid + bounds.
+Solution: capture the rectangular region the macOS window occupies via `screencapture -R`. Use a Swift one-liner to find the Quartz window id matching the Electron process pid + bounds.
 
 ## Helper functions (already in `packages/app/e2e/helpers/`)
 
-- `nativeWindowInfo(app)` — returns `{id, x, y, width, height}` for the
-  front-most Electron BrowserWindow.
+- `nativeWindowInfo(app)` — returns `{id, x, y, width, height}` for the front-most Electron BrowserWindow.
 - `captureNativeWindow(app, path)` — single PNG (uses `screencapture -l <id>`).
-- `recordNativeWindow(app, path, seconds, perform)` — runs `screencapture
-  -V <seconds> -R <rect>` while `perform()` drives the app concurrently.
-- `launchDemoApp(seed)` + `setDemoWindowBounds(ctx, 1080, 740)` — boot
-  Electron with programmatic fixtures, force dark, set canonical size.
+- `recordNativeWindow(app, path, seconds, perform)` — runs `screencapture -V <seconds> -R <rect>` while `perform()` drives the app concurrently.
+- `launchDemoApp(seed)` + `setDemoWindowBounds(ctx, 1080, 740)` — boot Electron with programmatic fixtures, force dark, set canonical size.
 - `emitUpdateStatus(app, payload)` — push updater banner state via IPC.
 - `pinFirstRowInProject(window, name)` — hover + pin first session row.
 
@@ -51,18 +43,14 @@ const PROJECTS: ProjectSeed[] = [
 **Rules for seed data:**
 
 - English-only titles
-- **Must not reference real user sessions** — invent plausible titles thematically
-  relevant to the release (e.g. for a share-feature release, titles about
-  "share flow review", "share rate limiting", etc).
+- **Must not reference real user sessions** — invent plausible titles thematically relevant to the release (e.g. for a share-feature release, titles about "share flow review", "share rate limiting", etc).
 - 10–15 projects total feels right in the sidebar.
 - One project's `total` should be high (≥ 70) to demo the count badge.
 - Mix `source` between `claude` and `codex` so the badges look varied.
 
 ## Writing the ad-hoc capture spec
 
-The capture spec is **per-release, not committed**. Put it at
-`packages/app/e2e/release-capture.spec.ts` and gitignore-add it (or just
-delete after the release ships).
+The capture spec is **per-release, not committed**. Put it at `packages/app/e2e/release-capture.spec.ts` and gitignore-add it (or just delete after the release ships).
 
 Structure:
 
@@ -95,6 +83,7 @@ test('record release clips', async () => {
 ```
 
 Run with:
+
 ```bash
 pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts --workers=1
 ```
@@ -110,16 +99,7 @@ pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts --work
 
 ## Common capture issues
 
-- **Window not found.** `screencapture -R` failures usually mean the Electron
-  window hasn't focused. Call `app.focus({steal: true})` + `win.focus()` before
-  recording.
-- **Playwright `mouse.click()` does NOT move the OS cursor.** It dispatches
-  DOM events directly. If you need cursor-in-frame, drive the OS cursor
-  separately (e.g. `cliclick`) — but this is usually a sign you should drop
-  the cursor entirely and let the UI change carry the story.
-- **First-frame black pixels in the output `.mov`.** `screencapture -V` has
-  ~21ms latency before the first frame lands. Padded out at composition time
-  via `tpad` (see `poster.md`).
-- **Timing slips between perform() and screencapture.** `recordNativeWindow`
-  starts the recording, then runs `perform()`. There's a ~500ms lead-in
-  where you can `waitForTimeout` to settle before the first action.
+- **Window not found.** `screencapture -R` failures usually mean the Electron window hasn't focused. Call `app.focus({steal: true})` + `win.focus()` before recording.
+- **Playwright `mouse.click()` does NOT move the OS cursor.** It dispatches DOM events directly. If you need cursor-in-frame, drive the OS cursor separately (e.g. `cliclick`) — but this is usually a sign you should drop the cursor entirely and let the UI change carry the story.
+- **First-frame black pixels in the output `.mov`.** `screencapture -V` has ~21ms latency before the first frame lands. Padded out at composition time via `tpad` (see `poster.md`).
+- **Timing slips between perform() and screencapture.** `recordNativeWindow` starts the recording, then runs `perform()`. There's a ~500ms lead-in where you can `waitForTimeout` to settle before the first action.
