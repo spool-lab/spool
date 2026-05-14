@@ -15,3 +15,17 @@ Key rules at a glance:
 
 In QA mode, flag any code that doesn't match DESIGN.md.
 
+## Release videos
+
+When asked to make a launch / release / announcement video for Spool,
+invoke the `launch-video` skill. It covers the capture pipeline, the
+HyperFrames composition layout, common pitfalls, and the social-media
+poster trick.
+
+- Capture primitives live in `packages/app/e2e/helpers/`
+  (`native-window-capture.ts`, `demo-fixtures.ts`, `demo-launch.ts`,
+  `demo-interactions.ts`).
+- The composition skeleton lives at `videos/launch-template/`.
+- Per-release assets (raw `.mov`, audio, renders) are gitignored —
+  source of truth is the composition `index.html` plus the helpers.
+

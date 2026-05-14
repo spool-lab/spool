@@ -59,6 +59,13 @@
         "repo": "spool"
       }
     ],
+    "files": [
+      "**/*",
+      "!e2e/**/*",
+      "!artifacts/**/*",
+      "!src/**/*",
+      "!**/*.map"
+    ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**",
       "node_modules/bindings/**",
