@@ -101,19 +101,35 @@ export default function ShareEditorPage({
   // produces a new conversation/opts object reference with no actual
   // change in content.
   //
-  // pendingRef holds the most recent un-flushed payload so the unmount
-  // / window-close handlers below can write it immediately rather than
-  // losing the last 400ms of edits when the user clicks Back or quits
-  // the app. The debounce timer also reads through this ref so a stale
-  // queued upsert turns into a no-op once another path (delete, flush)
-  // has cleared the pending state.
+  // pendingInputsRef stamps the *inputs* needed to build a payload, not
+  // the payload itself. The expensive part — `buildSpoolDocument` plus
+  // two `JSON.stringify` calls — is moved into `flushPendingSave` so it
+  // only runs once per debounce window (and once on unmount), instead
+  // of synchronously on every opts change. For a 1000+ msg share that
+  // saves ~hundreds of ms per click on the render thread.
   const didMountRef = useRef(false)
-  type UpsertPayload = Parameters<NonNullable<NonNullable<typeof window.spool>['shareDraft']>['upsert']>[0]
-  const pendingRef = useRef<UpsertPayload | null>(null)
+  type AutosaveInputs = {
+    draftId: string
+    sourceKind: ShareDraftSourceKind
+    sourceOrigin: string | null
+    effectiveTitle: string
+    liveConversation: Conversation
+    opts: EditorOpts
+  }
+  const pendingInputsRef = useRef<AutosaveInputs | null>(null)
   const flushPendingSave = useCallback(() => {
-    const payload = pendingRef.current
-    if (!payload) return
-    pendingRef.current = null
+    const inputs = pendingInputsRef.current
+    if (!inputs) return
+    pendingInputsRef.current = null
+    const doc = buildSpoolDocument(inputs.liveConversation, inputs.opts)
+    const payload = {
+      draft_id: inputs.draftId,
+      source_kind: inputs.sourceKind,
+      source_origin: inputs.sourceOrigin,
+      title: inputs.effectiveTitle,
+      snapshot_json: JSON.stringify(doc),
+      preview_json: JSON.stringify(buildPreviewDocument(doc)),
+    }
     void window.spool?.shareDraft?.upsert(payload).catch((err) =>
       console.error('Flush share draft autosave failed:', err),
     )
@@ -124,25 +140,15 @@ export default function ShareEditorPage({
       didMountRef.current = true
       return
     }
-    const doc = buildSpoolDocument(liveConversation, opts)
-    const payload: UpsertPayload = {
-      draft_id: draftId,
-      source_kind: sourceKind,
-      source_origin: sourceOrigin,
-      title: effectiveTitle,
-      snapshot_json: JSON.stringify(doc),
-      preview_json: JSON.stringify(buildPreviewDocument(doc)),
+    pendingInputsRef.current = {
+      draftId, sourceKind, sourceOrigin, effectiveTitle, liveConversation, opts,
     }
-    pendingRef.current = payload
-
-    const handle = window.setTimeout(() => {
-      // Identity check guards against the window where another path
-      // (delete, explicit flush) has cleared / replaced the pending
-      // payload between scheduling and firing.
-      if (pendingRef.current === payload) {
-        flushPendingSave()
-      }
-    }, 400)
+    // The cleanup below clears any in-flight timer when a new edit
+    // arrives or the component unmounts, so only the latest stamped
+    // inputs ever feed flushPendingSave. If `handleDelete` has cleared
+    // pendingInputsRef in the meantime, flushPendingSave returns a
+    // no-op when it reads the ref.
+    const handle = window.setTimeout(flushPendingSave, 400)
     return () => window.clearTimeout(handle)
   }, [opts, liveConversation, draftId, sourceKind, sourceOrigin, effectiveTitle, flushPendingSave])
 
@@ -279,7 +285,7 @@ export default function ShareEditorPage({
     // Cancel any queued autosave first — otherwise the unmount-flush
     // (or a still-queued setTimeout) would re-insert the row we're
     // about to delete.
-    pendingRef.current = null
+    pendingInputsRef.current = null
     try {
       await window.spool.shareDraft.delete(draftId)
     } catch (err) {
