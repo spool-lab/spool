@@ -143,6 +143,7 @@
     "language_ja": "日本語",
     "language_ko": "한국어",
     "language_de": "Deutsch",
+    "language_fr": "Français",
     "defaultAgent_label": "デフォルト Agent",
     "defaultAgent_help": "Agent 検索に切り替えたときに使用されます。",
     "defaultSearchSort_label": "デフォルトの検索並び順",
