@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ThemeEditorStateV1, ThemeSideConfig } from '../theme/editorTypes.js'
 import { THEME_PRESETS } from '../theme/editorTypes.js'
 import { lightPresetSeed, darkPresetSeed } from '../theme/presetSeeds.js'
@@ -32,6 +33,7 @@ function ColorRow(props: {
   showTopRule?: boolean
   ruleColor: string
 }) {
+  const { t } = useTranslation()
   const { id, label, value, tone, onChange, showTopRule, ruleColor } = props
   const swatch = tintForValue(colorInputValue(value))
 
@@ -56,7 +58,7 @@ function ColorRow(props: {
             value={colorInputValue(value)}
             onChange={(e) => onChange(e.target.value.toUpperCase())}
             className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label={`${label} color`}
+            aria-label={t('themeEditor.accent_color_aria', { label })}
           />
           <div className="h-full w-full rounded-full border shadow-sm" style={swatch} />
         </div>
@@ -72,7 +74,7 @@ function ColorRow(props: {
           autoComplete="off"
           className={`h-9 min-w-0 flex-1 px-3 font-mono text-[11px] ${sideInputBase}`}
           style={swatch}
-          aria-label={`${label} hex value`}
+          aria-label={t('themeEditor.accent_hex_aria', { label })}
         />
       </div>
     </div>
@@ -85,6 +87,7 @@ function SideBlock(props: {
   slot: ThemeSideConfig
   onSlotChange: (next: ThemeSideConfig) => void
 }) {
+  const { t } = useTranslation()
   const { title, mode, slot, onSlotChange } = props
 
   const patch = (partial: Partial<ThemeSideConfig>) => {
@@ -158,13 +161,13 @@ function SideBlock(props: {
               borderColor: divider,
               color: tone.primary,
             }}
-            aria-label={`${title} preset`}
+            aria-label={t('themeEditor.presetAria', { title })}
           >
             <>
-              <option value="spool">Spool</option>
-              <option value="solarized">Solarized</option>
-              <option value="everforest">Everforest</option>
-              <option value="custom">Custom</option>
+              <option value="spool">{t('themeEditor.preset_spool')}</option>
+              <option value="solarized">{t('themeEditor.preset_solarized')}</option>
+              <option value="everforest">{t('themeEditor.preset_everforest')}</option>
+              <option value="custom">{t('themeEditor.preset_custom')}</option>
             </>
           </select>
           <svg
@@ -182,7 +185,7 @@ function SideBlock(props: {
       <div className="flex flex-col">
         <ColorRow
           id={`${prefix}-accent`}
-          label="Accent"
+          label={t('themeEditor.accent')}
           value={slot.accent}
           tone={tone}
           ruleColor={divider}
@@ -190,7 +193,7 @@ function SideBlock(props: {
         />
         <ColorRow
           id={`${prefix}-background`}
-          label="Background"
+          label={t('themeEditor.background')}
           value={slot.background}
           tone={tone}
           showTopRule
@@ -199,7 +202,7 @@ function SideBlock(props: {
         />
         <ColorRow
           id={`${prefix}-foreground`}
-          label="Foreground"
+          label={t('themeEditor.foreground')}
           value={slot.foreground}
           tone={tone}
           showTopRule
@@ -216,7 +219,7 @@ function SideBlock(props: {
             className="text-[11px] font-medium"
             style={{ color: tone.primary }}
           >
-            Contrast
+            {t('themeEditor.contrast')}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -246,6 +249,7 @@ export default function ThemeEditorSection(props: {
   themeSource: 'system' | 'light' | 'dark'
   onThemeMode: (m: 'system' | 'light' | 'dark') => void | Promise<void>
 }) {
+  const { t } = useTranslation()
   const { state, onChange, themeSource, onThemeMode } = props
   const [systemDark, setSystemDark] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
@@ -266,13 +270,13 @@ export default function ThemeEditorSection(props: {
   const orderedSides = preferredMode === 'dark'
     ? ([
         {
-          title: 'Dark Theme',
+          title: t('themeEditor.darkTheme'),
           mode: 'dark' as const,
           slot: state.dark,
           onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
         },
         {
-          title: 'Light Theme',
+          title: t('themeEditor.lightTheme'),
           mode: 'light' as const,
           slot: state.light,
           onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
@@ -280,13 +284,13 @@ export default function ThemeEditorSection(props: {
       ])
     : ([
         {
-          title: 'Light Theme',
+          title: t('themeEditor.lightTheme'),
           mode: 'light' as const,
           slot: state.light,
           onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
         },
         {
-          title: 'Dark Theme',
+          title: t('themeEditor.darkTheme'),
           mode: 'dark' as const,
           slot: state.dark,
           onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
@@ -297,18 +301,18 @@ export default function ThemeEditorSection(props: {
     <div className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase">
-          Theme
+          {t('themeEditor.title')}
         </h4>
         <SegmentedPill
           value={themeSource}
           onChange={(value) => {
             void onThemeMode(value)
           }}
-          ariaLabel="Theme mode"
+          ariaLabel={t('themeEditor.modeAria')}
           options={[
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-            { value: 'system', label: 'System' },
+            { value: 'light', label: t('settings.theme_light') },
+            { value: 'dark', label: t('settings.theme_dark') },
+            { value: 'system', label: t('settings.theme_system') },
           ]}
         />
       </div>

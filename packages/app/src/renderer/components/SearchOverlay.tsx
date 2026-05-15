@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FragmentResult, Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import Hint from './Hint.js'
@@ -43,6 +44,7 @@ export default function SearchOverlay({
   onCommit,
   onOpenResult,
 }: Props) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState(initialQuery)
   const [results, setResults] = useState<FragmentSearchResult[]>([])
   const [recents, setRecents] = useState<Session[]>([])
@@ -53,7 +55,12 @@ export default function SearchOverlay({
   const seqRef = useRef(0)
 
   const showRecents = !query.trim()
-  const buckets = useMemo(() => (showRecents ? bucketSessionsByDate(recents) : []), [showRecents, recents])
+  const tLoose = t as unknown as (k: string) => string
+  const buckets = useMemo(
+    () => (showRecents ? bucketSessionsByDate(recents, tLoose) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showRecents, recents, t],
+  )
   const flatRecents = useMemo(() => buckets.flatMap(b => b.sessions), [buckets])
 
   useEffect(() => { setActiveIndex(0) }, [showRecents, scope])
@@ -160,7 +167,7 @@ export default function SearchOverlay({
       data-testid="search-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Search"
+      aria-label={t('search.overlayAria')}
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm"
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
@@ -173,35 +180,35 @@ export default function SearchOverlay({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKey}
-            placeholder={mode === 'ai' ? 'Ask anything about your sessions…' : 'Search your sessions…'}
+            placeholder={mode === 'ai' ? t('search.placeholder_ask') : t('search.placeholder_home')}
             className="flex-1 bg-transparent outline-none text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint"
           />
-          {searching && <span className="text-[10px] text-warm-faint">searching…</span>}
+          {searching && <span className="text-[10px] text-warm-faint">{t('search.searchingShort')}</span>}
           {onModeChange && (
             <SegmentedPill
               value={mode}
               onChange={onModeChange}
               compact
-              ariaLabel="Search mode"
+              ariaLabel={t('search.mode_fast') + ' / ' + t('search.mode_ai')}
               options={[
-                { value: 'fast', label: 'Fast', icon: <ZapIcon />, hideLabel: true, title: 'Fast search — find sessions by keyword' },
-                { value: 'ai', label: 'Agent', icon: <SparklesIcon />, hideLabel: true, testId: 'mode-agent', title: 'Agent — ask in natural language; the agent searches and answers' },
+                { value: 'fast', label: t('search.mode_fast'), icon: <ZapIcon />, hideLabel: true, title: t('search.mode_fast_title') },
+                { value: 'ai', label: t('search.mode_ai'), icon: <SparklesIcon />, hideLabel: true, testId: 'mode-agent', title: t('search.mode_ai_title') },
               ]}
             />
           )}
         </div>
 
         <div className="px-4 py-2 flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-warm-faint">Searching:</span>
+          <span className="text-[10px] uppercase tracking-wider text-warm-faint">{t('search.scope_searching')}</span>
           <ScopeChip
-            label={scopeProjectName ? `in: ${scopeProjectName}` : 'in: project'}
+            label={scopeProjectName ? t('search.scope_inProject', { project: scopeProjectName }) : t('search.scope_inProjectGeneric')}
             active={scope === 'project'}
             disabled={!scopeProjectName}
             onClick={() => onScopeChange('project')}
             testId="scope-project"
           />
           <ScopeChip
-            label="All projects"
+            label={t('search.scope_all')}
             active={scope === 'all'}
             onClick={() => onScopeChange('all')}
             testId="scope-all"
@@ -209,12 +216,12 @@ export default function SearchOverlay({
           {scopeProjectName && (
             <span className="flex items-center gap-1.5 text-[10px] text-warm-faint">
               <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">Tab</kbd>
-              <span>to switch</span>
+              <span>{t('search.scope_switchHint')}</span>
             </span>
           )}
           {agentSelector && mode === 'ai' && (
             <div className="ml-auto flex items-center gap-1.5 text-[10px] text-warm-faint">
-              <span className="uppercase tracking-wider">Asking:</span>
+              <span className="uppercase tracking-wider">{t('search.scope_asking')}</span>
               {agentSelector}
             </div>
           )}
@@ -224,7 +231,7 @@ export default function SearchOverlay({
           {showRecents ? (
             flatRecents.length === 0 ? (
               <div className="min-h-[220px] flex items-center justify-center px-4 text-center text-sm text-warm-faint dark:text-dark-muted">
-                {scope === 'project' ? 'No sessions in this project yet.' : 'No sessions yet.'}
+                {scope === 'project' ? t('search.noSessionsInProject') : t('search.noSessionsYet')}
               </div>
             ) : (
               (() => {
@@ -255,12 +262,12 @@ export default function SearchOverlay({
                                   <div className="flex items-center gap-2 min-w-0">
                                     <SourceBadge source={session.source} />
                                     <span className="flex-1 min-w-0 text-sm text-warm-text dark:text-dark-text truncate">
-                                      {session.title?.trim() || '(no title)'}
+                                      {session.title?.trim() || t('common.noTitle')}
                                     </span>
                                   </div>
                                 </div>
                                 <span className="flex-none font-mono text-[11px] leading-[20px] text-warm-faint dark:text-dark-muted tabular-nums">
-                                  {formatRelativeDate(session.startedAt)}
+                                  {formatRelativeDate(session.startedAt, { t: tLoose as unknown as (k: string, o?: Record<string, unknown>) => string })}
                                 </span>
                               </li>
                             )
@@ -276,8 +283,10 @@ export default function SearchOverlay({
             <div className="h-full flex items-center justify-center px-4 text-center text-sm text-warm-faint dark:text-dark-muted">
               <span>
                 {mode === 'ai' && query.trim()
-                  ? <>Press <kbd className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">↵</kbd> to ask the agent.</>
-                  : 'No matches.'}
+                  ? t('search.pressEnterToAsk_short', { key: '↵' }).split('↵').flatMap((part, i, arr) => i < arr.length - 1
+                      ? [part, <kbd key={i} className="font-mono text-[10px] px-1 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">↵</kbd>]
+                      : [part])
+                  : t('search.noMatches')}
               </span>
             </div>
           ) : (
@@ -306,7 +315,7 @@ export default function SearchOverlay({
                     />
                   </div>
                   <span className="flex-none font-mono text-[11px] leading-[20px] text-warm-faint dark:text-dark-muted tabular-nums">
-                    {formatRelativeDate(result.startedAt)}
+                    {formatRelativeDate(result.startedAt, { t: tLoose as unknown as (k: string, o?: Record<string, unknown>) => string })}
                   </span>
                 </li>
               ))}
@@ -318,18 +327,18 @@ export default function SearchOverlay({
           <div className="flex items-center gap-3 flex-wrap">
             {(showRecents ? flatRecents.length > 0 : results.length > 0) && (
               <>
-                <Hint keys={['↑', '↓']} label="navigate" />
-                <Hint keys={['↵']} label={mode === 'ai' ? 'ask' : 'open'} />
+                <Hint keys={['↑', '↓']} label={t('search.hint_navigate')} />
+                <Hint keys={['↵']} label={mode === 'ai' ? t('search.hint_ask') : t('search.hint_open')} />
               </>
             )}
             {!showRecents && results.length > 0 && mode !== 'ai' && (
-              <Hint keys={['⇧', '↵']} label="view all" />
+              <Hint keys={['⇧', '↵']} label={t('search.hint_viewAll')} />
             )}
-            <Hint keys={['esc']} label="close" />
+            <Hint keys={['esc']} label={t('search.hint_close')} />
           </div>
           <div className="flex-none">
             {showRecents && flatRecents.length > 0 ? (
-              <span>{flatRecents.length} recent {flatRecents.length === 1 ? 'session' : 'sessions'}</span>
+              <span>{t('search.recentCount_other', { count: flatRecents.length })}</span>
             ) : results.length > 0 ? (
               <button
                 type="button"
@@ -337,7 +346,7 @@ export default function SearchOverlay({
                 onClick={() => { if (query.trim()) onCommit(query) }}
                 className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
-                {results.length} results →
+                {t('search.resultsArrow_other', { count: results.length })}
               </button>
             ) : null}
           </div>

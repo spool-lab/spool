@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FragmentResult } from '@spool-lab/core'
 import ContinueActions from './ContinueActions.js'
 import { SourceBadge } from './Badges.js'
@@ -20,6 +21,14 @@ type Props = {
 }
 
 export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, onShareSession }: Props) {
+  const { t } = useTranslation()
+  const sortLabel = (value: SearchSortOrder): string => {
+    switch (value) {
+      case 'relevance': return t('fragment.sort_relevance')
+      case 'newest': return t('fragment.sort_newest')
+      case 'oldest': return t('fragment.sort_oldest')
+    }
+  }
   const [activeFilter, setActiveFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState<SearchSortOrder>(defaultSortOrder)
 
@@ -34,10 +43,9 @@ export default function FragmentResults({ results, query, onOpenSession, default
           <circle cx="14" cy="14" r="9" stroke="currentColor" strokeWidth="2"/>
           <path d="M22 22L28 28" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
-        <p className="text-sm text-warm-muted dark:text-dark-muted">No results for "{query}"</p>
+        <p className="text-sm text-warm-muted dark:text-dark-muted">{t('fragment.noResultsForQuery', { query })}</p>
         <p className="text-xs text-warm-faint dark:text-dark-muted opacity-80">
-          Try different keywords, use spaces for multi-term search, or run{' '}
-          <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code>
+          {t('fragment.noResultsHint')}
         </p>
       </div>
     )
@@ -63,7 +71,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
                   : 'border-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
               }`}
             >
-              {src === 'all' ? 'All' : formatSourceFilterLabel(src)}
+              {src === 'all' ? t('fragment.filterAll') : formatSourceFilterLabel(src)}
             </button>
           ))}
         </div>
@@ -76,13 +84,13 @@ export default function FragmentResults({ results, query, onOpenSession, default
               type="button"
               data-testid="search-sort"
               data-value={sortOrder}
-              aria-label="Sort results"
+              aria-label={t('fragment.sortAriaLabel')}
               aria-haspopup="menu"
               aria-expanded={open}
               onClick={toggle}
               className="inline-flex items-center gap-1 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
-              <span>Sort: {SEARCH_SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Relevance'}</span>
+              <span>{t('fragment.sortLabel', { value: sortLabel(sortOrder) })}</span>
               <svg
                 aria-hidden="true"
                 width="9"
@@ -96,7 +104,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
             </button>
           )}
           items={SEARCH_SORT_OPTIONS.map(option => ({
-            label: option.label,
+            label: sortLabel(option.value),
             active: sortOrder === option.value,
             onSelect: () => setSortOrder(option.value),
           }))}
@@ -138,10 +146,11 @@ function FragmentRow({
   onCopySessionId: (source: FragmentResult['source']) => void
   onShareSession?: (uuid: string) => void
 }) {
+  const { t } = useTranslation()
   const snippet = snippetToStrongHtml(result.snippet)
-  const date = formatRelativeDate(result.startedAt)
+  const date = formatRelativeDate(result.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })
   const project = result.project.split('/').pop() ?? result.project
-  const title = result.sessionTitle?.trim() || '(untitled session)'
+  const title = result.sessionTitle?.trim() || t('common.noTitle')
 
   return (
     <div
@@ -168,7 +177,7 @@ function FragmentRow({
           {project}
           {result.profileLabel && <span> · {result.profileLabel}</span>}
           {result.matchCount > 1 && (
-            <span data-testid="match-count"> · {result.matchCount} matches</span>
+            <span data-testid="match-count"> · {t('fragment.matchCount_other', { count: result.matchCount })}</span>
           )}
         </div>
 

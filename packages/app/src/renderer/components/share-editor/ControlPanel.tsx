@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   COLORWAYS,
   PAPERS,
@@ -66,6 +67,7 @@ type Props = {
 }
 
 export function ControlPanel({ convo, opts, setOpts }: Props) {
+  const { t } = useTranslation()
   const [advancedOpen, setAdvancedOpen] = useState(true)
   const [view, setView] = useState<View>('style')
   const currentColor = COLORWAYS.find((c) => c.id === opts.colorway) ?? COLORWAYS[0]!
@@ -87,17 +89,17 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
       <div className="flex-none px-3 pt-3 pb-2">
         <div
           role="tablist"
-          aria-label="Panel view"
+          aria-label={t('shareEditorPanel.panel_view')}
           className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-warm-surface dark:bg-dark-surface"
         >
-          <ViewTab testId="share-editor-view-style" active={view === 'style'} onClick={() => setView('style')}>Style</ViewTab>
-          <ViewTab testId="share-editor-view-messages" active={view === 'messages'} onClick={() => setView('messages')}>Messages</ViewTab>
+          <ViewTab testId="share-editor-view-style" active={view === 'style'} onClick={() => setView('style')}>{t('shareEditorPanel.tab_style')}</ViewTab>
+          <ViewTab testId="share-editor-view-messages" active={view === 'messages'} onClick={() => setView('messages')}>{t('shareEditorPanel.tab_messages')}</ViewTab>
           <ViewTab
             testId="share-editor-view-privacy"
             active={view === 'privacy'}
             onClick={() => setView('privacy')}
           >
-            Privacy
+            {t('shareEditorPanel.tab_privacy')}
           </ViewTab>
         </div>
       </div>
@@ -110,10 +112,10 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
       <div className="px-4 pt-3 pb-4">
         <div className="flex items-baseline justify-between mb-3">
           <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
-            Template
+            {t('shareEditorPanel.section_template')}
           </div>
           <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">
-            {TEMPLATES.length} looks
+            {t('shareEditorPanel.section_template_count', { count: TEMPLATES.length })}
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -158,15 +160,15 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
         </div>
       </div>
 
-      <Section label="Paper" hint={currentPaper.name}>
+      <Section label={t('shareEditorPanel.section_paper')} hint={currentPaper.name}>
         <PaperPicker value={opts.paper} onChange={(p) => setOpts({ ...opts, paper: p })} />
       </Section>
 
-      <Section label="Typeface" hint={currentTypeface.name}>
+      <Section label={t('shareEditorPanel.section_typeface')} hint={currentTypeface.name}>
         <TypefacePicker value={opts.typeface} onChange={(tf) => setOpts({ ...opts, typeface: tf })} />
       </Section>
 
-      <Section label="Colorway" hint={currentColor.name}>
+      <Section label={t('shareEditorPanel.section_colorway')} hint={currentColor.name}>
         <div className="flex items-center gap-3">
           {COLORWAYS.map((c) => {
             const active = opts.colorway === c.id
@@ -193,53 +195,53 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
 
 
       <Collapsible
-        label="More options"
+        label={t('shareEditorPanel.section_moreOptions')}
         open={advancedOpen}
         onToggle={() => setAdvancedOpen(!advancedOpen)}
       >
         <div className="flex items-center justify-between py-2">
-          <span className="text-[12px] text-warm-text/85 dark:text-dark-text/85">Density</span>
+          <span className="text-[12px] text-warm-text/85 dark:text-dark-text/85">{t('shareEditorPanel.section_density')}</span>
           <div className="flex gap-1">
             <Chip testId="share-editor-density-compact" active={opts.density === 'compact'} onClick={() => setOpts({ ...opts, density: 'compact' })}>
-              Compact
+              {t('shareEditor.density_compact')}
             </Chip>
             <Chip testId="share-editor-density-relaxed" active={opts.density === 'relaxed'} onClick={() => setOpts({ ...opts, density: 'relaxed' })}>
-              Relaxed
+              {t('shareEditor.density_relaxed')}
             </Chip>
           </div>
         </div>
         <Toggle
           testId="share-editor-toggle-hideEmptyTurns"
-          label="Hide empty turns"
-          sub="Skip role headers with no content (tool-only assistant turns)"
+          label={t('shareEditorPanel.toggle_hideEmptyTurns')}
+          sub={t('shareEditorPanel.toggle_hideEmptyTurns_sub')}
           value={opts.hideEmptyTurns}
           onChange={(v) => setOpts({ ...opts, hideEmptyTurns: v })}
         />
         <Toggle
           testId="share-editor-toggle-showGaps"
-          label="Gap markers"
-          sub="Show ⋯ where turns are skipped"
+          label={t('shareEditorPanel.toggle_gapMarkers')}
+          sub={t('shareEditorPanel.toggle_gapMarkers_sub')}
           value={opts.showGaps}
           onChange={(v) => setOpts({ ...opts, showGaps: v })}
         />
         <Toggle
           testId="share-editor-toggle-avatars"
-          label="Show source mark"
-          sub="Small glyph next to assistant turns"
+          label={t('shareEditorPanel.toggle_showSourceMark')}
+          sub={t('shareEditorPanel.toggle_showSourceMark_sub')}
           value={opts.avatars}
           onChange={(v) => setOpts({ ...opts, avatars: v })}
         />
         <Toggle
           testId="share-editor-toggle-showMasthead"
-          label="Masthead"
-          sub="Spool wordmark and template label on top"
+          label={t('shareEditorPanel.toggle_masthead')}
+          sub={t('shareEditorPanel.toggle_masthead_sub')}
           value={opts.showMasthead}
           onChange={(v) => setOpts({ ...opts, showMasthead: v })}
         />
         <Toggle
           testId="share-editor-toggle-showColophon"
-          label="Colophon"
-          sub='"Stitched on Spool" footer'
+          label={t('shareEditorPanel.toggle_colophon')}
+          sub={t('shareEditorPanel.toggle_colophon_sub')}
           value={opts.showColophon}
           onChange={(v) => setOpts({ ...opts, showColophon: v })}
         />
@@ -272,6 +274,7 @@ function RedactSummary({
   opts: EditorOpts
   setOpts: (next: EditorOpts) => void
 }) {
+  const { t } = useTranslation()
   const excludedKinds = new Set(opts.redactExclude?.kinds ?? [])
   const excludedHashes = new Set(opts.redactExclude?.valueHashes ?? [])
 
@@ -311,7 +314,7 @@ function RedactSummary({
         data-testid="share-editor-privacy-clean"
         className="mt-2 px-2.5 py-2 rounded-md bg-warm-surface/50 dark:bg-dark-surface/40 text-[11.5px] text-warm-muted dark:text-dark-muted leading-snug"
       >
-        No sensitive data detected.
+        {t('shareEditorPanel.redact_noneSensitive')}
       </div>
     )
   }
@@ -341,10 +344,10 @@ function RedactSummary({
       {hasAuthor && (
         <RedactRow
           kind={SYNTHETIC_KIND_AUTHOR}
-          label="Author name"
+          label={t('shareEditorPanel.section_authorName')}
           values={authorValues}
           minConfidence={1}
-          note="From turn headers"
+          note={t('shareEditorPanel.section_authorName_fromTurns')}
           kindExcluded={isKindExcluded(SYNTHETIC_KIND_AUTHOR)}
           onAllowAll={() => allowKind(SYNTHETIC_KIND_AUTHOR)}
           onRedactAll={() => reRedactKind(SYNTHETIC_KIND_AUTHOR, authorNames)}
@@ -355,10 +358,10 @@ function RedactSummary({
       {hasManual && (
         <RedactRow
           kind={SYNTHETIC_KIND_MANUAL}
-          label="Manual entry"
+          label={t('shareEditorPanel.section_manualEntry')}
           values={manualEntries}
           minConfidence={1}
-          note="You added these"
+          note={t('shareEditorPanel.section_manualEntry_note')}
           kindExcluded={isKindExcluded(SYNTHETIC_KIND_MANUAL)}
           onAllowAll={() => allowKind(SYNTHETIC_KIND_MANUAL)}
           onRedactAll={() => reRedactKind(SYNTHETIC_KIND_MANUAL, manualValues)}
@@ -505,12 +508,13 @@ function BulkCheckbox({
   onClick: (e: React.MouseEvent) => void
   label: string
 }) {
+  const { t } = useTranslation()
   const filled = state !== 'none'
   const title = state === 'none'
-    ? `Redact all ${label}`
+    ? t('shareEditorPanel.redact_redactAll', { label })
     : state === 'mixed'
-      ? `Mixed — click to redact all ${label}`
-      : `Click to allow all ${label}`
+      ? t('shareEditorPanel.redact_mixed', { label })
+      : t('shareEditorPanel.redact_allowAll', { label })
   return (
     <button
       type="button"
@@ -559,6 +563,7 @@ function ValueRow({
   interactive: boolean
   onClick?: () => void
 }) {
+  const { t } = useTranslation()
   const valueContent = (
     <>
       <ValueCheckbox checked={checked} interactive={interactive} />
@@ -573,7 +578,7 @@ function ValueRow({
       </span>
       {occurrences > 1 && (
         <span
-          title={`Appears ${occurrences} times in the source`}
+          title={t('shareEditorPanel.redact_appearsTimes_other', { count: occurrences })}
           className="flex-none text-[10px] text-warm-faint dark:text-dark-muted font-mono tabular-nums"
         >
           {occurrences}
@@ -701,6 +706,7 @@ function PrivacyView({
   pii: ReturnType<typeof detectPII>
   totalRedactions: number
 }) {
+  const { t } = useTranslation()
   // How many sensitive occurrences would be VISIBLE in the shared
   // / exported artifact under the current policy. Drives both the
   // header count line and decides whether to show the Reset button.
@@ -736,10 +742,10 @@ function PrivacyView({
   // user really wants to know "what will leak?" — so only the
   // visible count carries the warning weight.
   let countLabel: string
-  if (totalRedactions === 0) countLabel = 'none detected'
-  else if (!opts.redact) countLabel = `${totalRedactions} will be visible`
-  else if (visibleOccurrences === 0) countLabel = `${totalRedactions} items`
-  else countLabel = `${visibleOccurrences} visible`
+  if (totalRedactions === 0) countLabel = t('shareEditorPanel.redact_noneDetected')
+  else if (!opts.redact) countLabel = t('shareEditorPanel.redact_willBeVisible', { count: totalRedactions })
+  else if (visibleOccurrences === 0) countLabel = t('shareEditorPanel.redact_items_other', { count: totalRedactions })
+  else countLabel = t('shareEditorPanel.redact_visible', { count: visibleOccurrences })
 
   return (
     <div
@@ -752,7 +758,7 @@ function PrivacyView({
       <div className="flex-none px-4 pt-3">
         <div className="flex items-center justify-between mb-3 gap-2">
           <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
-            Redactions
+            {t('shareEditorPanel.section_redactions')}
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <div
@@ -769,9 +775,9 @@ function PrivacyView({
               <button
                 type="button"
                 onClick={handleReset}
-                aria-label="Reset all redaction exceptions"
+                aria-label={t('shareEditorPanel.redact_resetAll_aria')}
                 data-testid="share-editor-privacy-reset"
-                title="Mask everything detected (clear all exceptions)"
+                title={t('shareEditorPanel.redact_resetAll')}
                 className="flex-none w-4 h-4 inline-flex items-center justify-center rounded text-warm-faint/70 dark:text-dark-muted/70 hover:text-accent dark:hover:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors focus:outline-none"
               >
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -784,7 +790,7 @@ function PrivacyView({
         </div>
         <Toggle
           testId="share-editor-toggle-redact"
-          label="Redact sensitive info"
+          label={t('shareEditorPanel.redact_toggleLabel')}
           value={opts.redact}
           onChange={(v) => setOpts({ ...opts, redact: v })}
         />
@@ -798,10 +804,10 @@ function PrivacyView({
               className="text-[11.5px] font-medium"
               style={{ color: opts.accentHex }}
             >
-              {totalRedactions} sensitive item{totalRedactions === 1 ? '' : 's'} will be visible
+              {t('shareEditorPanel.redact_warning_other', { count: totalRedactions })}
             </div>
             <div className="mt-0.5 text-[11px] text-warm-muted dark:text-dark-muted">
-              Enable redaction before sharing or exporting
+              {t('shareEditorPanel.redact_warning_subtitle')}
             </div>
           </div>
         )}

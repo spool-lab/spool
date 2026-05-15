@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import SegmentedPill from './SegmentedPill.js'
 
 export type SearchMode = 'fast' | 'ai'
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function SearchBar({ query, onChange, onBack, onSubmit, isSearching, variant = 'compact', mode = 'fast', onModeChange, placeholder, scoped = false }: Props) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [showBusyIndicator, setShowBusyIndicator] = useState(false)
 
@@ -41,7 +43,7 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
         <button
           onClick={onBack}
           className="flex-none text-warm-muted hover:text-warm-text dark:text-dark-muted dark:hover:text-dark-text transition-colors"
-          aria-label="Back to search"
+          aria-label={t('session.backToResults')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -78,7 +80,7 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) onSubmit?.()
           }}
-          placeholder={placeholder ?? 'Search my thinking…'}
+          placeholder={placeholder ?? (isHome ? t('search.placeholder_home') : t('search.placeholder_results'))}
           className={[
             'w-full rounded-full outline-none',
             scoped
@@ -116,17 +118,17 @@ export default function SearchBar({ query, onChange, onBack, onSubmit, isSearchi
               value={mode}
               onChange={onModeChange}
               compact={!isHome}
-              ariaLabel="Search mode"
+              ariaLabel={t('search.mode_fast') + ' / ' + t('search.mode_ai')}
               options={[
                 {
                   value: 'fast',
-                  label: 'Fast',
+                  label: t('search.mode_fast'),
                   icon: <ZapIcon size={!isHome ? 12 : 13} />,
                   hideLabel: !isHome,
                 },
                 {
                   value: 'ai',
-                  label: 'Agent',
+                  label: t('search.mode_ai'),
                   icon: <SparklesIcon size={!isHome ? 12 : 13} />,
                   hideLabel: !isHome,
                   testId: 'mode-agent',

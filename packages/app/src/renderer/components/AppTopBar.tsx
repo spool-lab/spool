@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PanelLeft } from 'lucide-react'
 
 type Props = {
@@ -17,8 +18,12 @@ type Props = {
  * running top-to-bottom.
  */
 export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children }: Props) {
+  const { t } = useTranslation()
   const dragStyle = { WebkitAppRegion: 'drag' } as React.CSSProperties
   const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
+  const sidebarTitle = sidebarCollapsed
+    ? `${t('sidebar.expand')} (⌘B)`
+    : `${t('sidebar.collapse')} (⌘B)`
 
   return (
     <div data-testid="app-top-bar" className="relative flex-none min-h-9 select-none" style={dragStyle}>
@@ -44,8 +49,8 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
             type="button"
             data-testid="sidebar-toggle"
             onClick={onToggleSidebar}
-            title={sidebarCollapsed ? 'Show sidebar (⌘B)' : 'Hide sidebar (⌘B)'}
-            aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            title={sidebarTitle}
+            aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
             aria-pressed={sidebarCollapsed}
             className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
             style={noDragStyle}

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Library as LibraryIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { MessagesSquare as LibraryIcon } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
 import { FeaturedEmptyState } from './EmptyState.js'
+
+type BucketKey = 'today' | 'yesterday' | 'earlierWeek' | 'earlierMonth' | 'older'
 
 type Props = {
   onSelectProject: (identityKey: string) => void
@@ -12,11 +15,15 @@ type Props = {
 }
 
 type DateBucket = {
+  /** Stable identity for keys, data attrs, and bucket prop drilling. */
+  key: BucketKey
+  /** Already-localized display label for headers/aria. */
   label: string
   sessions: Session[]
 }
 
 export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare }: Props) {
+  const { t } = useTranslation()
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[] | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -61,9 +68,14 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
     setReloadKey(k => k + 1)
   }
 
+  // Cast the typed t() down to a loose `(string) => string` so it can be
+  // passed to `bucketByDate`, which is called from contexts (tests,
+  // SearchOverlay) that don't share the resource literal-union type.
+  const tLoose: TranslateFn = (key) => (t as unknown as (k: string) => string)(key)
   const buckets = useMemo(
-    () => (recentSessions ? bucketByDate(recentSessions) : []),
-    [recentSessions],
+    () => (recentSessions ? bucketByDate(recentSessions, tLoose) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recentSessions, t],
   )
   const totalSessions = (pinnedSessions.length) + (recentSessions?.length ?? 0)
 
@@ -75,18 +87,14 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         ) : totalSessions === 0 ? (
           <FeaturedEmptyState
             icon={<LibraryIcon size={22} strokeWidth={1.5} />}
-            title="No sessions yet"
-            hint={
-              <>
-                Run <code className="font-mono bg-warm-surface dark:bg-dark-surface px-1 rounded">spool sync</code> to index your AI sessions and they'll appear here.
-              </>
-            }
+            title={t('library.empty_title')}
+            hint={t('library.empty_body')}
           />
         ) : (
           <>
             {pinnedSessions.length > 0 && (
               <CollapsibleSection
-                label={`PINNED · ${pinnedSessions.length} ${pinnedSessions.length === 1 ? 'session' : 'sessions'}`}
+                label={t('library.section_pinned', { count: pinnedSessions.length })}
                 testId="library-pinned"
               >
                 <div>
@@ -108,17 +116,17 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
 
             {buckets.map(bucket => (
               <CollapsibleSection
-                key={bucket.label}
+                key={bucket.key}
                 label={bucket.label}
                 testId="library-bucket"
-                dataAttr={{ 'data-bucket': bucket.label }}
+                dataAttr={{ 'data-bucket': bucket.key }}
               >
                 {bucket.sessions.map(session => (
                   <SessionRow
                     key={session.sessionUuid}
                     session={session}
                     showProject
-                    bucket={bucket.label}
+                    bucket={bucket.key}
                     onPinChange={handlePinChange}
                     onOpenSession={onOpenSession}
                     onCopySessionId={onCopySessionId}
@@ -191,11 +199,25 @@ function SessionRowsSkeleton({ count }: { count: number }) {
   )
 }
 
-export function bucketSessionsByDate(sessions: Session[]): DateBucket[] {
-  return bucketByDate(sessions)
+type TranslateFn = (key: string) => string
+
+export function bucketSessionsByDate(sessions: Session[], t?: TranslateFn): DateBucket[] {
+  // Default labels — callers that don't have a translator (e.g. tests) get
+  // the English bucket names so existing assertions keep matching.
+  const fallback: TranslateFn = (key: string) => {
+    switch (key) {
+      case 'library.bucket_today': return 'TODAY'
+      case 'library.bucket_yesterday': return 'YESTERDAY'
+      case 'library.bucket_earlierWeek': return 'EARLIER THIS WEEK'
+      case 'library.bucket_earlierMonth': return 'EARLIER THIS MONTH'
+      case 'library.bucket_older': return 'OLDER'
+      default: return key
+    }
+  }
+  return bucketByDate(sessions, t ?? fallback)
 }
 
-function bucketByDate(sessions: Session[]): DateBucket[] {
+function bucketByDate(sessions: Session[], t: TranslateFn): DateBucket[] {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const startOfYesterday = startOfToday - 86400000
@@ -222,10 +244,10 @@ function bucketByDate(sessions: Session[]): DateBucket[] {
   }
 
   const buckets: DateBucket[] = []
-  if (today.length > 0) buckets.push({ label: 'TODAY', sessions: today })
-  if (yesterday.length > 0) buckets.push({ label: 'YESTERDAY', sessions: yesterday })
-  if (earlierWeek.length > 0) buckets.push({ label: 'EARLIER THIS WEEK', sessions: earlierWeek })
-  if (earlierMonth.length > 0) buckets.push({ label: 'EARLIER THIS MONTH', sessions: earlierMonth })
-  if (older.length > 0) buckets.push({ label: 'OLDER', sessions: older })
+  if (today.length > 0) buckets.push({ key: 'today', label: t('library.bucket_today'), sessions: today })
+  if (yesterday.length > 0) buckets.push({ key: 'yesterday', label: t('library.bucket_yesterday'), sessions: yesterday })
+  if (earlierWeek.length > 0) buckets.push({ key: 'earlierWeek', label: t('library.bucket_earlierWeek'), sessions: earlierWeek })
+  if (earlierMonth.length > 0) buckets.push({ key: 'earlierMonth', label: t('library.bucket_earlierMonth'), sessions: earlierMonth })
+  if (older.length > 0) buckets.push({ key: 'older', label: t('library.bucket_older'), sessions: older })
   return buckets
 }

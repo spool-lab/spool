@@ -103,7 +103,15 @@ function MessageBubble({
 }
 
 function formatTime(iso: string): string {
-  try { return new Date(iso).toLocaleTimeString() } catch { return '' }
+  try {
+    // Respect the app's UI language (set on <html lang>) instead of
+    // inheriting the OS region setting — otherwise an English macOS
+    // produces "10:35:02 PM" even when the app is in Chinese.
+    const locale = typeof document !== 'undefined' && document.documentElement.lang
+      ? document.documentElement.lang
+      : undefined
+    return new Date(iso).toLocaleTimeString(locale)
+  } catch { return '' }
 }
 
 export default memo(MessageBubble)

@@ -77,7 +77,7 @@ test('codex search results expose resume-related actions', async () => {
 
   await row.hover()
   await row.getByRole('button', { name: 'More actions' }).click()
-  await expect(window.getByRole('menuitem', { name: 'Open in Terminal' })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: 'Resume in terminal' })).toBeVisible()
   await expect(window.getByRole('menuitem', { name: 'Copy resume command' })).toBeVisible()
   await window.keyboard.press('Escape')
 })
@@ -93,7 +93,7 @@ test('gemini search results expose resume-related actions', async () => {
 
   await row.hover()
   await row.getByRole('button', { name: 'More actions' }).click()
-  await expect(window.getByRole('menuitem', { name: 'Open in Terminal' })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: 'Resume in terminal' })).toBeVisible()
   await expect(window.getByRole('menuitem', { name: 'Copy resume command' })).toBeVisible()
   await window.keyboard.press('Escape')
 })

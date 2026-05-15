@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import daemonIconUrl from '../assets/daemon-icon.png'
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export default function DaemonNoticeModal({ onClose }: Props) {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState<'install' | 'dismiss' | null>(null)
 
   const handleAction = async (action: 'install' | 'dismiss') => {
@@ -42,16 +44,14 @@ export default function DaemonNoticeModal({ onClose }: Props) {
             id="daemon-notice-title"
             className="text-center text-base font-semibold text-warm-text dark:text-dark-text mb-2"
           >
-            Connectors moved to Spool Daemon
+            {t('daemon.noticeTitle')}
           </h2>
           <p className="text-center text-[13px] leading-relaxed text-warm-muted dark:text-dark-muted">
-            Spool now focuses on AI sessions. Twitter, GitHub, Reddit, Hacker News and other
-            platform connectors live in{' '}
+            {t('daemon.noticeBody_prefix')}{' '}
             <span className="font-medium text-warm-text dark:text-dark-text whitespace-nowrap">
-              Spool Daemon
+              {t('daemon.noticeBody_appName')}
             </span>
-            , a sibling app. Synced platform data has been removed from Spool — install Daemon
-            to keep using connectors.
+            {t('daemon.noticeBody_suffix')}
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export default function DaemonNoticeModal({ onClose }: Props) {
             disabled={busy !== null}
             className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
           >
-            Maybe later
+            {t('daemon.dismiss')}
           </button>
           <button
             type="button"
@@ -71,7 +71,7 @@ export default function DaemonNoticeModal({ onClose }: Props) {
             disabled={busy !== null}
             className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            {busy === 'install' ? 'Opening…' : 'Get Spool Daemon'}
+            {busy === 'install' ? t('daemon.installing') : t('daemon.install')}
           </button>
         </div>
       </div>

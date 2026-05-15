@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search as SearchIcon } from 'lucide-react'
 import type { Session, SearchResult, SessionSource } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
@@ -34,10 +35,10 @@ type Row = {
   snippet?: string | undefined
 }
 
-function sessionToRow(s: Session): Row {
+function sessionToRow(s: Session, noTitle: string): Row {
   return {
     sessionUuid: s.sessionUuid,
-    title: s.title?.trim() || '(no title)',
+    title: s.title?.trim() || noTitle,
     source: s.source,
     projectLabel: s.projectDisplayName ?? '',
     startedAt: s.startedAt,
@@ -45,13 +46,13 @@ function sessionToRow(s: Session): Row {
   }
 }
 
-function searchResultToRow(r: SearchResult): Row {
+function searchResultToRow(r: SearchResult, noTitle: string): Row {
   // FragmentResult.project is a raw path; show its basename for parity
   // with SessionRow's display style on this list.
   const basename = r.project.split('/').filter(Boolean).pop() ?? r.project
   return {
     sessionUuid: r.sessionUuid,
-    title: r.sessionTitle?.trim() || '(no title)',
+    title: r.sessionTitle?.trim() || noTitle,
     source: r.source,
     projectLabel: basename,
     startedAt: r.startedAt,
@@ -60,6 +61,8 @@ function searchResultToRow(r: SearchResult): Row {
 }
 
 export default function NewDraftPicker({ onSelect, onClose }: Props) {
+  const { t } = useTranslation()
+  const noTitle = t('common.noTitle')
   const [recent, setRecent] = useState<Session[] | null>(null)
   const [results, setResults] = useState<Row[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -76,7 +79,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
       .then((rows) => { if (!cancelled) setRecent(rows) })
       .catch((err) => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Could not load sessions')
+        setError(err instanceof Error ? err.message : t('common.error'))
         setRecent([])
       })
     return () => { cancelled = true }
@@ -97,7 +100,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
       window.spool.searchPreview(q, SEARCH_LIMIT)
         .then((rows) => {
           if (cancelled) return
-          setResults(rows.map(searchResultToRow))
+          setResults(rows.map(r => searchResultToRow(r, noTitle)))
           setIsSearching(false)
         })
         .catch(() => {
@@ -127,7 +130,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
   const inSearchMode = query.trim().length > 0
   const rows: Row[] | null = inSearchMode
     ? results
-    : recent?.map(sessionToRow) ?? null
+    : recent?.map(s => sessionToRow(s, noTitle)) ?? null
 
   const queryTokens = inSearchMode
     ? query.trim().toLowerCase().split(/\s+/).filter(Boolean)
@@ -180,7 +183,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h2 id="new-draft-picker-title" className="sr-only">
-          Start a draft from a session
+          {t('newDraft.title')}
         </h2>
 
         <div className="flex-none flex items-center gap-2.5 px-5 py-3">
@@ -196,11 +199,11 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder="Start a draft from a session"
+            placeholder={t('newDraft.searchPlaceholder')}
             className="flex-1 bg-transparent outline-none text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted"
           />
           {isSearching && (
-            <span className="flex-none text-[10px] text-warm-faint dark:text-dark-muted">searching…</span>
+            <span className="flex-none text-[10px] text-warm-faint dark:text-dark-muted">{t('newDraft.searchingShort')}</span>
           )}
         </div>
 
@@ -209,13 +212,13 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
             <PickerSkeleton count={6} />
           ) : error && !inSearchMode ? (
             <p className="px-5 py-8 text-center text-sm text-warm-muted dark:text-dark-muted">
-              Couldn't load sessions: {error}
+              {t('newDraft.loadError', { error })}
             </p>
           ) : rows.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-warm-muted dark:text-dark-muted">
               {inSearchMode
-                ? isSearching ? 'Searching…' : `No sessions match "${query.trim()}".`
-                : 'No sessions yet — index some first and they\'ll show up here.'}
+                ? isSearching ? t('newDraft.searching') : t('newDraft.empty', { query: query.trim() })
+                : t('newDraft.emptyNoSessions')}
             </p>
           ) : (
             <ul ref={listRef} role="listbox">
@@ -243,18 +246,18 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
           <div className="flex items-center gap-3 flex-wrap">
             {rows && rows.length > 0 && (
               <>
-                <Hint keys={['↑', '↓']} label="navigate" />
-                <Hint keys={['↵']} label="open" />
+                <Hint keys={['↑', '↓']} label={t('newDraft.navigate')} />
+                <Hint keys={['↵']} label={t('newDraft.open')} />
               </>
             )}
-            <Hint keys={['esc']} label="close" />
+            <Hint keys={['esc']} label={t('newDraft.close')} />
           </div>
           <div className="flex-none">
             {rows && rows.length > 0 && (
               <span>
                 {inSearchMode
-                  ? `${rows.length} ${rows.length === 1 ? 'result' : 'results'}`
-                  : `${rows.length} recent ${rows.length === 1 ? 'session' : 'sessions'}`}
+                  ? t('newDraft.results_other', { count: rows.length })
+                  : t('newDraft.recentSessions_other', { count: rows.length })}
               </span>
             )}
           </div>
@@ -275,7 +278,8 @@ function PickerRow({
   active: boolean
   onSelect: () => void
 }) {
-  const date = formatRelativeDate(row.startedAt)
+  const { t } = useTranslation()
+  const date = formatRelativeDate(row.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })
   const inSearchMode = queryTokens.length > 0
   const snippetHtml = inSearchMode && row.snippet
     ? snippetToStrongHtml(row.snippet)

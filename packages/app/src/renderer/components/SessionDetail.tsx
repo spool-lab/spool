@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SquareTerminal, BookText, MoreHorizontal, Copy } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
@@ -24,6 +25,7 @@ type Props = {
 }
 
 export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
+  const { t } = useTranslation()
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -236,8 +238,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
           <button
             type="button"
             onClick={onBack}
-            aria-label="Back"
-            title="Back"
+            aria-label={t('common.back')}
+            title={t('common.back')}
             className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
           >
             <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
@@ -248,7 +250,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-medium text-warm-text dark:text-dark-text truncate" title={session.title ?? undefined}>
-            {session.title ?? '(no title)'}
+            {session.title ?? t('common.noTitle')}
           </h2>
 
           <p className="mt-1 flex items-center gap-1.5 text-[11px] text-warm-faint dark:text-dark-muted min-w-0">
@@ -263,9 +265,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             <span aria-hidden>·</span>
             <span className="font-mono truncate" title={session.projectDisplayPath}>{session.projectDisplayPath}</span>
             <span aria-hidden>·</span>
-            <span className="flex-none">{formatRelativeDate(session.startedAt)}</span>
+            <span className="flex-none">{formatRelativeDate(session.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })}</span>
             <span aria-hidden>·</span>
-            <span className="flex-none">{session.messageCount} {session.messageCount === 1 ? 'message' : 'messages'}</span>
+            <span className="flex-none">{t('session.messages_other', { count: session.messageCount })}</span>
           </p>
         </div>
 
@@ -280,8 +282,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             <button
               data-testid="detail-share"
               onClick={() => onShare(session, messages)}
-              title={hasDraft ? 'Open draft' : 'Open in share editor'}
-              aria-label={hasDraft ? 'Open share draft' : 'Open in share editor'}
+              title={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
+              aria-label={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
               className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
                 hasDraft
                   ? 'text-accent dark:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
@@ -296,8 +298,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             data-testid="detail-resume"
             onClick={handleResume}
             disabled={resuming}
-            title={resuming ? 'Opening…' : 'Resume in Terminal'}
-            aria-label={resuming ? 'Opening…' : 'Resume in Terminal'}
+            title={resuming ? t('common.loading') : t('session.resume_inTerminal')}
+            aria-label={resuming ? t('common.loading') : t('session.resume_inTerminal')}
             className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
@@ -310,7 +312,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               <button
                 type="button"
                 onClick={toggle}
-                aria-label="More actions"
+                aria-label={t('common.more')}
                 className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
               >
                 <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
@@ -318,12 +320,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             )}
             items={[
               {
-                label: 'Copy session ID',
+                label: t('sidebar.copySessionId'),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopySessionId() },
               },
               ...(resumeCommandAvailable ? [{
-                label: commandCopied ? 'Copied!' : 'Copy resume command',
+                label: commandCopied ? t('common.copiedResumeCommand') : t('common.copyResumeCommand'),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),

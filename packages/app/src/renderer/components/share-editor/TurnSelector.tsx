@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, CheckCheck, Eraser } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
 
@@ -19,6 +20,7 @@ type Props = {
  * `isExcerpt` flag flips back to false.
  */
 export function TurnSelector({ convo, opts, setOpts }: Props) {
+  const { t } = useTranslation()
   const total = convo.turns.length
 
   const selectedSet = useMemo(() => {
@@ -106,7 +108,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
   if (total === 0) {
     return (
       <div className="px-4 py-6 text-center text-[11px] text-warm-faint dark:text-dark-muted">
-        No messages in this conversation.
+        {t('shareEditorPanel.turnSelector_empty')}
       </div>
     )
   }
@@ -115,15 +117,15 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
     <div className="flex flex-col min-h-0 flex-1">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <span className="text-[10px] uppercase tracking-wider font-medium text-warm-faint dark:text-dark-faint">
-          Messages {visibleKept} of {visibleTotal}
+          {t('shareEditorPanel.turnSelector_header', { kept: visibleKept, total: visibleTotal })}
         </span>
         <span className="flex items-center gap-0.5">
           <button
             type="button"
             data-testid="share-editor-turns-select-all"
             onClick={selectAll}
-            title="Include all messages"
-            aria-label="Include all messages"
+            title={t('shareEditorPanel.turnSelector_selectAll')}
+            aria-label={t('shareEditorPanel.turnSelector_selectAll')}
             className="w-5 h-5 inline-flex items-center justify-center rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
           >
             <CheckCheck size={13} strokeWidth={1.75} />
@@ -132,8 +134,8 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
             type="button"
             data-testid="share-editor-turns-clear"
             onClick={clearAll}
-            title="Exclude all messages"
-            aria-label="Exclude all messages"
+            title={t('shareEditorPanel.turnSelector_deselectAll')}
+            aria-label={t('shareEditorPanel.turnSelector_deselectAll')}
             className="w-5 h-5 inline-flex items-center justify-center rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
           >
             <Eraser size={12} strokeWidth={1.75} />
@@ -159,9 +161,11 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 data-testid="share-editor-turn-toggle"
                 data-row-turn-index={i}
                 onClick={() => toggleTurn(i)}
-                title={included ? 'Click to exclude' : 'Click to include'}
+                title={included ? t('shareEditorPanel.turnSelector_clickExclude') : t('shareEditorPanel.turnSelector_clickInclude')}
                 aria-pressed={included}
-                aria-label={`${included ? 'Exclude' : 'Include'} message ${i + 1}`}
+                aria-label={included
+                  ? t('shareEditorPanel.turnSelector_excludeMsg', { index: i + 1 })
+                  : t('shareEditorPanel.turnSelector_includeMsg', { index: i + 1 })}
                 className="shrink-0 p-1 -m-1 rounded"
               >
                 <span
@@ -181,14 +185,14 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 data-row-turn-index={i}
                 onClick={() => jumpToTurn(i)}
                 title={previewTooltip(turn.body)}
-                aria-label={`Jump to message ${i + 1}`}
+                aria-label={t('shareEditorPanel.turnSelector_jumpToMsg', { index: i + 1 })}
                 className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
               >
                 <span className="font-mono text-[10.5px] tabular-nums text-warm-faint dark:text-dark-faint shrink-0">
                   {padIndex(i + 1, total)}
                 </span>
                 <span className="text-[12px] text-warm-text dark:text-dark-text truncate flex-1">
-                  {preview || <span className="text-warm-faint dark:text-dark-faint italic">empty</span>}
+                  {preview || <span className="text-warm-faint dark:text-dark-faint italic">{t('shareEditorPanel.turnSelector_empty_body')}</span>}
                 </span>
               </button>
             </li>

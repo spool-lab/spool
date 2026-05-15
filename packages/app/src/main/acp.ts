@@ -58,6 +58,8 @@ export interface AgentsConfig {
   pinnedSortOrder?: 'recent_pinned' | 'recent' | 'name'
   /** Sort order for the project view session list (default: 'recent') */
   projectSortOrder?: 'recent' | 'oldest' | 'most_messages' | 'title'
+  /** UI language; 'system' follows OS preference (default). */
+  language?: 'system' | 'en' | 'zh-CN' | 'zh-TW'
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string
