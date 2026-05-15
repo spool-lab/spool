@@ -283,9 +283,9 @@
     "noResults_body": "換個關鍵字，或擴大搜尋範圍。"
   },
   "update": {
-    "available": "Spool 有新版本可用",
+    "available": "有可用更新",
     "downloading": "下載更新中… {{percent}}%",
-    "ready": "更新已就緒 — 重新啟動以安裝",
+    "ready": "重新啟動以安裝",
     "restart": "重新啟動"
   },
   "status": {
