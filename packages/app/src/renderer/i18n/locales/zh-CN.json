@@ -209,8 +209,8 @@
     "sourceKind_imported": "已导入"
   },
   "shareEditor": {
-    "openExisting": "打开分享草稿",
-    "openNew": "在分享编辑器中打开",
+    "openExisting": "编辑分享草稿",
+    "openNew": "编辑分享草稿",
     "back": "返回",
     "panel_privacy": "隐私",
     "panel_timeline": "时间线",

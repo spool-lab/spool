@@ -216,8 +216,8 @@
     "sourceKind_imported": "Importé"
   },
   "shareEditor": {
-    "openExisting": "Ouvrir le brouillon de partage",
-    "openNew": "Ouvrir dans l'éditeur de partage",
+    "openExisting": "Modifier le brouillon de partage",
+    "openNew": "Modifier le brouillon de partage",
     "back": "Retour",
     "panel_privacy": "Confidentialité",
     "panel_timeline": "Chronologie",

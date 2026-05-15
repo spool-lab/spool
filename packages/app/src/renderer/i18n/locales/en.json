@@ -216,8 +216,8 @@
     "sourceKind_imported": "Imported"
   },
   "shareEditor": {
-    "openExisting": "Open share draft",
-    "openNew": "Open in share editor",
+    "openExisting": "Edit share draft",
+    "openNew": "Edit share draft",
     "back": "Back",
     "panel_privacy": "Privacy",
     "panel_timeline": "Timeline",

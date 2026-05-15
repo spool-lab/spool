@@ -34,7 +34,7 @@ export async function openSessionDetail(window: Page, sessionUuid: string): Prom
 }
 
 /**
- * Open a SessionRow ⋯ menu and pick "Open in share editor".
+ * Open a SessionRow ⋯ menu and pick "Edit share draft".
  */
 export async function shareFromSessionRowMenu(window: Page, sessionUuid: string): Promise<void> {
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
@@ -42,7 +42,7 @@ export async function shareFromSessionRowMenu(window: Page, sessionUuid: string)
   await expect(row).toBeVisible({ timeout: 5000 })
   await row.hover()
   await row.getByLabel('More actions').click()
-  await window.getByRole('menuitem', { name: 'Open in share editor' }).click()
+  await window.getByRole('menuitem', { name: 'Edit share draft' }).click()
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
 }
 

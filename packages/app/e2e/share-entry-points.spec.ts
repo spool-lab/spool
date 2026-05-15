@@ -68,7 +68,7 @@ test('entry point: LibraryLanding ⋯ menu Share opens editor', async () => {
   await expect(row).toBeVisible({ timeout: 5000 })
   await row.hover()
   await row.getByLabel('More actions').click()
-  await ctx.window.getByRole('menuitem', { name: 'Open in share editor' }).click()
+  await ctx.window.getByRole('menuitem', { name: 'Edit share draft' }).click()
   await expect(ctx.window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
   await closeEditorIfOpen()
 })
