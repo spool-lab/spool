@@ -744,9 +744,12 @@ function PrivacyView({
   return (
     <div
       data-testid="share-editor-privacy-panel"
-      className="flex-1 min-h-0 overflow-y-auto scrollbar-none"
+      className="flex-1 min-h-0 flex flex-col"
     >
-      <div className="px-4 pt-3 pb-4">
+      {/* Fixed header — REDACTIONS / count / Reset + master toggle.
+       *  Stays put when the category list scrolls below so the user
+       *  always has the master control + leak-count in view. */}
+      <div className="flex-none px-4 pt-3">
         <div className="flex items-center justify-between mb-3 gap-2">
           <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
             Redactions
@@ -785,19 +788,10 @@ function PrivacyView({
           value={opts.redact}
           onChange={(v) => setOpts({ ...opts, redact: v })}
         />
-        {opts.redact && (
-          <RedactSummary
-            groups={pii.groups}
-            authorNames={pii.names}
-            manualValues={pii.manual}
-            opts={opts}
-            setOpts={setOpts}
-          />
-        )}
         {!opts.redact && totalRedactions > 0 && (
           <div
             data-testid="share-editor-privacy-warning"
-            className="mt-3 px-3 py-2.5 rounded-md border leading-snug"
+            className="mt-3 mb-4 px-3 py-2.5 rounded-md border leading-snug"
             style={{ borderColor: `${opts.accentHex}4D`, background: `${opts.accentHex}1A` }}
           >
             <div
@@ -812,6 +806,19 @@ function PrivacyView({
           </div>
         )}
       </div>
+      {/* Only the categorised list scrolls. Header + master toggle
+       *  stay pinned above. */}
+      {opts.redact && (
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none px-4 pb-4">
+          <RedactSummary
+            groups={pii.groups}
+            authorNames={pii.names}
+            manualValues={pii.manual}
+            opts={opts}
+            setOpts={setOpts}
+          />
+        </div>
+      )}
     </div>
   )
 }
