@@ -135,12 +135,17 @@ test('handles 1500-message session: virtualization + deep find', async () => {
     .click()
   await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 10000 })
 
-  const renderedCount = await window
-    .locator('[data-testid="message-list-scroll"] [data-index]')
-    .count()
   // Expected steady state: viewport-visible (~5-9) + overscan 6 each side ≈ 17-21.
   // 35 is a tight ceiling that catches regressions early without flaking on minor tuning.
-  expect(renderedCount).toBeLessThan(35)
+  // Polled to ride out the post-mount transient where virtualization briefly
+  // overshoots before culling — observed on macOS CI runners.
+  await expect
+    .poll(
+      async () =>
+        window.locator('[data-testid="message-list-scroll"] [data-index]').count(),
+      { timeout: 3000 },
+    )
+    .toBeLessThan(35)
 
   const isMac = process.platform === 'darwin'
   await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
