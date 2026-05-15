@@ -56,6 +56,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
     <div
       data-testid="session-row"
       data-session-uuid={session.sessionUuid}
+      {...(pinned ? { 'data-pinned': '' } : {})}
       role="button"
       tabIndex={0}
       onClick={handleOpen}

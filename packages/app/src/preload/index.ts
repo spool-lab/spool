@@ -1,8 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup,
-  ListSessionsByIdentityOptions, ProjectSessionSortOrder,
+  ListSessionsByIdentityOptions, ProjectSessionSortOrder, SessionsCursor, SessionsPage, DirectoryCount,
   ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
+  SessionSource,
 } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -55,14 +56,17 @@ const api = {
   searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search-preview', { query, limit, source }),
 
-  listSessions: (limit?: number): Promise<Session[]> =>
-    ipcRenderer.invoke('spool:list-sessions', { limit }),
+  listSessions: (options?: { limit?: number; cursor?: SessionsCursor }): Promise<SessionsPage> =>
+    ipcRenderer.invoke('spool:list-sessions', options ?? {}),
 
   listProjectGroups: (): Promise<ProjectGroup[]> =>
     ipcRenderer.invoke('spool:list-project-groups'),
 
-  listSessionsByIdentity: (identityKey: string, options?: ListSessionsByIdentityOptions): Promise<Session[]> =>
+  listSessionsByIdentity: (identityKey: string, options?: ListSessionsByIdentityOptions): Promise<SessionsPage> =>
     ipcRenderer.invoke('spool:list-sessions-by-identity', { identityKey, options }),
+
+  listProjectDirectoryCounts: (identityKey: string, sources?: SessionSource[]): Promise<DirectoryCount[]> =>
+    ipcRenderer.invoke('spool:list-project-directory-counts', { identityKey, sources }),
 
   getSession: (sessionUuid: string): Promise<{ session: Session; messages: Message[] } | null> =>
     ipcRenderer.invoke('spool:get-session', { sessionUuid }),

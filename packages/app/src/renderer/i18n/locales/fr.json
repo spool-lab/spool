@@ -135,7 +135,10 @@
     "bucket_yesterday": "HIER",
     "bucket_earlierWeek": "PLUS TÔT CETTE SEMAINE",
     "bucket_earlierMonth": "PLUS TÔT CE MOIS-CI",
-    "bucket_older": "PLUS ANCIEN"
+    "bucket_older": "PLUS ANCIEN",
+    "footer_loadingMore": "Chargement des sessions plus anciennes…",
+    "footer_endOf_one": "Fin — {{count}} session",
+    "footer_endOf_other": "Fin — {{count}} sessions"
   },
   "settings": {
     "title": "Paramètres",

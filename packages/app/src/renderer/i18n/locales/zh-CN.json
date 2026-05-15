@@ -128,7 +128,9 @@
     "bucket_yesterday": "昨天",
     "bucket_earlierWeek": "本周早些时候",
     "bucket_earlierMonth": "本月早些时候",
-    "bucket_older": "更早"
+    "bucket_older": "更早",
+    "footer_loadingMore": "正在加载更早的会话…",
+    "footer_endOf_other": "共 {{count}} 个会话"
   },
   "settings": {
     "title": "设置",

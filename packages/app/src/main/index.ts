@@ -29,13 +29,13 @@ process.on('uncaughtException', (err) => {
 
 import {
   getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
-  searchFragments, searchSessionPreview, listRecentSessions, getSessionWithMessages, getStatus,
+  searchFragments, searchSessionPreview, listRecentSessionsPage, getSessionWithMessages, getStatus,
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
-  listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity,
+  listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
 } from '@spool-lab/core'
 import type {
-  FragmentResult, SessionSource, ListSessionsByIdentityOptions,
+  FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
 } from '@spool-lab/core'
 import { setupTray } from './tray.js'
@@ -329,8 +329,8 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
   return fragments
 })
 
-ipcMain.handle('spool:list-sessions', (_e, { limit = 50 }: { limit?: number } = {}) => {
-  return listRecentSessions(db, limit)
+ipcMain.handle('spool:list-sessions', (_e, args: { limit?: number; cursor?: SessionsCursor } = {}) => {
+  return listRecentSessionsPage(db, args)
 })
 
 ipcMain.handle('spool:list-project-groups', () => {
@@ -339,6 +339,10 @@ ipcMain.handle('spool:list-project-groups', () => {
 
 ipcMain.handle('spool:list-sessions-by-identity', (_e, { identityKey, options }: { identityKey: string; options?: ListSessionsByIdentityOptions }) => {
   return listSessionsByIdentity(db, identityKey, options)
+})
+
+ipcMain.handle('spool:list-project-directory-counts', (_e, { identityKey, sources }: { identityKey: string; sources?: SessionSource[] }) => {
+  return listProjectDirectoryCounts(db, identityKey, sources ? { sources } : {})
 })
 
 ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string }) => {

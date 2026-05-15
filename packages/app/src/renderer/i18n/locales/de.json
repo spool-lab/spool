@@ -135,7 +135,10 @@
     "bucket_yesterday": "GESTERN",
     "bucket_earlierWeek": "FRÜHER DIESE WOCHE",
     "bucket_earlierMonth": "FRÜHER DIESEN MONAT",
-    "bucket_older": "ÄLTER"
+    "bucket_older": "ÄLTER",
+    "footer_loadingMore": "Ältere Sitzungen werden geladen…",
+    "footer_endOf_one": "Ende — {{count}} Sitzung",
+    "footer_endOf_other": "Ende — {{count}} Sitzungen"
   },
   "settings": {
     "title": "Einstellungen",

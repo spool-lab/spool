@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessagesSquare as LibraryIcon } from 'lucide-react'
-import type { Session } from '@spool-lab/core'
-import SessionRow from './SessionRow.js'
+import type { Session, SessionsCursor } from '@spool-lab/core'
+import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
 import { FeaturedEmptyState } from './EmptyState.js'
+import { insertSessionSorted } from '../../shared/sessionSort.js'
 
 type BucketKey = 'today' | 'yesterday' | 'earlierWeek' | 'earlierMonth' | 'older'
 
@@ -15,44 +16,144 @@ type Props = {
 }
 
 type DateBucket = {
-  /** Stable identity for keys, data attrs, and bucket prop drilling. */
   key: BucketKey
-  /** Already-localized display label for headers/aria. */
   label: string
   sessions: Session[]
 }
 
+const PAGE_SIZE = 50
+
 export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[] | null>(null)
-  const [reloadKey, setReloadKey] = useState(0)
+  const [cursor, setCursor] = useState<SessionsCursor | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  // Per fetch we capture a token; only the freshest fetch is allowed to
+  // mutate state. Replaces the per-effect `cancelled` flag so the initial
+  // load and subsequent endReached pages share one rule.
+  const fetchTokenRef = useRef(0)
+
+  // Refs keep endReached's closure stable across renders.
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const loadingRef = useRef(loadingMore)
+  loadingRef.current = loadingMore
+  const pinnedSessionsRef = useRef<Session[]>([])
+  pinnedSessionsRef.current = pinnedSessions
+  const pinnedUuidsRef = useRef(new Set<string>())
+  pinnedUuidsRef.current = new Set(pinnedSessions.map(s => s.sessionUuid))
 
   useEffect(() => {
-    let cancelled = false
+    const token = ++fetchTokenRef.current
+    setRecentSessions(null)
+    setCursor(null)
+    setLoadingMore(false)
     Promise.all([
       window.spool.listPinnedSessions(),
-      window.spool.listSessions(200),
+      window.spool.listSessions({ limit: PAGE_SIZE }),
     ])
-      .then(([pinned, recent]) => {
-        if (cancelled) return
+      .then(([pinned, page]) => {
+        if (fetchTokenRef.current !== token) return
         const pinnedUuids = new Set(pinned.map(s => s.sessionUuid))
         setPinnedSessions(pinned)
-        setRecentSessions(recent.filter(s => !pinnedUuids.has(s.sessionUuid)))
+        setRecentSessions(page.sessions.filter(s => !pinnedUuids.has(s.sessionUuid)))
+        setCursor(page.nextCursor)
       })
       .catch(() => {
-        if (!cancelled) {
-          setPinnedSessions([])
-          setRecentSessions([])
-        }
+        if (fetchTokenRef.current !== token) return
+        setPinnedSessions([])
+        setRecentSessions([])
       })
-    return () => { cancelled = true }
-  }, [reloadKey])
+  }, [])
 
   useEffect(() => {
-    function bump() { setReloadKey(k => k + 1) }
-    window.addEventListener('spool:pin-change', bump)
-    return () => window.removeEventListener('spool:pin-change', bump)
+    // Pin events from sibling components (sidebar, session detail).
+    // Diff the fresh pinned list against the current one: anything that
+    // disappeared was unpinned externally and must be reinserted into
+    // recent — otherwise the session vanishes from this view entirely.
+    //
+    // We force `exhausted=true` for the reinsertion. Without it,
+    // insertSessionSorted would drop candidates older than the last
+    // loaded row (they'd "live in a future page"), which is exactly
+    // the situation we're trying to avoid here — the user just had the
+    // session in their pinned section and expects it to stay visible.
+    // loadMore filters dedupe against already-loaded UUIDs so the
+    // keyset query won't surface this session a second time.
+    function handlePinEvent() {
+      window.spool.listPinnedSessions()
+        .then(freshPinned => {
+          const freshUuids = new Set(freshPinned.map(s => s.sessionUuid))
+          const newlyUnpinned = pinnedSessionsRef.current.filter(
+            s => !freshUuids.has(s.sessionUuid),
+          )
+          setPinnedSessions(freshPinned)
+          setRecentSessions(prev => {
+            if (!prev) return prev
+            let acc = prev.filter(s => !freshUuids.has(s.sessionUuid))
+            for (const candidate of newlyUnpinned) {
+              acc = insertSessionSorted(acc, candidate, 'recent', true)
+            }
+            return acc
+          })
+        })
+        .catch(() => {})
+    }
+    window.addEventListener('spool:pin-change', handlePinEvent)
+    return () => window.removeEventListener('spool:pin-change', handlePinEvent)
+  }, [])
+
+  useEffect(() => {
+    // New sessions arrived via sync: soft-merge them into the first page
+    // without unmounting the list. Skipped while we're between pages
+    // (`loadingMore`) because the merge would race with that fetch.
+    const off = window.spool.onNewSessions(() => {
+      if (loadingRef.current) return
+      window.spool.listSessions({ limit: PAGE_SIZE })
+        .then(page => {
+          setRecentSessions(prev => {
+            if (prev === null) return page.sessions
+            const known = new Set(prev.map(s => s.sessionUuid))
+            const pinnedUuids = pinnedUuidsRef.current
+            const additions = page.sessions.filter(s =>
+              !known.has(s.sessionUuid) && !pinnedUuids.has(s.sessionUuid),
+            )
+            return additions.length === 0 ? prev : [...additions, ...prev]
+          })
+        })
+        .catch(() => {})
+    })
+    return () => { off() }
+  }, [])
+
+  const loadMore = useCallback(() => {
+    if (loadingRef.current || !cursorRef.current) return
+    const token = ++fetchTokenRef.current
+    setLoadingMore(true)
+    window.spool.listSessions({ limit: PAGE_SIZE, cursor: cursorRef.current })
+      .then(page => {
+        if (fetchTokenRef.current !== token) return
+        setRecentSessions(prev => {
+          const base = prev ?? []
+          // Dedupe against pinned + already-loaded. The keyset cursor
+          // alone would suffice if nothing else mutated the list, but
+          // handlePinEvent reinserts unpinned candidates regardless of
+          // whether they sit beyond the loaded range, so they can
+          // re-appear here when the page is fetched.
+          const seen = new Set(base.map(s => s.sessionUuid))
+          const additions = page.sessions.filter(s =>
+            !pinnedUuidsRef.current.has(s.sessionUuid) && !seen.has(s.sessionUuid),
+          )
+          return [...base, ...additions]
+        })
+        setCursor(page.nextCursor)
+        setLoadingMore(false)
+      })
+      .catch(() => {
+        if (fetchTokenRef.current !== token) return
+        setLoadingMore(false)
+        setCursor(null)
+      })
   }, [])
 
   function handlePinChange(sessionUuid: string, pinned: boolean) {
@@ -63,83 +164,95 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         setPinnedSessions(prev => [candidate, ...prev])
       }
     } else {
+      const candidate = pinnedSessions.find(s => s.sessionUuid === sessionUuid)
       setPinnedSessions(prev => prev.filter(s => s.sessionUuid !== sessionUuid))
+      if (candidate) {
+        // exhausted=true so an unpinned session deeper than the loaded
+        // range still appears — see handlePinEvent for the rationale.
+        setRecentSessions(prev =>
+          prev ? insertSessionSorted(prev, candidate, 'recent', true) : prev,
+        )
+      }
     }
-    setReloadKey(k => k + 1)
   }
 
-  // Cast the typed t() down to a loose `(string) => string` so it can be
-  // passed to `bucketByDate`, which is called from contexts (tests,
-  // SearchOverlay) that don't share the resource literal-union type.
-  const tLoose: TranslateFn = (key) => (t as unknown as (k: string) => string)(key)
+  // i18n.language is a stable per-locale key; depending on `t` (which
+  // changes identity on most renders) would rebuild rows constantly.
   const buckets = useMemo(
-    () => (recentSessions ? bucketByDate(recentSessions, tLoose) : []),
+    () => (recentSessions ? bucketByDate(recentSessions, looseTranslator(t)) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recentSessions, t],
+    [recentSessions, i18n.language],
   )
-  const totalSessions = (pinnedSessions.length) + (recentSessions?.length ?? 0)
+  const totalSessions = pinnedSessions.length + (recentSessions?.length ?? 0)
+  const pinnedLabel = useMemo(
+    () => t('library.section_pinned', { count: pinnedSessions.length }),
+    [t, pinnedSessions.length],
+  )
+  const exhausted = recentSessions !== null && cursor === null
+
+  const rows = useMemo<SessionListRow[]>(() => {
+    const out: SessionListRow[] = []
+    if (pinnedSessions.length > 0) {
+      out.push({
+        kind: 'header',
+        id: 'pinned',
+        label: pinnedLabel,
+        testId: 'library-pinned-header',
+      })
+      for (const s of pinnedSessions) {
+        out.push({ kind: 'session', id: `p-${s.sessionUuid}`, session: s, pinned: true, showProject: true, headerId: 'pinned' })
+      }
+    }
+    for (const bucket of buckets) {
+      out.push({
+        kind: 'header',
+        id: `bucket-${bucket.key}`,
+        label: bucket.label,
+        testId: 'library-bucket-header',
+        dataAttr: { 'data-bucket': bucket.key },
+      })
+      for (const s of bucket.sessions) {
+        out.push({
+          kind: 'session',
+          id: s.sessionUuid,
+          session: s,
+          showProject: true,
+          bucket: bucket.key,
+          headerId: `bucket-${bucket.key}`,
+        })
+      }
+    }
+    out.push({ kind: 'footer', id: 'footer', loading: loadingMore, exhausted, total: totalSessions })
+    return out
+  }, [pinnedSessions, pinnedLabel, buckets, loadingMore, exhausted, totalSessions])
 
   return (
     <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto pb-12 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
-        {recentSessions === null ? (
-          <SessionRowsSkeleton count={6} />
-        ) : totalSessions === 0 ? (
-          <FeaturedEmptyState
-            icon={<LibraryIcon size={22} strokeWidth={1.5} />}
-            title={t('library.empty_title')}
-            hint={t('library.empty_body')}
-          />
-        ) : (
-          <>
-            {pinnedSessions.length > 0 && (
-              <CollapsibleSection
-                label={t('library.section_pinned', { count: pinnedSessions.length })}
-                testId="library-pinned"
-              >
-                <div>
-                  {pinnedSessions.map(session => (
-                    <SessionRow
-                      key={session.sessionUuid}
-                      session={session}
-                      pinned
-                      showProject
-                      onPinChange={handlePinChange}
-                      onOpenSession={onOpenSession}
-                      onCopySessionId={onCopySessionId}
-                      {...(onShare ? { onShare } : {})}
-                    />
-                  ))}
-                </div>
-              </CollapsibleSection>
-            )}
-
-            {buckets.map(bucket => (
-              <CollapsibleSection
-                key={bucket.key}
-                label={bucket.label}
-                testId="library-bucket"
-                dataAttr={{ 'data-bucket': bucket.key }}
-              >
-                {bucket.sessions.map(session => (
-                  <SessionRow
-                    key={session.sessionUuid}
-                    session={session}
-                    showProject
-                    bucket={bucket.key}
-                    onPinChange={handlePinChange}
-                    onOpenSession={onOpenSession}
-                    onCopySessionId={onCopySessionId}
-                    {...(onShare ? { onShare } : {})}
-                  />
-                ))}
-              </CollapsibleSection>
-            ))}
-          </>
-        )}
-      </div>
+      {recentSessions === null ? (
+        <SessionRowsSkeleton count={6} />
+      ) : totalSessions === 0 ? (
+        <FeaturedEmptyState
+          icon={<LibraryIcon size={22} strokeWidth={1.5} />}
+          title={t('library.empty_title')}
+          hint={t('library.empty_body')}
+        />
+      ) : (
+        <VirtualSessionList
+          rows={rows}
+          onEndReached={loadMore}
+          onPinChange={handlePinChange}
+          onOpenSession={onOpenSession}
+          onCopySessionId={onCopySessionId}
+          {...(onShare ? { onShare } : {})}
+          testId="library-landing-scroll"
+        />
+      )}
     </div>
   )
+}
+
+function looseTranslator(t: ReturnType<typeof useTranslation>['t']): TranslateFn {
+  return (key) => (t as unknown as (k: string) => string)(key)
 }
 
 export function CollapsibleSection({
@@ -202,8 +315,6 @@ function SessionRowsSkeleton({ count }: { count: number }) {
 type TranslateFn = (key: string) => string
 
 export function bucketSessionsByDate(sessions: Session[], t?: TranslateFn): DateBucket[] {
-  // Default labels — callers that don't have a translator (e.g. tests) get
-  // the English bucket names so existing assertions keep matching.
   const fallback: TranslateFn = (key: string) => {
     switch (key) {
       case 'library.bucket_today': return 'TODAY'
@@ -231,15 +342,15 @@ function bucketByDate(sessions: Session[], t: TranslateFn): DateBucket[] {
   const older: Session[] = []
 
   for (const session of sessions) {
-    const t = Date.parse(session.startedAt)
-    if (Number.isNaN(t)) {
+    const ts = Date.parse(session.startedAt)
+    if (Number.isNaN(ts)) {
       older.push(session)
       continue
     }
-    if (t >= startOfToday) today.push(session)
-    else if (t >= startOfYesterday) yesterday.push(session)
-    else if (t >= startOfWeek) earlierWeek.push(session)
-    else if (t >= startOfMonth) earlierMonth.push(session)
+    if (ts >= startOfToday) today.push(session)
+    else if (ts >= startOfYesterday) yesterday.push(session)
+    else if (ts >= startOfWeek) earlierWeek.push(session)
+    else if (ts >= startOfMonth) earlierMonth.push(session)
     else older.push(session)
   }
 
