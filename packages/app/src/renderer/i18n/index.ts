@@ -6,11 +6,12 @@ import zhTW from './locales/zh-TW.json'
 import ja from './locales/ja.json'
 import ko from './locales/ko.json'
 import de from './locales/de.json'
+import fr from './locales/fr.json'
 
-export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de'
+export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'
 export type LanguagePreference = 'system' | SupportedLocale
 
-export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'de']
+export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'de', 'fr']
 
 const STORAGE_KEY = 'spool:lang-cache'
 
@@ -22,7 +23,7 @@ const STORAGE_KEY = 'spool:lang-cache'
 function readCachedLocale(): SupportedLocale | null {
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    if (v === 'en' || v === 'zh-CN' || v === 'zh-TW' || v === 'ja' || v === 'ko' || v === 'de') return v
+    if (v === 'en' || v === 'zh-CN' || v === 'zh-TW' || v === 'ja' || v === 'ko' || v === 'de' || v === 'fr') return v
   } catch { /* localStorage disabled — ignore */ }
   return null
 }
@@ -43,6 +44,7 @@ i18n
       ja: { translation: ja },
       ko: { translation: ko },
       de: { translation: de },
+      fr: { translation: fr },
     },
     // Initial language: cached value if available, else en. The renderer
     // will call `applyLanguage` once it resolves the user's preference.

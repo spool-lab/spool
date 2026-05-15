@@ -23,7 +23,7 @@ export interface BuiltinAgent {
   acpMode: 'extension' | 'native' | 'websocket'
 }
 
-export type LanguagePreference = 'system' | 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de'
+export type LanguagePreference = 'system' | 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'
 
 export interface AgentsConfig {
   defaultAgent?: string
@@ -89,7 +89,7 @@ const api = {
     ipcRenderer.invoke('spool:get-runtime-info'),
 
   /** Returns the OS-preferred locale mapped to one Spool supports, or 'en'. */
-  getSystemLocale: (): Promise<'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de'> =>
+  getSystemLocale: (): Promise<'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'> =>
     ipcRenderer.invoke('spool:get-system-locale'),
 
   syncNow: (): Promise<SyncResult> =>
