@@ -1,6 +1,6 @@
 {
   "name": "@spool/app",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "private": true,
   "productName": "Spool",
   "main": "./out/main/index.js",
