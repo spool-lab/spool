@@ -25,6 +25,9 @@ jobs:
       - run: pnpm --filter @spool-lab/core test
       - run: pnpm --filter @spool-lab/cli build
       - run: pnpm --filter @spool-lab/cli test
+      - run: pnpm --filter @spool-lab/redact build
+      - run: pnpm --filter @spool-lab/redact test
+      - run: pnpm --filter @spool/share-kit test
 
   e2e:
     strategy:
