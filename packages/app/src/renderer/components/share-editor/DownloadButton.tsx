@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { ArrowUpToLine, Loader2 } from 'lucide-react'
 
 export type ExportFormat = 'png' | 'pdf' | 'md' | 'spool'
 
@@ -7,17 +7,19 @@ type FormatDef = {
   k: ExportFormat
   /** Dropdown menu label. */
   l: string
-  /** Primary button label when this format is selected. */
+  /** Primary button label when this format is selected (used as
+   *  accessible name for screen readers; the visual label is always
+   *  the static "Export"). */
   b: string
   /** Dropdown sub-copy (mono). */
   s: string
 }
 
 const FORMATS: FormatDef[] = [
-  { k: 'png', l: 'PNG image', b: 'Download PNG', s: '3× pixel ratio · social-feed friendly' },
-  { k: 'pdf', l: 'PDF', b: 'Download PDF', s: 'A4 paginated · print-ready' },
-  { k: 'md', l: 'Markdown', b: 'Download .md', s: 'Plain text · Obsidian / GitHub friendly' },
-  { k: 'spool', l: 'Spool file', b: 'Download .spool', s: 'Editable in Spool · keeps your styling' },
+  { k: 'png', l: 'PNG image', b: 'Export PNG', s: '3× pixel ratio · social-feed friendly' },
+  { k: 'pdf', l: 'PDF', b: 'Export PDF', s: 'A4 paginated · print-ready' },
+  { k: 'md', l: 'Markdown', b: 'Export .md', s: 'Plain text · Obsidian / GitHub friendly' },
+  { k: 'spool', l: 'Spool file', b: 'Export .spool', s: 'Editable in Spool · keeps your styling' },
 ]
 
 const STORAGE_KEY = 'spool:share:lastFormat'
@@ -68,27 +70,39 @@ export function DownloadButton({ saving, onExport }: Props) {
 
   return (
     <div ref={rootRef} className="relative flex flex-none" data-testid="share-editor-download">
+      {/* Primary action: always "Download". The button width never
+       *  reflows on format switch or while saving — only the icon
+       *  swaps (Download → spinner) and the OS tooltip carries the
+       *  format detail for users who hover. The current format is
+       *  visible in the dropdown (rendered with a checkmark on the
+       *  active row) rather than on the trigger itself. */}
       <button
         type="button"
         data-testid="share-editor-download-trigger"
         data-format={format}
         onClick={trigger}
         disabled={saving}
-        title={`${current.b}  ⌘S`}
-        className="inline-flex items-center gap-1.5 h-6 px-2 rounded-l text-xs font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+        aria-label={`Export ${current.l} (Cmd+S)`}
+        className="inline-flex items-center gap-1.5 h-6 px-2 rounded-l text-[13px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        <Download size={11} strokeWidth={1.8} />
-        <span>{saving ? 'Downloading…' : current.b}</span>
+        {saving
+          ? <Loader2 size={13} strokeWidth={1.75} className="animate-spin" aria-hidden />
+          : <ArrowUpToLine size={13} strokeWidth={1.75} aria-hidden />}
+        <span>Export</span>
       </button>
+      {/* Format chooser — caret-only opener. Keeps "action" (Download)
+       *  and "selection" (format) as distinct, narrow click targets;
+       *  the trigger never widens because the secondary button is
+       *  fixed-content. */}
       <button
         type="button"
         data-testid="share-editor-download-caret"
         onClick={() => setOpen(o => !o)}
-        aria-label="Choose format"
+        aria-label={`Format: ${current.l}, click to change`}
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={saving}
-        className="inline-flex items-center justify-center h-6 w-5 rounded-r text-white bg-accent dark:bg-accent-dark border-l border-white/25 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+        className="inline-flex items-center justify-center h-6 w-5 rounded-r text-white bg-accent dark:bg-accent-dark border-l border-white/10 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M2 4l3 3 3-3" />
