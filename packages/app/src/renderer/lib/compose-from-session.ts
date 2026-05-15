@@ -1,5 +1,5 @@
 import type { Session, Message, SessionSource } from '@spool-lab/core'
-import type { Conversation, Platform, Turn } from '@spool/share-kit'
+import type { Conversation, Turn } from '@spool/share-kit'
 
 /**
  * Stable per-session draft id. Re-opening the same Spool session always
@@ -10,19 +10,6 @@ import type { Conversation, Platform, Turn } from '@spool/share-kit'
  */
 export function sessionDraftId(sessionUuid: string): string {
   return `session:${sessionUuid}`
-}
-
-/**
- * share-kit's Platform union currently covers ChatGPT / Claude / Gemini —
- * Codex doesn't exist there yet. We map it onto 'ChatGPT' since the two
- * share OpenAI tooling lineage; the field only drives the source chip's
- * label tinting, not behavior. TODO: extend share-kit's Platform with
- * 'Codex' when the kit's parsers grow Codex support.
- */
-const PLATFORM_BY_SOURCE: Record<SessionSource, Platform> = {
-  claude: 'Claude',
-  codex: 'ChatGPT',
-  gemini: 'Gemini',
 }
 
 const SOURCE_LABEL: Record<SessionSource, string> = {
@@ -54,7 +41,6 @@ export function composeFromSession(
   messages: Message[],
   opts: ComposeOpts = {},
 ): Conversation {
-  const platform = PLATFORM_BY_SOURCE[session.source]
   const sourceLabel = SOURCE_LABEL[session.source]
 
   const turns: Turn[] = messages
@@ -73,7 +59,11 @@ export function composeFromSession(
   return {
     source: session.source,
     sourceLabel,
-    origin: { kind: 'pasted', platform },
+    origin: {
+      kind: 'agent-session',
+      agent: session.source,
+      sessionUuid: session.sessionUuid,
+    },
     title,
     shareUrl: null,
     createdAt: formatCreatedAt(session.startedAt),

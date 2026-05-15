@@ -6,7 +6,11 @@ import type { Conversation } from './types'
 export const FIXTURE_PASTED: Conversation = {
   source: 'claude',
   sourceLabel: 'Claude',
-  origin: { kind: 'pasted', platform: 'Claude' },
+  origin: {
+    kind: 'web-share',
+    platform: 'Claude',
+    url: 'https://claude.ai/share/8f3a2e1b-d4c7-4a90-b3f2-1e9c7a0d5f8b',
+  },
   title: 'Debugging a race condition in the cache layer',
   shareUrl: 'https://claude.ai/share/8f3a2e1b-d4c7-4a90-b3f2-1e9c7a0d5f8b',
   shortUrl: 'spool.share/s/3fm2',

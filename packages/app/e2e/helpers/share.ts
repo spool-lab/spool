@@ -164,7 +164,7 @@ export async function seedShareDraft(
     const convo = payload.conversation ?? {
       source: 'claude',
       sourceLabel: 'Claude',
-      origin: { kind: 'pasted', platform: 'Claude' },
+      origin: { kind: 'web-share', platform: 'Claude' },
       title: payload.title ?? 'Seeded draft',
       shareUrl: null,
       createdAt: new Date().toISOString(),

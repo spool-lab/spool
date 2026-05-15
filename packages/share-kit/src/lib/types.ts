@@ -8,8 +8,24 @@
 
 export type Platform = 'ChatGPT' | 'Claude' | 'Gemini'
 
+/** Where a `Conversation` came from. Drives the source chip in the
+ *  editor topbar and lets future security/cleanup features
+ *  distinguish web pastes from local agent recordings.
+ *
+ *  - `web-share`: user pasted a public share URL (chatgpt.com /
+ *    claude.ai / gemini.google.com). The shared URL is the user's
+ *    own published artifact — public-by-design.
+ *  - `agent-session`: user opened a local `.spool` session captured
+ *    from a coding agent (Claude Code, codex, gemini-cli). The
+ *    transcript was never public — agent transcripts can contain
+ *    secrets the agent read off disk and that the user never
+ *    intended to publish, which is why the Privacy panel exists.
+ *    The planned Security Scan feature only sweeps `agent-session`
+ *    conversations.
+ *  - `file`: user dropped a `.spool` file (Spool's portable format). */
 export type Origin =
-  | { kind: 'pasted'; platform: Platform }
+  | { kind: 'web-share'; platform: Platform; url?: string }
+  | { kind: 'agent-session'; agent: string; sessionUuid?: string }
   | { kind: 'file'; filename: string }
 
 export type TurnRole = 'user' | 'assistant'
