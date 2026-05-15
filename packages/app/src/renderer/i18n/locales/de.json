@@ -216,8 +216,8 @@
     "sourceKind_imported": "Importiert"
   },
   "shareEditor": {
-    "openExisting": "Freigabe-Entwurf öffnen",
-    "openNew": "Im Freigabe-Editor öffnen",
+    "openExisting": "Freigabe-Entwurf bearbeiten",
+    "openNew": "Freigabe-Entwurf bearbeiten",
     "back": "Zurück",
     "panel_privacy": "Datenschutz",
     "panel_timeline": "Verlauf",

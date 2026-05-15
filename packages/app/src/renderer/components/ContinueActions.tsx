@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MoreHorizontal, Eye, SquareTerminal, BookText, Copy, Loader2 } from 'lucide-react'
+import { MoreHorizontal, Eye, SquareTerminal, SquarePen, Copy, Loader2 } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -50,7 +50,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
     },
     ...(onShare ? [{
       label: t('shareEditor.openNew'),
-      icon: <BookText size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
+      icon: <SquarePen size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: onShare,
     }] : []),
     ...(resumeCommand ? [{

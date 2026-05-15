@@ -209,8 +209,8 @@
     "sourceKind_imported": "インポート済み"
   },
   "shareEditor": {
-    "openExisting": "共有下書きを開く",
-    "openNew": "共有エディタで開く",
+    "openExisting": "共有下書きを編集",
+    "openNew": "共有下書きを編集",
     "back": "戻る",
     "panel_privacy": "プライバシー",
     "panel_timeline": "タイムライン",

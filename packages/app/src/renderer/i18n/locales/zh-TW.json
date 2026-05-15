@@ -209,8 +209,8 @@
     "sourceKind_imported": "已匯入"
   },
   "shareEditor": {
-    "openExisting": "開啟分享草稿",
-    "openNew": "在分享編輯器中開啟",
+    "openExisting": "編輯分享草稿",
+    "openNew": "編輯分享草稿",
     "back": "返回",
     "panel_privacy": "隱私",
     "panel_timeline": "時間軸",

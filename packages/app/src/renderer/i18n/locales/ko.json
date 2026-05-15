@@ -209,8 +209,8 @@
     "sourceKind_imported": "가져옴"
   },
   "shareEditor": {
-    "openExisting": "공유 초안 열기",
-    "openNew": "공유 편집기에서 열기",
+    "openExisting": "공유 초안 편집",
+    "openNew": "공유 초안 편집",
     "back": "뒤로",
     "panel_privacy": "개인정보",
     "panel_timeline": "타임라인",

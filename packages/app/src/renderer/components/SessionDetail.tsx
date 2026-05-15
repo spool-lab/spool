@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, BookText, MoreHorizontal, Copy } from 'lucide-react'
+import { SquareTerminal, SquarePen, MoreHorizontal, Copy } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
@@ -290,7 +290,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                   : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
               }`}
             >
-              <BookText size={13} strokeWidth={1.6} aria-hidden />
+              <SquarePen size={13} strokeWidth={1.6} aria-hidden />
             </button>
           )}
 
