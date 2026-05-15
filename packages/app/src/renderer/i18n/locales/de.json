@@ -131,6 +131,7 @@
     "empty_body": "Öffnen Sie Claude Code, Codex oder Gemini, um eine Sitzung zu starten – Spool indexiert sie automatisch.",
     "section_pinned": "ANGEHEFTET · {{count}} Sitzung",
     "section_pinned_other": "ANGEHEFTET · {{count}} Sitzungen",
+    "section_recent": "ZULETZT",
     "bucket_today": "HEUTE",
     "bucket_yesterday": "GESTERN",
     "bucket_earlierWeek": "FRÜHER DIESE WOCHE",
