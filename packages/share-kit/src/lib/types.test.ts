@@ -25,7 +25,7 @@ describe('curated option lists match the app picker (4 of each)', () => {
   })
 
   it('exposes 4 colorways, ordered warm → cool', () => {
-    expect(COLORWAYS.map((c) => c.id)).toEqual(['amber', 'walnut', 'moss', 'iris'])
+    expect(COLORWAYS.map((c) => c.id)).toEqual(['amber', 'walnut', 'sage', 'marine'])
   })
 })
 
@@ -66,14 +66,14 @@ describe('normalizeOpts coerces stale ids to the defaults', () => {
       paper: 'graphite' as const,
       typeface: 'fraunces' as const,
       colorway: 'walnut' as const,
-      accentHex: '#8E6843',
+      accentHex: '#9F7A4C',
     }
     const out = normalizeOpts(input)
     expect(out.template).toBe('timeline')
     expect(out.paper).toBe('graphite')
     expect(out.typeface).toBe('fraunces')
     expect(out.colorway).toBe('walnut')
-    expect(out.accentHex).toBe('#8E6843')
+    expect(out.accentHex).toBe('#9F7A4C')
   })
 
   it('fills missing fields from DEFAULT_OPTS', () => {

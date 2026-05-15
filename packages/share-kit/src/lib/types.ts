@@ -196,7 +196,7 @@ export function typefaceFamily(id: Typeface): string {
 }
 
 export interface Colorway {
-  id: 'amber' | 'iris' | 'moss' | 'walnut'
+  id: 'amber' | 'walnut' | 'sage' | 'marine'
   name: string
   swatch: string
 }
@@ -283,20 +283,19 @@ export const TEMPLATES: { id: Template; name: string; blurb: string }[] = [
 ]
 
 export const COLORWAYS: Colorway[] = [
-  // Order is "warm → cool" so the picker reads as a structured palette
-  // rather than a hue-jumping list: amber (warm orange) → walnut (warm
-  // brown) → moss (cool green) → iris (cool purple).
+  // Order is warm → cool (amber → walnut → sage → marine) so the
+  // picker reads as a structured palette rather than a hue jump.
+  //
+  // Every swatch is calibrated to relative luminance ≈ 0.18–0.22 so
+  // accent vs paper contrast clears WCAG 3:1 on all four papers
+  // (Snow / Bone / Graphite / Ink) — the floor for non-text graphical
+  // accents (underline, dot, chip, link). Earlier picks (Moss
+  // #4A6B3E, Iris #7E6BB5, Walnut #8E6843) dropped below 3:1 on the
+  // dark papers and were retuned.
   { id: 'amber', name: 'Amber', swatch: '#C85A00' },
-  // Walnut replaces Ink (2026-05-14) — Ink's near-black swatch
-  // disappeared on dark papers (Graphite / Ink), and the accent it
-  // produced on the artifact was indistinguishable from the body text.
-  // Walnut (warm medium brown, lower-chroma than amber so it reads as
-  // "brown" not "another orange") keeps the palette warm-coherent
-  // alongside amber/iris/moss and stays visible on every paper. The
-  // name fits Spool's library / wooden-shelf archival tone.
-  { id: 'walnut', name: 'Walnut', swatch: '#8E6843' },
-  { id: 'moss', name: 'Moss', swatch: '#4A6B3E' },
-  { id: 'iris', name: 'Iris', swatch: '#7E6BB5' },
+  { id: 'walnut', name: 'Walnut', swatch: '#9F7A4C' },
+  { id: 'sage', name: 'Sage', swatch: '#688A55' },
+  { id: 'marine', name: 'Marine', swatch: '#4A85B0' },
 ]
 
 export const TEMPLATE_RATIO: Record<Template, { w: number; h: number }> = {
@@ -354,10 +353,11 @@ export function normalizeOpts(raw: unknown): EditorOpts {
   if (!TYPEFACES.some((t) => t.id === merged.typeface)) {
     merged.typeface = DEFAULT_OPTS.typeface
   }
-  // A legacy snapshot can still carry a since-retired colorway id (e.g.
-  // 'ink', 'bone' from pre-v0.5.0). Coerce to the default + reset
-  // accentHex so the picker shows a valid current selection and the
-  // rendered accent doesn't keep a stale swatch.
+  // A legacy snapshot can still carry a since-retired colorway id
+  // (e.g. 'ink' from pre-#207, 'moss' / 'iris' from the pre-readability
+  // palette). Coerce to the default + reset accentHex so the picker
+  // shows a valid current selection and the rendered accent doesn't
+  // keep a stale swatch.
   const colorway = COLORWAYS.find((c) => c.id === merged.colorway)
   if (!colorway) {
     merged.colorway = DEFAULT_OPTS.colorway

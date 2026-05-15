@@ -39,8 +39,8 @@ test('template / typeface / paper / colorway switches reflect in preview', async
   await window.locator('[data-testid="share-editor-paper-bone"]').click()
   await expect(preview).toHaveAttribute('data-paper', 'bone')
 
-  await window.locator('[data-testid="share-editor-colorway-iris"]').click()
-  await expect(preview).toHaveAttribute('data-colorway', 'iris')
+  await window.locator('[data-testid="share-editor-colorway-marine"]').click()
+  await expect(preview).toHaveAttribute('data-colorway', 'marine')
 
   await window.locator('[data-testid="share-editor-density-relaxed"]').click()
   await expect(preview).toHaveAttribute('data-density', 'relaxed')
