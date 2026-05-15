@@ -37,7 +37,14 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
     return rows.filter(({ turn }) => turn.body.trim() !== '')
   }, [convo.turns, opts.hideEmptyTurns])
 
-  const kept = selectedSet === null ? total : opts.selected!.length
+  // The displayed list filters out empty turns when `hideEmptyTurns`
+  // is on. The header counts must reflect what the user actually sees
+  // in the panel — otherwise "526 of 526" looks wrong next to a
+  // scrolled list of ~150 visible rows.
+  const visibleTotal = visibleTurns.length
+  const visibleKept = selectedSet === null
+    ? visibleTotal
+    : visibleTurns.filter(({ originalIndex }) => selectedSet.has(originalIndex)).length
 
   const writeSelection = useCallback(
     (next: number[]) => {
@@ -108,7 +115,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
     <div className="flex flex-col min-h-0 flex-1">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <span className="text-[10px] uppercase tracking-wider font-medium text-warm-faint dark:text-dark-faint">
-          Messages {kept} of {total}
+          Messages {visibleKept} of {visibleTotal}
         </span>
         <span className="flex items-center gap-0.5">
           <button
@@ -133,7 +140,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
           </button>
         </span>
       </div>
-      <ul className="flex-1 min-h-0 overflow-y-auto py-1">
+      <ul className="flex-1 min-h-0 overflow-y-auto scrollbar-none py-1">
         {visibleTurns.map(({ turn, originalIndex: i }) => {
           const included = selectedSet === null ? true : selectedSet.has(i)
           const preview = firstLinePreview(turn.body)
@@ -143,7 +150,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
               data-testid="share-editor-turn-row"
               data-row-turn-index={i}
               data-included={included ? '' : undefined}
-              className={`group flex items-center gap-3 pl-3 pr-4 py-1 transition-colors hover:bg-warm-surface dark:hover:bg-dark-surface ${
+              className={`group flex items-center gap-3 pl-4 pr-4 py-1 transition-colors hover:bg-warm-surface dark:hover:bg-dark-surface ${
                 included ? '' : 'opacity-60'
               }`}
             >
@@ -158,14 +165,14 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 className="shrink-0 p-1 -m-1 rounded"
               >
                 <span
-                  className={`block w-[18px] h-[18px] rounded-[4px] flex items-center justify-center transition-colors ${
+                  className={`block w-[14px] h-[14px] rounded-[3px] flex items-center justify-center transition-colors ${
                     included
                       ? 'bg-accent dark:bg-accent-dark'
                       : 'border border-warm-border2 dark:border-dark-border2'
                   }`}
                   aria-hidden="true"
                 >
-                  {included && <Check size={12} strokeWidth={2.5} className="text-white" />}
+                  {included && <Check size={10} strokeWidth={2.5} className="text-white" />}
                 </span>
               </button>
               <button
@@ -175,12 +182,12 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 onClick={() => jumpToTurn(i)}
                 title={previewTooltip(turn.body)}
                 aria-label={`Jump to message ${i + 1}`}
-                className="flex-1 min-w-0 flex items-center gap-3 text-left"
+                className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
               >
-                <span className="font-mono text-[11px] tabular-nums text-warm-faint dark:text-dark-faint shrink-0">
+                <span className="font-mono text-[10.5px] tabular-nums text-warm-faint dark:text-dark-faint shrink-0">
                   {padIndex(i + 1, total)}
                 </span>
-                <span className="text-[13px] text-warm-text dark:text-dark-text truncate flex-1">
+                <span className="text-[12px] text-warm-text dark:text-dark-text truncate flex-1">
                   {preview || <span className="text-warm-faint dark:text-dark-faint italic">empty</span>}
                 </span>
               </button>
