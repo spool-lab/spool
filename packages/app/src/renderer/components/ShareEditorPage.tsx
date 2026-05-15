@@ -179,6 +179,20 @@ export default function ShareEditorPage({
   const exportPng = useCallback(async () => {
     const node = previewRef.current
     if (!node) return
+    const width = TEMPLATE_RATIO[opts.template].w
+    const height = node.scrollHeight
+    // Pre-flight the canvas-axis cap BEFORE opening the save picker.
+    // showSaveFilePicker creates a zero-byte file at the chosen path
+    // the moment the user clicks Save in the system dialog; if we
+    // then fail to write (because rasterization throws
+    // PngTooTallError), that empty file is left on disk. By bailing
+    // here we never reach the picker for over-sized conversations
+    // and the user keeps a clean directory.
+    const CANVAS_MAX_AXIS = 16384
+    if (Math.max(width, height) > CANVAS_MAX_AXIS) {
+      toast.error("Couldn't export PNG", { description: 'Conversation too tall — try PDF instead.' })
+      return
+    }
     // PRE-PICK on the live user gesture, before any async work. If we
     // wait until after rasterization (~1-2s for a real conversation),
     // Chromium revokes the gesture and showSaveFilePicker rejects with
@@ -193,8 +207,6 @@ export default function ShareEditorPage({
 
     await beginSaving()
     try {
-      const width = TEMPLATE_RATIO[opts.template].w
-      const height = node.scrollHeight
       const blob = await rasterizeToPngBlob(node, { width, height })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
@@ -202,6 +214,16 @@ export default function ShareEditorPage({
     } catch (err) {
       console.error('Export to PNG failed:', err)
       setSaveState('error')
+      // showSaveFilePicker may have already created a 0-byte file at
+      // the picked path. Best-effort cleanup via the experimental
+      // FileSystemFileHandle.remove() API (Chromium 110+); silently
+      // no-op on older runtimes.
+      if (slot.kind === 'picker') {
+        const removable = slot.handle as unknown as { remove?: () => Promise<void> }
+        if (typeof removable.remove === 'function') {
+          await removable.remove().catch(() => {})
+        }
+      }
       if (err instanceof PngTooTallError) {
         toast.error("Couldn't export PNG", { description: 'Conversation too tall — try PDF instead.' })
       } else {
