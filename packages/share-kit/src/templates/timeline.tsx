@@ -6,7 +6,7 @@
 // conversation render as labeled negative space — the rail
 // literally breathes where the user paused. Distinct from chat
 // (no bubbles, no side-alternation), letter (rail spine + per-turn
-// markers, not label-on-top), and atelier (single column, time-anchored).
+// markers, not label-on-top), and forum (threaded posts with avatars).
 //
 // Legacy drafts saved before `Turn.timestamp` existed gracefully
 // degrade: the gutter shows a dash and no gaps are drawn.
@@ -260,8 +260,6 @@ export function Timeline({ convo, opts }: Props) {
         <div
           style={{
             marginTop: 40,
-            paddingTop: 12,
-            borderTop: `1px solid ${t.border}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'baseline',

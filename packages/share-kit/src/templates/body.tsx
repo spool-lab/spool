@@ -22,7 +22,7 @@ import type { RedactReplacement } from './redact'
 interface BodyProps {
   text: string
   redact?: RedactReplacement[] | undefined
-  /** Monospace content — used by Atelier's mono editorial body. */
+  /** Monospace content — opt-in by templates that want a mono body. */
   mono?: boolean | undefined
   /** Override the sans-serif family used for non-mono bodies. Letter
    *  passes the user's typeface here so serif choices actually show
@@ -170,10 +170,9 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
               padding: '1px 5px',
               borderRadius: 3,
               background: 'rgba(128,128,128,0.12)',
-              // Long unbreakable mono tokens (file paths, hashes) blow out
-              // of narrow columns — atelier's two-col layout is the worst
-              // offender. Break anywhere so the token stays inside its
-              // column at the cost of mid-word linebreaks.
+              // Long unbreakable mono tokens (file paths, hashes) can blow
+              // out of narrow containers. Break anywhere so the token stays
+              // inside its column at the cost of mid-word linebreaks.
               overflowWrap: 'anywhere',
               wordBreak: 'break-word',
             }}

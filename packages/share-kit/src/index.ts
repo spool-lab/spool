@@ -41,7 +41,7 @@ export { FIXTURE_PASTED } from './lib/fixtures'
 
 // ─── Template renderers ─────────────────────────────────────────
 export { TemplateRender } from './templates'
-export { Atelier } from './templates/atelier'
+export { Forum } from './templates/forum'
 export { Letter } from './templates/letter'
 export { Timeline } from './templates/timeline'
 export { Chat } from './templates/chat'

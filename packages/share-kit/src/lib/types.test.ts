@@ -13,7 +13,7 @@ describe('curated option lists match the app picker (4 of each)', () => {
   // exported lists are now the source of truth — adding/removing a
   // template/paper/typeface/colorway here changes what users see.
   it('exposes 4 templates', () => {
-    expect(TEMPLATES.map((t) => t.id)).toEqual(['chat', 'letter', 'atelier', 'timeline'])
+    expect(TEMPLATES.map((t) => t.id)).toEqual(['chat', 'letter', 'forum', 'timeline'])
   })
 
   it('exposes 4 papers', () => {

@@ -8,7 +8,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import type { Conversation, EditorOpts, Template } from '@/lib/types'
 import { paperTokens } from '@/lib/types'
-import { Atelier } from './atelier'
+import { Forum } from './forum'
 import { Letter } from './letter'
 import { Timeline } from './timeline'
 import { Chat } from './chat'
@@ -41,8 +41,8 @@ function TemplateDispatch({ template, convo, opts }: Props) {
     return <FallbackPreview opts={opts} message="No conversation data." />
   }
   switch (template) {
-    case 'atelier':
-      return <Atelier convo={convo} opts={opts} />
+    case 'forum':
+      return <Forum convo={convo} opts={opts} />
     case 'letter':
       return <Letter convo={convo} opts={opts} />
     case 'timeline':

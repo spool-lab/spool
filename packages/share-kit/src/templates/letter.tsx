@@ -1,7 +1,7 @@
 // Template: Letter — single-column, generous margins, literary.
 //
 // Complementary to the other templates:
-//   • Atelier  = dense editorial two-column
+//   • Forum    = threaded posts, session-detail feel
 //   • Letter   = spacious single-column, reading-first
 //   • Chat     = bubble flow
 //   • Timeline = time-anchored rail
@@ -172,8 +172,6 @@ export function Letter({ convo, opts }: Props) {
         <div
           style={{
             marginTop: 48,
-            paddingTop: 14,
-            borderTop: `1px solid ${t.border}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'baseline',

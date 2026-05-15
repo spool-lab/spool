@@ -27,23 +27,33 @@ export function TemplateThumb({ id, accent, paper, border, text, muted, surface 
     <div style={{ height: 2, width: w, background: muted, opacity: op, borderRadius: 1 }} />
   )
 
-  if (id === 'atelier') {
+  if (id === 'forum') {
+    const post = (avatarBg: string, lines: number) => (
+      <div style={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+        <div
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: avatarBg,
+            flexShrink: 0,
+            marginTop: 0.5,
+          }}
+        />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {bar('70%', 0.8)}
+          {Array.from({ length: lines }).map((_, idx) => bar(idx === lines - 1 ? '60%' : '95%', 0.5))}
+        </div>
+      </div>
+    )
     return (
       <div style={baseStyle}>
-        <div style={{ height: 3, width: '70%', background: text }} />
+        <div style={{ height: 3, width: '55%', background: text }} />
         <div style={{ height: 1, background: border, margin: '1px 0' }} />
-        <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {bar('100%', 0.6)}
-            {bar('90%', 0.5)}
-            {bar('100%', 0.6)}
-            {bar('70%', 0.4)}
-          </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {bar('100%', 0.6)}
-            {bar('80%', 0.5)}
-            {bar('90%', 0.6)}
-          </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {post(surface, 2)}
+          <div style={{ height: 1, background: border }} />
+          {post(accent, 2)}
         </div>
       </div>
     )
