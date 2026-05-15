@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { getDB, listRecentSessions } from '@spool-lab/core'
+import { getDB, listRecentSessionsPage } from '@spool-lab/core'
 import type { Session } from '@spool-lab/core'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini'])
@@ -12,7 +12,7 @@ export const listCommand = new Command('list')
   .option('--json', 'Output as JSON')
   .action((opts: { limit: string; source?: string; project?: string; json?: boolean }) => {
     const db = getDB(true)
-    let sessions = listRecentSessions(db, parseInt(opts.limit, 10) * 2)
+    let sessions = listRecentSessionsPage(db, { limit: parseInt(opts.limit, 10) * 2 }).sessions
 
     if (opts.source && SESSION_SOURCES.has(opts.source)) {
       sessions = sessions.filter(s => s.source === opts.source)

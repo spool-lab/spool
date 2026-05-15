@@ -231,17 +231,6 @@ export const SESSION_SELECT = `
   JOIN sources src ON src.id = s.source_id
   JOIN projects p ON p.id = s.project_id`
 
-export function listRecentSessions(
-  db: Database.Database,
-  limit = 50,
-): Session[] {
-  return (db.prepare(`
-    ${SESSION_SELECT}
-    WHERE s.message_count > 0
-    ORDER BY s.started_at DESC
-    LIMIT ?
-  `).all(limit) as Array<Record<string, unknown>>).map(rowToSession)
-}
 
 export function getSessionWithMessages(
   db: Database.Database,
@@ -957,9 +946,13 @@ export function listPinnedSessions(db: Database.Database): Session[] {
 }
 
 export function getStatus(db: Database.Database): StatusInfo {
+  // Filter empty sessions so this matches every user-facing list, which
+  // all gate on message_count > 0 (aborted starts and crash files have
+  // zero messages but still occupy a row in the sessions table).
   const counts = db.prepare(`
     SELECT src.name, COUNT(*) AS cnt
     FROM sessions s JOIN sources src ON src.id = s.source_id
+    WHERE s.message_count > 0
     GROUP BY src.name
   `).all() as Array<{ name: string; cnt: number }>
 

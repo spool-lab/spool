@@ -128,7 +128,9 @@
     "bucket_yesterday": "어제",
     "bucket_earlierWeek": "이번 주 초",
     "bucket_earlierMonth": "이번 달 초",
-    "bucket_older": "이전"
+    "bucket_older": "이전",
+    "footer_loadingMore": "이전 세션 불러오는 중…",
+    "footer_endOf_other": "총 {{count}}개 세션"
   },
   "settings": {
     "title": "설정",

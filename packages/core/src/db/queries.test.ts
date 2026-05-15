@@ -6,6 +6,7 @@ import {
   getOrCreateAskProject,
   insertSpoolAuthoredSession,
   upsertSession,
+  getStatus,
 } from './queries.js'
 
 describe('getOrCreateProject (with identity)', () => {
@@ -203,5 +204,31 @@ describe('insertSpoolAuthoredSession', () => {
     expect(row.title_source).toBe('spool')
     expect(row.file_path).toBe('/Users/x/.claude/projects/-Users-x--spool-agent-search-sessions/ask-uuid-3.jsonl')
     expect(row.message_count).toBe(5)
+  })
+})
+
+describe('getStatus', () => {
+  let db: Database.Database
+  beforeEach(() => {
+    db = new Database(':memory:')
+    runMigrations(db)
+    db.exec(`
+      INSERT INTO projects (source_id, slug, display_path, display_name, identity_kind, identity_key)
+      VALUES (1, 'p', '/p', 'p', 'path', '/p');
+      INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count, has_tool_use, raw_file_mtime)
+      VALUES
+        (1, 1, 'a', '/a', 'a', '2026-05-01', '2026-05-01', 5, 0, '2026-05-01'),
+        (1, 1, 'b', '/b', 'b', '2026-05-02', '2026-05-02', 0, 0, '2026-05-02'),
+        (1, 2, 'c', '/c', 'c', '2026-05-03', '2026-05-03', 3, 0, '2026-05-03'),
+        (1, 2, 'd', '/d', 'd', '2026-05-04', '2026-05-04', 0, 0, '2026-05-04');
+    `)
+  })
+
+  it('counts only sessions with message_count > 0 — matches what user-visible lists show', () => {
+    const status = getStatus(db)
+    expect(status.totalSessions).toBe(2)
+    expect(status.claudeSessions).toBe(1)
+    expect(status.codexSessions).toBe(1)
+    expect(status.geminiSessions).toBe(0)
   })
 })

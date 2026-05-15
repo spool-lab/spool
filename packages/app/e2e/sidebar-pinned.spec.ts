@@ -72,17 +72,28 @@ test('unpinning from sidebar also clears the Library pinned segment', async () =
 
   await window.locator('[data-testid="sidebar-library"]').click()
 
-  const libraryPinned = window.locator('[data-testid="library-pinned"]')
-  await expect(libraryPinned).toBeVisible({ timeout: 5000 })
-  await expect(libraryPinned.locator(`[data-session-uuid="${uuid}"]`)).toBeVisible()
+  const libraryPinnedHeader = window.locator('[data-testid="library-pinned-header"]')
+  await expect(libraryPinnedHeader).toBeVisible({ timeout: 5000 })
+  await expect(
+    window.locator(`[data-testid="session-row"][data-pinned][data-session-uuid="${uuid}"]`),
+  ).toBeVisible()
 
   // Unpin from sidebar
   const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
   await pinnedRow.hover()
   await pinnedRow.locator('[data-testid="sidebar-pinned-unpin"]').click()
 
-  // Library's pinned segment should react immediately
-  await expect(libraryPinned.locator(`[data-session-uuid="${uuid}"]`)).toBeHidden({ timeout: 5000 })
+  // Library's pinned row should react immediately…
+  await expect(
+    window.locator(`[data-testid="session-row"][data-pinned][data-session-uuid="${uuid}"]`),
+  ).toBeHidden({ timeout: 5000 })
+
+  // …but the session itself must reappear in the recent list. Regression
+  // test for the cross-component pin-event listener forgetting to
+  // reinsert externally-unpinned sessions back into recent.
+  await expect(
+    window.locator(`[data-testid="session-row"][data-session-uuid="${uuid}"]:not([data-pinned])`),
+  ).toBeVisible({ timeout: 5000 })
 })
 
 test('sidebar pinned kebab menu exposes Resume and Copy actions', async () => {

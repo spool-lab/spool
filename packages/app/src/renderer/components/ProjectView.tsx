@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDownUp } from 'lucide-react'
-import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder } from '@spool-lab/core'
-import SessionRow from './SessionRow.js'
+import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder, SessionsCursor, DirectoryCount } from '@spool-lab/core'
+import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
 import Menu from './Menu.js'
-import { CollapsibleSection } from './LibraryLanding.js'
+import { insertSessionSorted } from '../../shared/sessionSort.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { PROJECT_SORT_OPTIONS } from '../../shared/projectView.js'
@@ -18,6 +18,8 @@ type Props = {
   onShare?: (uuid: string) => void
 }
 
+const PAGE_SIZE = 50
+
 export default function ProjectView({
   identityKey,
   sortOrder,
@@ -26,7 +28,7 @@ export default function ProjectView({
   onCopySessionId,
   onShare,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const projectSortLabel = (value: ProjectSessionSortOrder): string => {
     switch (value) {
       case 'recent': return t('project.sort_recent')
@@ -38,20 +40,17 @@ export default function ProjectView({
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
+  const [directoryCounts, setDirectoryCounts] = useState<DirectoryCount[]>([])
+  const [cursor, setCursor] = useState<SessionsCursor | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [activeSources, setActiveSources] = useState<Set<SessionSource>>(new Set())
-  const [closedCwds, setClosedCwds] = useState<Set<string>>(new Set())
   const [isolatedCwd, setIsolatedCwd] = useState<string | null>(null)
-  const [reloadKey, setReloadKey] = useState(0)
+  const fetchTokenRef = useRef(0)
 
   useEffect(() => {
     setActiveSources(new Set())
-    setClosedCwds(new Set())
     setIsolatedCwd(null)
   }, [identityKey])
-
-  useEffect(() => {
-    setSessions(null)
-  }, [identityKey, sortOrder, activeSources])
 
   useEffect(() => {
     let cancelled = false
@@ -65,40 +64,158 @@ export default function ProjectView({
   }, [identityKey])
 
   useEffect(() => {
-    let cancelled = false
+    const token = ++fetchTokenRef.current
+    setSessions(null)
+    setCursor(null)
+    setLoadingMore(false)
     const sourcesArray = Array.from(activeSources)
-    const sharedOptions = {
-      ...(sourcesArray.length > 0 ? { sources: sourcesArray } : {}),
-    }
+    const sharedOptions = sourcesArray.length > 0 ? { sources: sourcesArray } : {}
     Promise.all([
       window.spool.listPinnedSessionsByIdentity(identityKey),
       window.spool.listSessionsByIdentity(identityKey, {
         sortOrder,
         excludePinned: true,
+        limit: PAGE_SIZE,
         ...sharedOptions,
       }),
+      window.spool.listProjectDirectoryCounts(identityKey, sourcesArray.length > 0 ? sourcesArray : undefined),
     ])
-      .then(([pinned, recent]) => {
-        if (cancelled) return
+      .then(([pinned, page, counts]) => {
+        if (fetchTokenRef.current !== token) return
         const filteredPinned = sourcesArray.length > 0
           ? pinned.filter(s => sourcesArray.includes(s.source))
           : pinned
         setPinnedSessions(filteredPinned)
-        setSessions(recent)
+        setSessions(page.sessions)
+        setCursor(page.nextCursor)
+        setDirectoryCounts(counts)
       })
       .catch(() => {
-        if (!cancelled) {
-          setPinnedSessions([])
-          setSessions([])
-        }
+        if (fetchTokenRef.current !== token) return
+        setPinnedSessions([])
+        setSessions([])
+        setDirectoryCounts([])
       })
-    return () => { cancelled = true }
-  }, [identityKey, sortOrder, activeSources, reloadKey])
+  }, [identityKey, sortOrder, activeSources])
+
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const loadingRef = useRef(loadingMore)
+  loadingRef.current = loadingMore
+  const fetchArgsRef = useRef({ identityKey, sortOrder, activeSources })
+  fetchArgsRef.current = { identityKey, sortOrder, activeSources }
+  const pinnedSessionsRef = useRef<Session[]>([])
+  pinnedSessionsRef.current = pinnedSessions
+  const pinnedUuidsRef = useRef(new Set<string>())
+  pinnedUuidsRef.current = new Set(pinnedSessions.map(s => s.sessionUuid))
 
   useEffect(() => {
-    function bump() { setReloadKey(k => k + 1) }
-    window.addEventListener('spool:pin-change', bump)
-    return () => window.removeEventListener('spool:pin-change', bump)
+    // Pin events from sibling components. Diff against pinnedSessionsRef
+    // to detect what was unpinned externally and reinsert into the body
+    // list — otherwise sidebar/menu-driven unpins make sessions vanish
+    // from this view.
+    function handlePinEvent() {
+      const { identityKey: key, sortOrder: order, activeSources: srcs } = fetchArgsRef.current
+      const sourcesArray = Array.from(srcs)
+      window.spool.listPinnedSessionsByIdentity(key)
+        .then(pinned => {
+          const filtered = sourcesArray.length > 0
+            ? pinned.filter(s => sourcesArray.includes(s.source))
+            : pinned
+          const freshUuids = new Set(filtered.map(s => s.sessionUuid))
+          const newlyUnpinned = pinnedSessionsRef.current.filter(
+            s => !freshUuids.has(s.sessionUuid),
+          )
+          setPinnedSessions(filtered)
+          setSessions(prev => {
+            if (!prev) return prev
+            let acc = prev.filter(s => !freshUuids.has(s.sessionUuid))
+            for (const candidate of newlyUnpinned) {
+              // Re-respect the source filter — a pin from a filtered-out
+              // source shouldn't reappear in the body when filtered.
+              if (sourcesArray.length > 0 && !sourcesArray.includes(candidate.source)) continue
+              // exhausted=true so candidates older than the loaded range
+              // still surface; loadMore filters dedupe by uuid against
+              // already-loaded rows.
+              acc = insertSessionSorted(acc, candidate, order, true)
+            }
+            return acc
+          })
+        })
+        .catch(() => {})
+    }
+    window.addEventListener('spool:pin-change', handlePinEvent)
+    return () => window.removeEventListener('spool:pin-change', handlePinEvent)
+  }, [])
+
+  useEffect(() => {
+    // Soft-merge on sync. Always refresh directoryCounts (cheap, keeps
+    // chip badges accurate); only refresh the body list when sortOrder
+    // is 'recent', where new sessions reliably surface on the first
+    // page. For other sort orders the refetched first page wouldn't
+    // contain the new rows anyway (they're highest by startedAt, not by
+    // title/oldest/message_count), so a merge would be misleading.
+    const off = window.spool.onNewSessions(() => {
+      if (loadingRef.current) return
+      const { identityKey: key, sortOrder: order, activeSources: srcs } = fetchArgsRef.current
+      const sourcesArray = Array.from(srcs)
+      window.spool.listProjectDirectoryCounts(key, sourcesArray.length > 0 ? sourcesArray : undefined)
+        .then(setDirectoryCounts)
+        .catch(() => {})
+      if (order !== 'recent') return
+      window.spool.listSessionsByIdentity(key, {
+        sortOrder: order,
+        excludePinned: true,
+        limit: PAGE_SIZE,
+        ...(sourcesArray.length > 0 ? { sources: sourcesArray } : {}),
+      })
+        .then(page => {
+          setSessions(prev => {
+            if (prev === null) return page.sessions
+            const known = new Set(prev.map(s => s.sessionUuid))
+            const pinnedUuids = pinnedUuidsRef.current
+            const additions = page.sessions.filter(s =>
+              !known.has(s.sessionUuid) && !pinnedUuids.has(s.sessionUuid),
+            )
+            return additions.length === 0 ? prev : [...additions, ...prev]
+          })
+        })
+        .catch(() => {})
+    })
+    return () => { off() }
+  }, [])
+
+  const loadMore = useCallback(() => {
+    if (loadingRef.current || !cursorRef.current) return
+    const token = ++fetchTokenRef.current
+    setLoadingMore(true)
+    const { identityKey: key, sortOrder: order, activeSources: srcs } = fetchArgsRef.current
+    const sourcesArray = Array.from(srcs)
+    window.spool.listSessionsByIdentity(key, {
+      sortOrder: order,
+      excludePinned: true,
+      limit: PAGE_SIZE,
+      cursor: cursorRef.current,
+      ...(sourcesArray.length > 0 ? { sources: sourcesArray } : {}),
+    })
+      .then(page => {
+        if (fetchTokenRef.current !== token) return
+        setSessions(prev => {
+          const base = prev ?? []
+          // Dedupe against handlePinEvent's reinserted candidates and
+          // any pin/unpin races since the cursor was captured.
+          const seen = new Set(base.map(s => s.sessionUuid))
+          const additions = page.sessions.filter(s => !seen.has(s.sessionUuid))
+          return [...base, ...additions]
+        })
+        setCursor(page.nextCursor)
+        setLoadingMore(false)
+      })
+      .catch(() => {
+        if (fetchTokenRef.current !== token) return
+        setLoadingMore(false)
+        setCursor(null)
+      })
   }, [])
 
   function handlePinChange(sessionUuid: string, pinned: boolean) {
@@ -109,9 +226,16 @@ export default function ProjectView({
         setPinnedSessions(prev => [candidate, ...prev])
       }
     } else {
+      const candidate = pinnedSessions.find(s => s.sessionUuid === sessionUuid)
       setPinnedSessions(prev => prev.filter(s => s.sessionUuid !== sessionUuid))
+      if (candidate) {
+        // exhausted=true: see handlePinEvent for why we force this and
+        // why loadMore dedupes against already-loaded rows.
+        setSessions(prev =>
+          prev ? insertSessionSorted(prev, candidate, sortOrder, true) : prev,
+        )
+      }
     }
-    setReloadKey(k => k + 1)
   }
 
   const availableSources = group?.sources ?? []
@@ -119,30 +243,31 @@ export default function ProjectView({
     return pinnedSessions[0]?.projectDisplayPath ?? sessions?.[0]?.projectDisplayPath ?? null
   }, [pinnedSessions, sessions])
 
-  // Chip-strip groups: include pinned so counts match the project total.
+  // Bodies are grouped over loaded data so sections only show what we
+  // can render. Chip badges run off directoryCounts (full project) so
+  // their numbers stay accurate while pages stream in.
   const directoryGroups = useMemo(() => {
     if (!sessions) return null
     const map = new Map<string, Session[]>()
-    for (const s of [...pinnedSessions, ...sessions]) {
+    for (const s of sessions) {
       const key = cwdOf(s)
       const arr = map.get(key)
       if (arr) arr.push(s)
       else map.set(key, [s])
     }
     return Array.from(map.entries())
-      .map(([cwd, items]) => {
-        const lastAt = items.reduce((acc, s) => (s.startedAt > acc ? s.startedAt : acc), '')
-        return { cwd, sessions: items, lastAt }
+      .map(([cwd, unpinned]) => {
+        const lastAt = unpinned.reduce((acc, s) => (s.startedAt > acc ? s.startedAt : acc), '')
+        return { cwd, unpinned, lastAt }
       })
       .sort((a, b) => (b.lastAt > a.lastAt ? 1 : b.lastAt < a.lastAt ? -1 : 0))
-  }, [sessions, pinnedSessions])
+  }, [sessions])
 
   useEffect(() => {
-    if (!directoryGroups || isolatedCwd === null) return
-    if (!directoryGroups.some(g => g.cwd === isolatedCwd)) setIsolatedCwd(null)
-  }, [directoryGroups, isolatedCwd])
+    if (isolatedCwd === null) return
+    if (!directoryCounts.some(c => c.cwd === isolatedCwd)) setIsolatedCwd(null)
+  }, [directoryCounts, isolatedCwd])
 
-  // Render-side splits: PINNED section + grouped/isolated unpinned list.
   const visiblePinned = useMemo(() => {
     if (isolatedCwd === null) return pinnedSessions
     return pinnedSessions.filter(s => cwdOf(s) === isolatedCwd)
@@ -154,31 +279,15 @@ export default function ProjectView({
     return sessions.filter(s => cwdOf(s) === isolatedCwd)
   }, [sessions, isolatedCwd])
 
-  const unpinnedGroups = useMemo(() => {
-    if (!sessions) return null
-    const map = new Map<string, Session[]>()
-    for (const s of sessions) {
-      const key = cwdOf(s)
-      const arr = map.get(key)
-      if (arr) arr.push(s)
-      else map.set(key, [s])
-    }
-    return Array.from(map.entries())
-      .map(([cwd, items]) => {
-        const lastAt = items.reduce((acc, s) => (s.startedAt > acc ? s.startedAt : acc), '')
-        return { cwd, sessions: items, lastAt }
-      })
-      .sort((a, b) => (b.lastAt > a.lastAt ? 1 : b.lastAt < a.lastAt ? -1 : 0))
-  }, [sessions])
+  const groupByDirectory = isolatedCwd === null && (directoryGroups?.length ?? 0) >= 2
 
-  const showGrouped = (unpinnedGroups?.length ?? 0) >= 2 && isolatedCwd === null
   const looseT = t as unknown as (k: string, o?: Record<string, unknown>) => string
   const meta = useMemo(() => {
     if (!group) return null
     const lastActivity = group.lastSessionAt ? formatRelativeDate(group.lastSessionAt, { t: looseT }) : null
     return { count: group.sessionCount, lastActivity, sources: group.sources }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group, t])
+  }, [group, i18n.language])
 
   function toggleSource(source: SessionSource) {
     setActiveSources(prev => {
@@ -188,6 +297,66 @@ export default function ProjectView({
       return next
     })
   }
+
+  // When the user isolates to one cwd we filter client-side, so the
+  // footer count must reflect what's actually visible — otherwise the
+  // "End of N sessions" line disagrees with the chip badge.
+  const totalLoaded = isolatedCwd === null
+    ? (sessions?.length ?? 0) + pinnedSessions.length
+    : visiblePinned.length + visibleUnpinned.length
+  const exhausted = sessions !== null && cursor === null
+  const pinnedLabel = useMemo(
+    () => t('library.section_pinned', { count: visiblePinned.length }),
+    [t, visiblePinned.length],
+  )
+  const rows = useMemo<SessionListRow[]>(() => {
+    const out: SessionListRow[] = []
+    if (visiblePinned.length > 0) {
+      out.push({
+        kind: 'header',
+        id: 'pinned',
+        label: pinnedLabel,
+        testId: 'project-view-pinned-header',
+      })
+      for (const s of visiblePinned) {
+        out.push({
+          kind: 'session', id: `p-${s.sessionUuid}`, session: s,
+          pinned: true, headerId: 'pinned',
+        })
+      }
+    }
+    if (groupByDirectory && directoryGroups) {
+      for (const g of directoryGroups) {
+        if (g.unpinned.length === 0) continue
+        const { name } = formatCwdLabel(g.cwd, displayPath)
+        const headerId = `cwd-${g.cwd}`
+        out.push({
+          kind: 'header',
+          id: headerId,
+          label: <DirectoryHeaderLabel name={name} count={g.unpinned.length} />,
+          testId: 'project-view-directory-group-header',
+          dataAttr: { 'data-cwd': g.cwd },
+        })
+        for (const s of g.unpinned) {
+          out.push({ kind: 'session', id: s.sessionUuid, session: s, headerId })
+        }
+      }
+    } else {
+      if (visiblePinned.length > 0 && visibleUnpinned.length > 0) {
+        out.push({
+          kind: 'header',
+          id: 'recent',
+          label: 'RECENT',
+          testId: 'project-view-recent-header',
+        })
+      }
+      for (const s of visibleUnpinned) {
+        out.push({ kind: 'session', id: s.sessionUuid, session: s, headerId: 'recent' })
+      }
+    }
+    out.push({ kind: 'footer', id: 'footer', loading: loadingMore, exhausted, total: totalLoaded })
+    return out
+  }, [visiblePinned, visibleUnpinned, groupByDirectory, directoryGroups, displayPath, loadingMore, exhausted, totalLoaded, pinnedLabel])
 
   return (
     <div data-testid="project-view" className="flex flex-col h-full overflow-hidden">
@@ -280,9 +449,9 @@ export default function ProjectView({
           </div>
         </div>
 
-        {(directoryGroups?.length ?? 0) >= 2 && directoryGroups && (
+        {directoryCounts.length >= 2 && (
           <DirectoryChipStrip
-            groups={directoryGroups}
+            counts={directoryCounts}
             isolatedCwd={isolatedCwd}
             projectDisplayPath={displayPath}
             onSelect={setIsolatedCwd}
@@ -300,227 +469,86 @@ export default function ProjectView({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
-        {sessions === null ? (
-          <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
-            {t('common.loading')}
-          </div>
-        ) : visibleUnpinned.length === 0 && visiblePinned.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <p className="text-sm text-warm-muted dark:text-dark-muted">{t('project.noSessions')}</p>
-            <div className="mt-2 flex items-center justify-center gap-3 text-xs">
-              {activeSources.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setActiveSources(new Set())}
-                  className="text-accent hover:underline"
-                >
-                  {t('project.clearSourceFilter')}
-                </button>
-              )}
-              {isolatedCwd !== null && (
-                <button
-                  type="button"
-                  onClick={() => setIsolatedCwd(null)}
-                  className="text-accent hover:underline"
-                >
-                  {t('project.clearDirectoryFilter')}
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            {visiblePinned.length > 0 && (
-              <CollapsibleSection
-                label={t('library.section_pinned', { count: visiblePinned.length })}
-                testId="project-view-pinned"
+      {sessions === null ? (
+        <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
+          {t('common.loading')}
+        </div>
+      ) : visibleUnpinned.length === 0 && visiblePinned.length === 0 ? (
+        <div className="px-4 py-12 text-center">
+          <p className="text-sm text-warm-muted dark:text-dark-muted">{t('project.noSessions')}</p>
+          <div className="mt-2 flex items-center justify-center gap-3 text-xs">
+            {activeSources.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveSources(new Set())}
+                className="text-accent hover:underline"
               >
-                <div>
-                  {visiblePinned.map(session => (
-                    <SessionRow
-                      key={session.sessionUuid}
-                      session={session}
-                      pinned
-                      onPinChange={handlePinChange}
-                      onOpenSession={onOpenSession}
-                      onCopySessionId={onCopySessionId}
-                      {...(onShare ? { onShare } : {})}
-                    />
-                  ))}
-                </div>
-              </CollapsibleSection>
+                {t('project.clearSourceFilter')}
+              </button>
             )}
-            {showGrouped && unpinnedGroups ? (
-              <div data-testid="project-view-by-directory">
-                {unpinnedGroups.map(g => (
-                  <DirectoryGroupSection
-                    key={g.cwd}
-                    cwd={g.cwd}
-                    projectDisplayPath={displayPath}
-                    sessions={g.sessions}
-                    open={!closedCwds.has(g.cwd)}
-                    onToggleOpen={() => {
-                      setClosedCwds(prev => {
-                        const next = new Set(prev)
-                        if (next.has(g.cwd)) next.delete(g.cwd)
-                        else next.add(g.cwd)
-                        return next
-                      })
-                    }}
-                    onPinChange={handlePinChange}
-                    onOpenSession={onOpenSession}
-                    onCopySessionId={onCopySessionId}
-                    {...(onShare ? { onShare } : {})}
-                  />
-                ))}
-              </div>
-            ) : isolatedCwd !== null ? (
-              <div data-testid="project-view-isolated" data-cwd={isolatedCwd}>
-                {visibleUnpinned.map(session => (
-                  <SessionRow
-                    key={session.sessionUuid}
-                    session={session}
-                    onPinChange={handlePinChange}
-                    onOpenSession={onOpenSession}
-                    onCopySessionId={onCopySessionId}
-                    {...(onShare ? { onShare } : {})}
-                  />
-                ))}
-              </div>
-            ) : visiblePinned.length > 0 && visibleUnpinned.length > 0 ? (
-              <CollapsibleSection label="RECENT" testId="project-view-recent">
-                {visibleUnpinned.map(session => (
-                  <SessionRow
-                    key={session.sessionUuid}
-                    session={session}
-                    onPinChange={handlePinChange}
-                    onOpenSession={onOpenSession}
-                    onCopySessionId={onCopySessionId}
-                    {...(onShare ? { onShare } : {})}
-                  />
-                ))}
-              </CollapsibleSection>
-            ) : (
-              <div data-testid="project-view-recent">
-                {visibleUnpinned.map(session => (
-                  <SessionRow
-                    key={session.sessionUuid}
-                    session={session}
-                    onPinChange={handlePinChange}
-                    onOpenSession={onOpenSession}
-                    onCopySessionId={onCopySessionId}
-                    {...(onShare ? { onShare } : {})}
-                  />
-                ))}
-              </div>
+            {isolatedCwd !== null && (
+              <button
+                type="button"
+                onClick={() => setIsolatedCwd(null)}
+                className="text-accent hover:underline"
+              >
+                {t('project.clearDirectoryFilter')}
+              </button>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <VirtualSessionList
+          rows={rows}
+          onEndReached={loadMore}
+          onPinChange={handlePinChange}
+          onOpenSession={onOpenSession}
+          onCopySessionId={onCopySessionId}
+          {...(onShare ? { onShare } : {})}
+          testId="project-view-scroll"
+        />
+      )}
     </div>
   )
 }
 
-function DirectoryGroupSection({
-  cwd,
-  projectDisplayPath,
-  sessions,
-  open,
-  onToggleOpen,
-  onPinChange,
-  onOpenSession,
-  onCopySessionId,
-  onShare,
-}: {
-  cwd: string
-  projectDisplayPath: string | null
-  sessions: Session[]
-  open: boolean
-  onToggleOpen: () => void
-  onPinChange: (uuid: string, pinned: boolean) => void
-  onOpenSession: (uuid: string) => void
-  onCopySessionId: (source: Session['source']) => void
-  onShare?: (uuid: string) => void
-}) {
-  const { t } = useTranslation()
-  const { name } = formatCwdLabel(cwd, projectDisplayPath)
-  const count = sessions.length
-  const tooltip = cwd === '(unknown)' ? undefined : cwd
-
+function DirectoryHeaderLabel({ name, count }: { name: string; count: number }) {
   return (
-    <div data-testid="project-view-directory-group" data-cwd={cwd}>
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        aria-expanded={open}
-        aria-label={open ? t('project.collapseDirectory') : t('project.expandDirectory')}
-        title={tooltip}
-        className="group w-full flex items-center gap-2 px-6 pt-3 pb-1 text-left text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
-      >
-        <span className="font-mono text-[11px] font-medium truncate">
-          {name}
-        </span>
-        {count > 1 && (
-          <span className="font-mono text-[10px] tabular-nums flex-none">
-            {count}
-          </span>
-        )}
-        <svg
-          width="9"
-          height="9"
-          viewBox="0 0 9 9"
-          fill="none"
-          aria-hidden
-          className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
-        >
-          <path d="M3 1.5L6 4.5L3 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open && (
-        <div>
-          {sessions.map(session => (
-            <SessionRow
-              key={session.sessionUuid}
-              session={session}
-              onPinChange={onPinChange}
-              onOpenSession={onOpenSession}
-              onCopySessionId={onCopySessionId}
-              {...(onShare ? { onShare } : {})}
-            />
-          ))}
-        </div>
+    <span className="inline-flex items-center gap-2">
+      <span className="font-mono text-[11px] font-medium truncate">{name}</span>
+      {count > 1 && (
+        <span className="font-mono text-[10px] tabular-nums flex-none">{count}</span>
       )}
-    </div>
+    </span>
   )
 }
 
 const MAX_INLINE_CHIPS = 4
 
 function DirectoryChipStrip({
-  groups,
+  counts,
   isolatedCwd,
   projectDisplayPath,
   onSelect,
 }: {
-  groups: Array<{ cwd: string; sessions: Session[] }>
+  counts: DirectoryCount[]
   isolatedCwd: string | null
   projectDisplayPath: string | null
   onSelect: (cwd: string | null) => void
 }) {
-  const totalSessions = groups.reduce((sum, g) => sum + g.sessions.length, 0)
-  const top = groups.slice(0, MAX_INLINE_CHIPS)
+  const totalSessions = counts.reduce((sum, c) => sum + c.sessionCount, 0)
+  const top = counts.slice(0, MAX_INLINE_CHIPS)
   let inline = top
   if (
     isolatedCwd !== null
-    && !top.some(g => g.cwd === isolatedCwd)
-    && groups.some(g => g.cwd === isolatedCwd)
+    && !top.some(c => c.cwd === isolatedCwd)
+    && counts.some(c => c.cwd === isolatedCwd)
   ) {
-    const active = groups.find(g => g.cwd === isolatedCwd)!
+    const active = counts.find(c => c.cwd === isolatedCwd)!
     inline = [...top.slice(0, MAX_INLINE_CHIPS - 1), active]
   }
-  const inlineSet = new Set(inline.map(g => g.cwd))
-  const overflow = groups.filter(g => !inlineSet.has(g.cwd))
+  const inlineSet = new Set(inline.map(c => c.cwd))
+  const overflow = counts.filter(c => !inlineSet.has(c.cwd))
 
   return (
     <div data-testid="project-directory-chips" className="mt-2 flex items-center gap-1 flex-wrap">
@@ -530,16 +558,16 @@ function DirectoryChipStrip({
         count={totalSessions}
         onClick={() => onSelect(null)}
       />
-      {inline.map(g => {
-        const { name } = formatCwdLabel(g.cwd, projectDisplayPath)
+      {inline.map(c => {
+        const { name } = formatCwdLabel(c.cwd, projectDisplayPath)
         return (
           <DirectoryChip
-            key={g.cwd}
-            active={isolatedCwd === g.cwd}
+            key={c.cwd}
+            active={isolatedCwd === c.cwd}
             label={name}
-            title={g.cwd === '(unknown)' ? undefined : g.cwd}
-            count={g.sessions.length}
-            onClick={() => onSelect(g.cwd)}
+            title={c.cwd === '(unknown)' ? undefined : c.cwd}
+            count={c.sessionCount}
+            onClick={() => onSelect(c.cwd)}
           />
         )
       })}
@@ -562,12 +590,12 @@ function DirectoryChipStrip({
               </svg>
             </button>
           )}
-          items={overflow.map(g => {
-            const { name } = formatCwdLabel(g.cwd, projectDisplayPath)
+          items={overflow.map(c => {
+            const { name } = formatCwdLabel(c.cwd, projectDisplayPath)
             return {
-              label: `${name} · ${g.sessions.length}`,
-              active: isolatedCwd === g.cwd,
-              onSelect: () => onSelect(g.cwd),
+              label: `${name} · ${c.sessionCount}`,
+              active: isolatedCwd === c.cwd,
+              onSelect: () => onSelect(c.cwd),
             }
           })}
         />

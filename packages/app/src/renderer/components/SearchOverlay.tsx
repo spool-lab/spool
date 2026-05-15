@@ -83,10 +83,10 @@ export default function SearchOverlay({
     let cancelled = false
     const fetchRecents = scope === 'project' && scopeProjectKey
       ? window.spool.listSessionsByIdentity(scopeProjectKey, { limit: 30 })
-      : window.spool.listSessions(30)
+      : window.spool.listSessions({ limit: 30 })
     /* recents and FTS both limit to 30 for consistent footer counts */
     fetchRecents
-      .then(sessions => { if (!cancelled) setRecents(sessions) })
+      .then(page => { if (!cancelled) setRecents(page.sessions) })
       .catch(() => { if (!cancelled) setRecents([]) })
     return () => { cancelled = true }
   }, [open, showRecents, scope, scopeProjectKey])

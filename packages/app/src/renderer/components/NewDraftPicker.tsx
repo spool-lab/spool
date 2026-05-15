@@ -75,8 +75,8 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
   // Fetch recent on mount.
   useEffect(() => {
     let cancelled = false
-    window.spool.listSessions(RECENT_LIMIT)
-      .then((rows) => { if (!cancelled) setRecent(rows) })
+    window.spool.listSessions({ limit: RECENT_LIMIT })
+      .then((page) => { if (!cancelled) setRecent(page.sessions) })
       .catch((err) => {
         if (cancelled) return
         setError(err instanceof Error ? err.message : t('common.error'))
