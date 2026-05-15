@@ -3,11 +3,12 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import zhCN from './locales/zh-CN.json'
 import zhTW from './locales/zh-TW.json'
+import ja from './locales/ja.json'
 
-export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW'
+export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW' | 'ja'
 export type LanguagePreference = 'system' | SupportedLocale
 
-export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'zh-CN', 'zh-TW']
+export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'zh-CN', 'zh-TW', 'ja']
 
 const STORAGE_KEY = 'spool:lang-cache'
 
@@ -19,7 +20,7 @@ const STORAGE_KEY = 'spool:lang-cache'
 function readCachedLocale(): SupportedLocale | null {
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    if (v === 'en' || v === 'zh-CN' || v === 'zh-TW') return v
+    if (v === 'en' || v === 'zh-CN' || v === 'zh-TW' || v === 'ja') return v
   } catch { /* localStorage disabled — ignore */ }
   return null
 }
@@ -37,6 +38,7 @@ i18n
       en: { translation: en },
       'zh-CN': { translation: zhCN },
       'zh-TW': { translation: zhTW },
+      ja: { translation: ja },
     },
     // Initial language: cached value if available, else en. The renderer
     // will call `applyLanguage` once it resolves the user's preference.

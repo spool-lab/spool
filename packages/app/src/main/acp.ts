@@ -59,7 +59,7 @@ export interface AgentsConfig {
   /** Sort order for the project view session list (default: 'recent') */
   projectSortOrder?: 'recent' | 'oldest' | 'most_messages' | 'title'
   /** UI language; 'system' follows OS preference (default). */
-  language?: 'system' | 'en' | 'zh-CN' | 'zh-TW'
+  language?: 'system' | 'en' | 'zh-CN' | 'zh-TW' | 'ja'
   /** Custom agent definitions (extend beyond builtins) */
   customAgents?: Record<string, {
     name?: string
