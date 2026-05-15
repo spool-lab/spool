@@ -418,6 +418,7 @@ ipcMain.handle('spool:get-system-locale', () => {
     return 'zh-CN'
   }
   if (raw.startsWith('ja')) return 'ja'
+  if (raw.startsWith('ko')) return 'ko'
   return 'en'
 })
 

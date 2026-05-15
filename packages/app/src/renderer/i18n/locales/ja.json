@@ -141,6 +141,7 @@
     "language_zh_CN": "简体中文",
     "language_zh_TW": "繁體中文",
     "language_ja": "日本語",
+    "language_ko": "한국어",
     "defaultAgent_label": "デフォルト Agent",
     "defaultAgent_help": "Agent 検索に切り替えたときに使用されます。",
     "defaultSearchSort_label": "デフォルトの検索並び順",
