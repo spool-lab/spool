@@ -112,7 +112,9 @@
     "resume_inTerminal": "在終端機繼續",
     "copySessionId_short": "複製 ID",
     "scrollToBottom": "捲到底部",
-    "msgs_other": "{{count}} 則"
+    "msgs_other": "{{count}} 則",
+    "divider_today": "今天",
+    "divider_yesterday": "昨天"
   },
   "library": {
     "greeting": "歡迎回來",

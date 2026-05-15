@@ -112,7 +112,9 @@
     "resume_inTerminal": "ターミナルで再開",
     "copySessionId_short": "ID をコピー",
     "scrollToBottom": "末尾までスクロール",
-    "msgs_other": "{{count}} 件"
+    "msgs_other": "{{count}} 件",
+    "divider_today": "今日",
+    "divider_yesterday": "昨日"
   },
   "library": {
     "greeting": "おかえりなさい",
