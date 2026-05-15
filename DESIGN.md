@@ -86,9 +86,9 @@ Only currently-supported agent sources are listed. New sources arrive via the da
 
 | Source | Light | Dark |
 |--------|-------|------|
-| Claude Code | `#6B5B8A` | `#9B8BBF` |
-| Codex CLI | `#1A6B3C` | `#40C87A` |
-| Gemini | `#3B6FB0` | `#7AA8E0` |
+| Claude Code | `#C26A4E` | `#E89A7C` |
+| Codex CLI | `#4A9670` | `#7CC9A2` |
+| Gemini | `#5887D0` | `#8AB0E5` |
 
 ### Semantic States
 Status colors are warm-tuned to match the rest of the palette — never use Tailwind defaults (`green-500`, `red-500`).

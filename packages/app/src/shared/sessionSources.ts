@@ -2,20 +2,20 @@ const SESSION_SOURCE_META = {
   claude: {
     label: 'Claude Code',
     shortLabel: 'claude',
-    color: '#6B5B8A',
-    colorDark: '#9B8BBF',
+    color: '#C26A4E',
+    colorDark: '#E89A7C',
   },
   codex: {
     label: 'Codex CLI',
     shortLabel: 'codex',
-    color: '#2F7A4A',
-    colorDark: '#7AC78F',
+    color: '#4A9670',
+    colorDark: '#7CC9A2',
   },
   gemini: {
     label: 'Gemini CLI',
     shortLabel: 'gemini',
-    color: '#4285F4',
-    colorDark: '#7AA8E0',
+    color: '#5887D0',
+    colorDark: '#8AB0E5',
   },
 } as const
 

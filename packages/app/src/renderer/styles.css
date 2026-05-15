@@ -75,9 +75,9 @@
   --color-status-error-dark:   #D67259;
 
   /* Source badges */
-  --color-src-claude: #6B5B8A;
-  --color-src-codex: #2F7A4A;
-  --color-src-gemini: #4285F4;
+  --color-src-claude: #C26A4E;
+  --color-src-codex: #4A9670;
+  --color-src-gemini: #5887D0;
 
   /* Typography */
   --font-sans: 'Inter Variable', system-ui, sans-serif;

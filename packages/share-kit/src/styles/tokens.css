@@ -21,8 +21,8 @@
 
   /* Source badges */
   --src-chatgpt: #10A37F;
-  --src-claude: #6B5B8A;
-  --src-gemini: #1A6B9F;
+  --src-claude: #C26A4E;
+  --src-gemini: #5887D0;
 }
 
 [data-theme='dark'] {
@@ -42,6 +42,6 @@
   --err-bg: #2A1508;
 
   --src-chatgpt: #20C38F;
-  --src-claude: #9B8BBF;
-  --src-gemini: #4A9BD4;
+  --src-claude: #E89A7C;
+  --src-gemini: #8AB0E5;
 }
