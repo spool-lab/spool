@@ -229,6 +229,7 @@ function GeneralTab({
               { value: 'en', label: t('settings.language_en') },
               { value: 'zh-CN', label: t('settings.language_zh_CN') },
               { value: 'zh-TW', label: t('settings.language_zh_TW') },
+              { value: 'ja', label: t('settings.language_ja') },
             ]}
           />
         </div>

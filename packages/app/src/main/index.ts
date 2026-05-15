@@ -417,6 +417,7 @@ ipcMain.handle('spool:get-system-locale', () => {
     if (raw.includes('-tw') || raw.includes('-hk') || raw.includes('-mo')) return 'zh-TW'
     return 'zh-CN'
   }
+  if (raw.startsWith('ja')) return 'ja'
   return 'en'
 })
 

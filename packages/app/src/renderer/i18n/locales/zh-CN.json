@@ -140,6 +140,7 @@
     "language_en": "English",
     "language_zh_CN": "简体中文",
     "language_zh_TW": "繁體中文",
+    "language_ja": "日本語",
     "defaultAgent_label": "默认 Agent",
     "defaultAgent_help": "切换到「Agent 搜索」时默认使用。",
     "defaultSearchSort_label": "默认搜索排序",
