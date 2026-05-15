@@ -118,7 +118,9 @@
     "copySessionId_short": "Copier l'ID",
     "scrollToBottom": "Aller en bas",
     "msgs_one": "{{count}} msg",
-    "msgs_other": "{{count}} msgs"
+    "msgs_other": "{{count}} msgs",
+    "divider_today": "Aujourd'hui",
+    "divider_yesterday": "Hier"
   },
   "library": {
     "greeting": "Bon retour",

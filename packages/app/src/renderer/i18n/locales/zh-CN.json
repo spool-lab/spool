@@ -112,7 +112,9 @@
     "resume_inTerminal": "在终端继续",
     "copySessionId_short": "复制 ID",
     "scrollToBottom": "滚到底部",
-    "msgs_other": "{{count}} 条"
+    "msgs_other": "{{count}} 条",
+    "divider_today": "今天",
+    "divider_yesterday": "昨天"
   },
   "library": {
     "greeting": "欢迎回来",

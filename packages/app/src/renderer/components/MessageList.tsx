@@ -1,7 +1,10 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import type { Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
+
+type DividerLabel = (iso: string, now: Date) => string
 
 export interface MessageListHandle {
   scrollToMessageId: (id: number) => void
@@ -23,17 +26,92 @@ interface Props {
   showTargetHighlight: boolean
 }
 
+/** A virtualised row is either an actual message or a day-divider header. */
+type Row =
+  | { kind: 'msg'; msg: Message; showAvatar: boolean }
+  | { kind: 'divider'; key: string; isoDay: string; label: string }
+
+/** Stable per-local-day key used for divider grouping + dedup. */
+function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+function sameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
+function makeDividerLabel(today: string, yesterday: string, locale: string | undefined): DividerLabel {
+  return (iso, now) => {
+    const d = new Date(iso)
+    if (sameLocalDay(d, now)) return today
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    if (sameLocalDay(d, y)) return yesterday
+    const opts: Intl.DateTimeFormatOptions =
+      d.getFullYear() === now.getFullYear()
+        ? { weekday: 'short', month: 'short', day: 'numeric' }
+        : { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }
+    return new Intl.DateTimeFormat(locale, opts).format(d)
+  }
+}
+
+/** Build the virtualised row list. A divider is inserted whenever the
+ *  message's local day differs from the previous row, including before the
+ *  very first message. `showAvatar` is pre-computed here so itemContent
+ *  stays cheap and so role-grouping resets across day boundaries (the
+ *  first message after a divider always shows its avatar). */
+function buildRows(messages: Message[], label: DividerLabel): Row[] {
+  const rows: Row[] = []
+  let prevDay: string | null = null
+  let prevMsg: Message | null = null
+  const now = new Date()
+  for (const msg of messages) {
+    const day = localDayKey(msg.timestamp)
+    if (day !== prevDay) {
+      rows.push({
+        kind: 'divider',
+        key: `div-${day}`,
+        isoDay: day,
+        label: label(msg.timestamp, now),
+      })
+      prevDay = day
+      prevMsg = null
+    }
+    const showAvatar =
+      !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
+    rows.push({ kind: 'msg', msg, showAvatar })
+    prevMsg = msg
+  }
+  return rows
+}
+
 const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   { messages, isDark, showFindBar, messageFindRanges, activeMatchIndex, onActiveMatchRef, targetMessageId, showTargetHighlight },
   ref,
 ) {
+  const { t, i18n } = useTranslation()
   const virtuosoRef = useRef<VirtuosoHandle | null>(null)
 
-  const idToIndex = useMemo(() => {
+  const dividerLabel = useMemo(
+    () => makeDividerLabel(t('session.divider_today'), t('session.divider_yesterday'), i18n.language),
+    [t, i18n.language],
+  )
+  const rows = useMemo(() => buildRows(messages, dividerLabel), [messages, dividerLabel])
+
+  // Maps a message id to its row index. Row indices include day dividers,
+  // so this is the only correct way to translate "scroll to message X" into
+  // a Virtuoso index after dividers are inserted.
+  const idToRowIndex = useMemo(() => {
     const map = new Map<number, number>()
-    messages.forEach((m, i) => map.set(m.id, i))
+    rows.forEach((row, i) => {
+      if (row.kind === 'msg') map.set(row.msg.id, i)
+    })
     return map
-  }, [messages])
+  }, [rows])
 
   // Captured once at mount: Virtuoso reads this before its first paint, so the
   // target row is already centered when the user sees the list. Subsequent
@@ -43,18 +121,18 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   // initialTopMostItemIndex with the fresh target.
   const initialIndex = useMemo(() => {
     if (targetMessageId == null) return undefined
-    const idx = idToIndex.get(targetMessageId)
+    const idx = idToRowIndex.get(targetMessageId)
     return idx == null ? undefined : { index: idx, align: 'center' as const }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useImperativeHandle(ref, () => ({
     scrollToMessageId(id) {
-      const idx = idToIndex.get(id)
+      const idx = idToRowIndex.get(id)
       if (idx == null) return
       virtuosoRef.current?.scrollIntoView({ index: idx, align: 'center', behavior: 'auto' })
     },
-  }), [idToIndex])
+  }), [idToRowIndex])
 
   if (messages.length === 0) {
     return (
@@ -67,21 +145,36 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   return (
     <Virtuoso
       ref={virtuosoRef}
-      data={messages}
-      computeItemKey={(_index, msg) => msg.id}
+      data={rows}
+      computeItemKey={(_index, row) => row.kind === 'msg' ? `m-${row.msg.id}` : row.key}
       defaultItemHeight={64}
       {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
       increaseViewportBy={400}
       data-testid="message-list-scroll"
       className="flex-1 [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]"
-      itemContent={(index, msg) => {
+      itemContent={(index, row) => {
+        if (row.kind === 'divider') {
+          return (
+            <div
+              data-index={index}
+              data-testid="day-divider"
+              data-day={row.isoDay}
+              className="px-6 pt-5 pb-2 flex items-center gap-3 select-none"
+            >
+              <span className="flex-1 h-px bg-warm-border dark:bg-dark-border" />
+              <span className="text-[10px] font-semibold tracking-[0.08em] uppercase text-warm-faint dark:text-dark-muted">
+                {row.label}
+              </span>
+              <span className="flex-1 h-px bg-warm-border dark:bg-dark-border" />
+            </div>
+          )
+        }
+        const msg = row.msg
         const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
         const containsActive = matchState != null
           && activeMatchIndex >= matchState.offset
           && activeMatchIndex < matchState.offset + matchState.ranges.length
         const isTarget = msg.id === targetMessageId
-        const prev = index > 0 ? messages[index - 1] : undefined
-        const showAvatar = !prev || prev.role !== msg.role || prev.role === 'system'
 
         return (
           <div
@@ -95,7 +188,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
             <MessageBubble
               message={msg}
               isDark={isDark}
-              showAvatar={showAvatar}
+              showAvatar={row.showAvatar}
               {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
               activeMatchIndex={containsActive ? activeMatchIndex : -1}
               {...(containsActive ? { onActiveMatchRef } : {})}

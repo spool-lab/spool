@@ -112,7 +112,9 @@
     "resume_inTerminal": "터미널에서 재개",
     "copySessionId_short": "ID 복사",
     "scrollToBottom": "맨 아래로 스크롤",
-    "msgs_other": "{{count}}개"
+    "msgs_other": "{{count}}개",
+    "divider_today": "오늘",
+    "divider_yesterday": "어제"
   },
   "library": {
     "greeting": "환영합니다",

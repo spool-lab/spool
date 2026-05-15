@@ -118,7 +118,9 @@
     "copySessionId_short": "ID kopieren",
     "scrollToBottom": "Nach unten scrollen",
     "msgs_one": "{{count}} Nachr.",
-    "msgs_other": "{{count}} Nachr."
+    "msgs_other": "{{count}} Nachr.",
+    "divider_today": "Heute",
+    "divider_yesterday": "Gestern"
   },
   "library": {
     "greeting": "Willkommen zurück",

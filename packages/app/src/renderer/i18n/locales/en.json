@@ -118,7 +118,9 @@
     "copySessionId_short": "Copy ID",
     "scrollToBottom": "Scroll to bottom",
     "msgs_one": "{{count}} msg",
-    "msgs_other": "{{count}} msgs"
+    "msgs_other": "{{count}} msgs",
+    "divider_today": "Today",
+    "divider_yesterday": "Yesterday"
   },
   "library": {
     "greeting": "Welcome back",
