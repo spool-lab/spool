@@ -149,6 +149,7 @@
     "language_zh_TW": "繁體中文",
     "language_ja": "日本語",
     "language_ko": "한국어",
+    "language_de": "Deutsch",
     "defaultAgent_label": "Default agent",
     "defaultAgent_help": "Used when you switch to Ask mode.",
     "defaultSearchSort_label": "Default search sort",
