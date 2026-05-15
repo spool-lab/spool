@@ -290,9 +290,9 @@
     "noResults_body": "Try a different query, or widen the scope."
   },
   "update": {
-    "available": "A new version of Spool is available",
+    "available": "Update available",
     "downloading": "Downloading update… {{percent}}%",
-    "ready": "Update ready — restart to install",
+    "ready": "Restart to install",
     "restart": "Restart"
   },
   "status": {

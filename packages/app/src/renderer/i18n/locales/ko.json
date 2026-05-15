@@ -283,9 +283,9 @@
     "noResults_body": "다른 키워드를 시도하거나 범위를 넓혀 보세요."
   },
   "update": {
-    "available": "Spool의 새 버전이 사용 가능합니다",
+    "available": "업데이트 사용 가능",
     "downloading": "업데이트 다운로드 중… {{percent}}%",
-    "ready": "업데이트 준비 완료 — 재시작하여 설치",
+    "ready": "재시작하여 설치",
     "restart": "재시작"
   },
   "status": {

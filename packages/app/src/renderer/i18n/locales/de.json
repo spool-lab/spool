@@ -290,9 +290,9 @@
     "noResults_body": "Probieren Sie andere Stichwörter oder erweitern Sie den Suchbereich."
   },
   "update": {
-    "available": "Eine neue Version von Spool ist verfügbar",
+    "available": "Update verfügbar",
     "downloading": "Update wird heruntergeladen… {{percent}}%",
-    "ready": "Update bereit – Neustart zum Installieren",
+    "ready": "Zum Installieren neu starten",
     "restart": "Neu starten"
   },
   "status": {
