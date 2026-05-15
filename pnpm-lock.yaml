@@ -241,8 +241,20 @@ importers:
         specifier: ^0.7.2
         version: 0.7.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@void/md@0.7.2)(@voidzero-dev/vite-plus-core@0.1.20(@types/node@22.19.17)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(typescript@5.9.3))(arktype@2.2.0)(kysely@0.28.17)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(valibot@1.4.0(typescript@5.9.3))(vitest@4.1.4(@opentelemetry/api@1.9.1)(@types/node@22.19.17)(@voidzero-dev/vite-plus-core@0.1.20(@types/node@22.19.17)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(typescript@5.9.3)))(workerd@1.20260507.1)(zod@4.3.6)
 
+  packages/redact:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.17
+        version: 22.19.17
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
+
   packages/share-kit:
     dependencies:
+      '@spool-lab/redact':
+        specifier: workspace:*
+        version: link:../redact
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13

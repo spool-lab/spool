@@ -302,7 +302,12 @@ export default function ShareEditorPage({
 
     await beginSaving()
     try {
-      const doc = buildSpoolDocument(liveConversation, opts)
+      // Sanitise the body before writing. When `redact: true` is on,
+      // the downloaded .spool will contain `[redacted]` markers in
+      // turn bodies instead of the original credentials — so a
+      // recipient (or any process that reads the file) never sees
+      // the secret. Autosave path stays raw on purpose.
+      const doc = buildSpoolDocument(liveConversation, opts, { sanitize: true })
       const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/spool+json' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')

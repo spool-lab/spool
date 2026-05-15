@@ -11,9 +11,10 @@
 // Legacy drafts saved before `Turn.timestamp` existed gracefully
 // degrade: the gutter shows a dash and no gaps are drawn.
 
+import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
-import { templateTokens } from './tokens'
+import { accentBgFor, templateTokens } from './tokens'
 import { collectRedactList } from './redact'
 import { selectSegments } from './selection'
 import { Body } from './body'
@@ -26,8 +27,12 @@ interface Props {
 export function Timeline({ convo, opts }: Props) {
   const t = templateTokens(opts.paper)
   const accent = opts.accentHex
+  const accentBg = accentBgFor(accent)
   const tf = typefaceFamily(opts.typeface)
-  const redactList = collectRedactList(convo.turns)
+  const redactList = useMemo(
+    () => collectRedactList(convo.turns, opts),
+    [convo.turns, opts.redactExclude],
+  )
   const segments = selectSegments(convo, opts)
   const turnGap = opts.density === 'compact' ? 18 : 28
 
@@ -241,7 +246,7 @@ export function Timeline({ convo, opts }: Props) {
                       redact={opts.redact ? redactList : undefined}
                       sansFont={tf}
                       accent={accent}
-                      accentBg={t.accentBg}
+                      accentBg={accentBg}
                     />
                   </div>
                 </div>

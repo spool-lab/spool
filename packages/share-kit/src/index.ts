@@ -19,6 +19,7 @@ export type {
   TypefaceDef,
   Colorway,
   EditorOpts,
+  RedactExclude,
   SpoolDocument,
 } from './lib/types'
 
@@ -105,5 +106,23 @@ export {
 export type { Draft } from './lib/storage/drafts'
 
 // ─── Sensitive-data detection ───────────────────────────────────
-export { detectSensitiveSpans } from './lib/redaction-detect'
-export type { SensitiveKind, SensitiveMatch } from './lib/redaction-detect'
+export {
+  detectSensitiveSpans,
+  groupBySensitiveKind,
+  hashValueForRedactExclude,
+  SENSITIVE_KIND_LABEL,
+} from './lib/redaction-detect'
+export type {
+  SensitiveKind,
+  SensitiveMatch,
+  SensitiveGroup,
+  SensitiveValue,
+} from './lib/redaction-detect'
+export {
+  detectPII,
+  collectRedactList,
+  applyRedactPolicy,
+  SYNTHETIC_KIND_AUTHOR,
+  SYNTHETIC_KIND_MANUAL,
+} from './templates/redact'
+export type { PIIDetection } from './templates/redact'
