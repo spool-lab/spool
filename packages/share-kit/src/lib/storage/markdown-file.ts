@@ -20,10 +20,17 @@ const MIME = 'text/markdown'
 
 export function buildMarkdownDocument(conversation: Conversation, opts: EditorOpts): string {
   const { turns, gapBefore } = selectSegments(conversation, opts)
-  const redactList = opts.redact ? collectRedactList(turns) : []
+  const redactList = opts.redact ? collectRedactList(turns, opts) : []
+  const redactMap = new Map(redactList.map((r) => [r.value, r.replacement]))
   const redactRx = redactList.length
-    ? new RegExp(redactList.map(escapeRx).join('|'), 'g')
+    ? new RegExp(redactList.map((r) => escapeRx(r.value)).join('|'), 'g')
     : null
+  // Per-kind substitution wrapped in backticks so the masked span
+  // reads as a chip in any markdown renderer.
+  const substitute = (text: string): string =>
+    redactRx
+      ? text.replace(redactRx, (match) => '`' + (redactMap.get(match) ?? '[redacted]') + '`')
+      : text
 
   const lines: string[] = []
 
@@ -63,7 +70,7 @@ export function buildMarkdownDocument(conversation: Conversation, opts: EditorOp
       : conversation.sourceLabel
     lines.push(`**${name}:**`)
     lines.push('')
-    lines.push(redactRx ? turn.body.replace(redactRx, '`[redacted]`') : turn.body)
+    lines.push(substitute(turn.body))
     lines.push('')
   })
 

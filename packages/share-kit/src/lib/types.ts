@@ -185,6 +185,32 @@ export interface Colorway {
   swatch: string
 }
 
+/** Per-draft overrides to the redact pipeline. Only effective when
+ *  `redact: true` is also set.
+ *
+ *  • `kinds` — `SensitiveKind` (or synthetic `'synthetic:author'`
+ *    / `'synthetic:manual'`) categories the user has opted out of
+ *    (e.g. `'absolute-path'` when paths are part of the story).
+ *    Persisted with the draft — these are policy strings, never
+ *    value-bearing.
+ *
+ *  • `valueHashes` — FNV-1a 32-bit hex hashes of specific literal
+ *    substrings the user has chosen NOT to redact. Persisted with
+ *    the draft so per-item decisions survive reload. The literal
+ *    itself is never written: at apply time we hash each detected
+ *    value and check membership. See
+ *    `hashValueForRedactExclude` in `@spool-lab/redact`.
+ *
+ *  • `values` — same idea as `valueHashes` but with literal strings.
+ *    Provided for ergonomic/programmatic use (unit tests, in-memory
+ *    composition); the Share editor host MUST NOT persist them.
+ *    Both fields are honoured at apply time as a set union. */
+export interface RedactExclude {
+  kinds?: string[]
+  valueHashes?: string[]
+  values?: string[]
+}
+
 export interface EditorOpts {
   template: Template
   paper: Paper
@@ -194,6 +220,7 @@ export interface EditorOpts {
   density: Density
   avatars: boolean
   redact: boolean
+  redactExclude?: RedactExclude | undefined
   /** Indices of turns to include in the artifact. `undefined` means
    *  "include all turns" (the default). An empty array excludes
    *  everything — unusual but valid. */
@@ -286,6 +313,22 @@ export const DEFAULT_OPTS: EditorOpts = {
  *  IndexedDB entry can't crash the UI. */
 export function normalizeOpts(raw: unknown): EditorOpts {
   const merged = { ...DEFAULT_OPTS, ...((raw as Partial<EditorOpts>) ?? {}) }
+  // redactExclude defaults to undefined. At normalise we honour
+  // `kinds` (policy strings) and `valueHashes` (FNV hex hashes —
+  // not the literals). Any `values` field found in a stored draft
+  // is silently dropped: persisting literal exclusion strings would
+  // duplicate the very secrets we're trying to hide. Tests and
+  // in-memory composition may still pass `values` to
+  // `applyRedactPolicy`; the load path just refuses to keep them.
+  if (merged.redactExclude) {
+    const re = merged.redactExclude
+    merged.redactExclude = {
+      kinds: Array.isArray(re.kinds) ? re.kinds.filter((k): k is string => typeof k === 'string') : [],
+      valueHashes: Array.isArray(re.valueHashes)
+        ? re.valueHashes.filter((h): h is string => typeof h === 'string')
+        : [],
+    }
+  }
   if (!TEMPLATES.some((t) => t.id === merged.template)) {
     merged.template = DEFAULT_OPTS.template
   }

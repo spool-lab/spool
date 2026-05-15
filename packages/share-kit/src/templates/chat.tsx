@@ -4,9 +4,10 @@
 // evoke the native chat UI of ChatGPT/Claude/Gemini while still
 // reading as a considered artifact.
 
+import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
-import { templateTokens } from './tokens'
+import { accentBgFor, templateTokens } from './tokens'
 import { collectRedactList } from './redact'
 import { selectSegments } from './selection'
 import { GapMarker } from './gap-marker'
@@ -20,8 +21,15 @@ interface Props {
 export function Chat({ convo, opts }: Props) {
   const t = templateTokens(opts.paper)
   const accent = opts.accentHex
+  const accentBg = accentBgFor(accent)
   const tf = typefaceFamily(opts.typeface)
-  const redactList = collectRedactList(convo.turns)
+  // Memo so style-only opts changes (paper / typeface / colorway /
+  // density / selection) don't re-trigger the 22-regex detection
+  // pass. Re-runs only when source turns or redact policy moves.
+  const redactList = useMemo(
+    () => collectRedactList(convo.turns, opts),
+    [convo.turns, opts.redactExclude],
+  )
   const segments = selectSegments(convo, opts)
   const turnGap = opts.density === 'compact' ? 20 : 30
 
@@ -114,7 +122,7 @@ export function Chat({ convo, opts }: Props) {
                       sansFont={tf}
                       fontSize={13.5}
                       accent={accent}
-                      accentBg={t.accentBg}
+                      accentBg={accentBg}
                       blockBorder={t.border}
                     />
                   </div>
@@ -165,7 +173,7 @@ export function Chat({ convo, opts }: Props) {
                       sansFont={tf}
                       fontSize={13.5}
                       accent={accent}
-                      accentBg={t.accentBg}
+                      accentBg={accentBg}
                     />
                   </div>
                 </div>

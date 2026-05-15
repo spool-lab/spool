@@ -5,17 +5,23 @@
 //
 // Why the code-span trick: react-markdown escapes HTML, so the
 // simplest way to inject our custom redact chip is to preprocess the
-// plain text, replacing each redact match with an inline code span
-// `[redacted]`, then customize the `code` renderer to detect that
-// exact string and render our styled chip instead of a code element.
+// plain text — each detected literal is replaced with an inline code
+// span carrying the per-kind mask text (e.g. `m***@example.com`,
+// `[redacted: AWS key]`, `**** **** **** 1111`). A leading U+200B
+// (zero-width space) tags those code spans as "redaction chips" so
+// the `code` renderer can style them distinctly from ordinary inline
+// code that happens to occur in the conversation. The ZWSP is
+// invisible in the rendered output and survives the markdown export
+// round-trip cleanly.
 
 import { useMemo, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import type { RedactReplacement } from './redact'
 
 interface BodyProps {
   text: string
-  redact?: string[] | undefined
+  redact?: RedactReplacement[] | undefined
   /** Monospace content — used by Atelier's mono editorial body. */
   mono?: boolean | undefined
   /** Override the sans-serif family used for non-mono bodies. Letter
@@ -94,16 +100,24 @@ function MarkdownImage({ src, alt, accent }: { src?: string | undefined; alt?: s
   )
 }
 
-const REDACT_SENTINEL = '[redacted]'
+// Zero-width space prefixed to every redaction-chip code span so the
+// `code` renderer can tell our chips apart from incidental inline
+// code in the conversation. Invisible to readers; survives copy/
+// paste and markdown export.
+const REDACT_CHIP_MARKER = '​'
 
 function escapeRx(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function preprocess(text: string, redact?: string[]): string {
+function preprocess(text: string, redact?: RedactReplacement[]): string {
   if (!redact || redact.length === 0) return text
-  const rx = new RegExp(redact.map(escapeRx).join('|'), 'g')
-  return text.replace(rx, '`' + REDACT_SENTINEL + '`')
+  const map = new Map(redact.map((r) => [r.value, r.replacement]))
+  const rx = new RegExp(Array.from(map.keys()).map(escapeRx).join('|'), 'g')
+  return text.replace(rx, (match) => {
+    const mask = map.get(match) ?? '[redacted]'
+    return '`' + REDACT_CHIP_MARKER + mask + '`'
+  })
 }
 
 export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, accent, accentBg, blockBorder }: BodyProps) {
@@ -122,7 +136,9 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
   const components = useMemo<Components>(() => ({
     code({ className, children, node: _node, ...props }: any) {
       const codeText = String(children).replace(/\n$/, '')
-      if (codeText === REDACT_SENTINEL) {
+      if (codeText.startsWith(REDACT_CHIP_MARKER)) {
+        // Strip the marker before showing the per-kind mask.
+        const label = codeText.slice(REDACT_CHIP_MARKER.length)
         return (
           <span
             style={{
@@ -136,7 +152,7 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
               letterSpacing: '0.02em',
             }}
           >
-            [redacted]
+            {label}
           </span>
         )
       }

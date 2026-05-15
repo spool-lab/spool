@@ -1,18 +1,57 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   COLORWAYS,
   PAPERS,
   TEMPLATES,
   TYPEFACES,
+  SENSITIVE_KIND_LABEL,
+  SYNTHETIC_KIND_AUTHOR,
+  SYNTHETIC_KIND_MANUAL,
+  detectPII,
+  hashValueForRedactExclude,
   type Conversation,
   type EditorOpts,
   type Paper,
   type Typeface,
+  type SensitiveGroup,
+  type SensitiveValue,
 } from '@spool/share-kit'
 import { TemplateThumb } from './TemplateThumb.js'
 import { TurnSelector } from './TurnSelector.js'
 
-type View = 'style' | 'messages'
+/** Tiny helper that updates the persisted opt-out lists. Both fields
+ *  are kept sorted+deduped to keep diffs/autosave snapshots stable. */
+function setRedactExclude(
+  opts: EditorOpts,
+  setOpts: (next: EditorOpts) => void,
+  patch: { kinds?: string[]; valueHashes?: string[] },
+) {
+  const next = {
+    kinds: dedupSorted(patch.kinds ?? opts.redactExclude?.kinds ?? []),
+    valueHashes: dedupSorted(patch.valueHashes ?? opts.redactExclude?.valueHashes ?? []),
+  }
+  // If everything is empty, drop the field entirely so the serialised
+  // snapshot doesn't carry an empty `{kinds:[], valueHashes:[]}`.
+  if (next.kinds.length === 0 && next.valueHashes.length === 0) {
+    const { redactExclude: _drop, ...rest } = opts
+    setOpts(rest as EditorOpts)
+    return
+  }
+  setOpts({ ...opts, redactExclude: next })
+}
+
+function dedupSorted(xs: string[]): string[] {
+  return Array.from(new Set(xs)).sort()
+}
+
+function toggleInSet(xs: string[], v: string): string[] {
+  const set = new Set(xs)
+  if (set.has(v)) set.delete(v)
+  else set.add(v)
+  return Array.from(set)
+}
+
+type View = 'style' | 'messages' | 'privacy'
 
 // share-kit's exported lists now match exactly what the app picker
 // shows — Phase 0 trimmed the extras (transcript template, linen paper,
@@ -33,6 +72,12 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
   const currentPaper = PAPERS.find((p) => p.id === opts.paper) ?? PAPERS[0]!
   const currentTypeface = TYPEFACES.find((t) => t.id === opts.typeface) ?? TYPEFACES[0]!
 
+  // Detection runs over every turn (not the selection) so the user
+  // can spot leaks in turns they're about to include. The Body
+  // renderer applies the final list per-turn at render time.
+  const pii = useMemo(() => detectPII(convo.turns), [convo.turns])
+  const totalRedactions = pii.groups.reduce((n, g) => n + g.count, 0) + pii.names.length
+
   return (
     <div className="w-full h-full p-2 pt-0">
     <aside
@@ -47,10 +92,19 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
         >
           <ViewTab testId="share-editor-view-style" active={view === 'style'} onClick={() => setView('style')}>Style</ViewTab>
           <ViewTab testId="share-editor-view-messages" active={view === 'messages'} onClick={() => setView('messages')}>Messages</ViewTab>
+          <ViewTab
+            testId="share-editor-view-privacy"
+            active={view === 'privacy'}
+            onClick={() => setView('privacy')}
+          >
+            Privacy
+          </ViewTab>
         </div>
       </div>
       {view === 'messages' ? (
         <TurnSelector convo={convo} opts={opts} setOpts={setOpts} />
+      ) : view === 'privacy' ? (
+        <PrivacyView opts={opts} setOpts={setOpts} pii={pii} totalRedactions={totalRedactions} />
       ) : (
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
       <div className="px-4 pt-3 pb-4">
@@ -197,16 +251,414 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
   )
 }
 
+// Categorised summary. Each row is collapsible: header shows a
+// tri-state checkbox + label + count; expanding reveals every
+// detected literal with its own checkbox. Clicking a checkbox
+// flips its state. For high-stakes categories (credentials, JWTs,
+// PEM blocks…) the dangerous direction (allow → publish) opens an
+// inline `[Allow] [Cancel]` confirm bar under the row so the user
+// sees exactly which value is about to leak before they confirm.
+// The safe direction (re-redact) is always immediate.
+function RedactSummary({
+  groups,
+  authorNames,
+  manualValues,
+  opts,
+  setOpts,
+}: {
+  groups: SensitiveGroup[]
+  authorNames: string[]
+  manualValues: string[]
+  opts: EditorOpts
+  setOpts: (next: EditorOpts) => void
+}) {
+  const excludedKinds = new Set(opts.redactExclude?.kinds ?? [])
+  const excludedHashes = new Set(opts.redactExclude?.valueHashes ?? [])
+
+  const isKindExcluded = (kind: string) => excludedKinds.has(kind)
+  const isValueExcluded = (value: string) =>
+    excludedHashes.has(hashValueForRedactExclude(value))
+
+  const allowKind = (kind: string) =>
+    setRedactExclude(opts, setOpts, {
+      kinds: Array.from(new Set([...(opts.redactExclude?.kinds ?? []), kind])),
+    })
+  const reRedactKind = (kind: string, valuesInKind: string[]) => {
+    // Drop the kind from the exclude list AND clear any per-item
+    // exceptions that belong to this category — the user's intent
+    // here is "everything in this category goes back to masked",
+    // not "everything except the items I previously whitelisted".
+    const hashesToClear = new Set(valuesInKind.map(hashValueForRedactExclude))
+    setRedactExclude(opts, setOpts, {
+      kinds: (opts.redactExclude?.kinds ?? []).filter((k) => k !== kind),
+      valueHashes: (opts.redactExclude?.valueHashes ?? []).filter((h) => !hashesToClear.has(h)),
+    })
+  }
+  const toggleValue = (value: string) =>
+    setRedactExclude(opts, setOpts, {
+      valueHashes: toggleInSet(
+        opts.redactExclude?.valueHashes ?? [],
+        hashValueForRedactExclude(value),
+      ),
+    })
+
+  const hasAuto = groups.length > 0
+  const hasAuthor = authorNames.length > 0
+  const hasManual = manualValues.length > 0
+  if (!hasAuto && !hasAuthor && !hasManual) {
+    return (
+      <div
+        data-testid="share-editor-privacy-clean"
+        className="mt-2 px-2.5 py-2 rounded-md bg-warm-surface/50 dark:bg-dark-surface/40 text-[11.5px] text-warm-muted dark:text-dark-muted leading-snug"
+      >
+        No sensitive data detected.
+      </div>
+    )
+  }
+  // Synthetic categories (author / manual) don't go through the
+  // regex pipeline, so they don't carry occurrence counts. Wrap as
+  // distinct entries with count 1 so the same RedactRow component
+  // works for them.
+  const authorValues: SensitiveValue[] = authorNames.map((value) => ({ value, count: 1 }))
+  const manualEntries: SensitiveValue[] = manualValues.map((value) => ({ value, count: 1 }))
+
+  return (
+    <div data-testid="share-editor-privacy-summary" className="mt-2 flex flex-col gap-1">
+      {groups.map((g) => (
+        <RedactRow
+          key={g.kind}
+          kind={g.kind}
+          label={SENSITIVE_KIND_LABEL[g.kind]}
+          values={g.values}
+          minConfidence={g.minConfidence}
+          kindExcluded={isKindExcluded(g.kind)}
+          onAllowAll={() => allowKind(g.kind)}
+          onRedactAll={() => reRedactKind(g.kind, g.values.map((v) => v.value))}
+          isValueExcluded={isValueExcluded}
+          onToggleValue={toggleValue}
+        />
+      ))}
+      {hasAuthor && (
+        <RedactRow
+          kind={SYNTHETIC_KIND_AUTHOR}
+          label="Author name"
+          values={authorValues}
+          minConfidence={1}
+          note="From turn headers"
+          kindExcluded={isKindExcluded(SYNTHETIC_KIND_AUTHOR)}
+          onAllowAll={() => allowKind(SYNTHETIC_KIND_AUTHOR)}
+          onRedactAll={() => reRedactKind(SYNTHETIC_KIND_AUTHOR, authorNames)}
+          isValueExcluded={isValueExcluded}
+          onToggleValue={toggleValue}
+        />
+      )}
+      {hasManual && (
+        <RedactRow
+          kind={SYNTHETIC_KIND_MANUAL}
+          label="Manual entry"
+          values={manualEntries}
+          minConfidence={1}
+          note="You added these"
+          kindExcluded={isKindExcluded(SYNTHETIC_KIND_MANUAL)}
+          onAllowAll={() => allowKind(SYNTHETIC_KIND_MANUAL)}
+          onRedactAll={() => reRedactKind(SYNTHETIC_KIND_MANUAL, manualValues)}
+          isValueExcluded={isValueExcluded}
+          onToggleValue={toggleValue}
+        />
+      )}
+    </div>
+  )
+}
+
+function RedactRow({
+  kind,
+  label,
+  values,
+  minConfidence: _minConfidence,
+  note,
+  kindExcluded,
+  onAllowAll,
+  onRedactAll,
+  isValueExcluded,
+  onToggleValue,
+}: {
+  kind: string
+  label: string
+  values: SensitiveValue[]
+  minConfidence: number
+  note?: string
+  kindExcluded: boolean
+  onAllowAll: () => void
+  onRedactAll: () => void
+  isValueExcluded: (value: string) => boolean
+  onToggleValue: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  // Header `×N` sums occurrences across duplicates so the user sees
+  // how many times sensitive data appears in the source. The
+  // expanded list still shows one row per distinct value.
+  const totalOccurrences = values.reduce((n, v) => n + v.count, 0)
+  const allowedDistinct = kindExcluded
+    ? values.length
+    : values.filter((v) => isValueExcluded(v.value)).length
+  const bulkState: 'all' | 'mixed' | 'none' = kindExcluded
+    ? 'none'
+    : allowedDistinct === 0
+      ? 'all'
+      : 'mixed'
+
+  const handleBulkClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (bulkState === 'all') onAllowAll()
+    else onRedactAll()
+  }
+
+  const testId = `share-editor-privacy-row-${label.toLowerCase().replace(/\s+/g, '-')}`
+  return (
+    <div
+      data-testid={testId}
+      className={`rounded-md transition-colors ${
+        kindExcluded
+          ? 'bg-accent-bg/20 dark:bg-accent-bg-dark/15 border border-accent/20 dark:border-accent-dark/20'
+          : 'bg-warm-surface/50 dark:bg-dark-surface/40 border border-transparent'
+      }`}
+    >
+      <div
+        className="flex items-center gap-2 px-2.5 py-1.5"
+        data-testid={`${testId}-header`}
+      >
+        <BulkCheckbox
+          state={bulkState}
+          onClick={handleBulkClick}
+          label={label}
+        />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex-1 min-w-0 flex items-center gap-1.5 text-left focus:outline-none"
+        >
+          <Chevron open={open} />
+          <span className={`flex-1 min-w-0 text-[12px] truncate ${kindExcluded ? 'text-warm-faint dark:text-dark-muted line-through' : 'text-warm-text dark:text-dark-text'}`}>
+            {label}
+          </span>
+          <span className="flex-none text-[10.5px] text-warm-faint dark:text-dark-muted font-mono tabular-nums">
+            {totalOccurrences}
+          </span>
+        </button>
+      </div>
+
+      {open && (
+        <div className="px-2.5 pb-2 pt-1 flex flex-col gap-0.5 border-t border-warm-border/40 dark:border-dark-border/40">
+          {note && <div className="text-[10.5px] text-warm-faint dark:text-dark-muted py-1">{note}</div>}
+          {values.map((v, i) => {
+            const excluded = isValueExcluded(v.value) || kindExcluded
+            const interactive = !kindExcluded
+            return (
+              <ValueRow
+                key={i}
+                kind={kind}
+                value={v.value}
+                occurrences={v.count}
+                checked={!excluded}
+                interactive={interactive}
+                {...(interactive ? { onClick: () => onToggleValue(v.value) } : {})}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      className="flex-none text-warm-muted dark:text-dark-muted transition-transform"
+      style={{ transform: open ? 'rotate(90deg)' : 'none' }}
+    >
+      <path d="M3.5 2L7 5L3.5 8" />
+    </svg>
+  )
+}
+
+// Tri-state checkbox encoding the bulk redact state for a category.
+// `all` = every item will be masked (default, accent-filled box with
+// check). `mixed` = some opted out (accent-filled box with horizontal
+// bar). `none` = whole category opted out (empty box). Click cycles
+// follow safe-direction logic in the parent — this component just
+// renders the state and reports clicks.
+function BulkCheckbox({
+  state,
+  onClick,
+  label,
+}: {
+  state: 'all' | 'mixed' | 'none'
+  onClick: (e: React.MouseEvent) => void
+  label: string
+}) {
+  const filled = state !== 'none'
+  const title = state === 'none'
+    ? `Redact all ${label}`
+    : state === 'mixed'
+      ? `Mixed — click to redact all ${label}`
+      : `Click to allow all ${label}`
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={state === 'all' ? true : state === 'none' ? false : 'mixed'}
+      aria-label={title}
+      title={title}
+      onClick={onClick}
+      data-testid={`share-editor-privacy-bulk-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      className={`flex-none w-[14px] h-[14px] inline-flex items-center justify-center rounded-[3px] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/50 ${
+        filled
+          ? 'bg-accent dark:bg-accent-dark'
+          : 'bg-transparent border border-warm-border dark:border-dark-border'
+      }`}
+    >
+      {state === 'all' && (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M2 5L4 7L8 3" />
+        </svg>
+      )}
+      {state === 'mixed' && (
+        <div className="w-[7px] h-[1.8px] bg-white rounded-[1px]" aria-hidden />
+      )}
+    </button>
+  )
+}
+
+// One value row inside an expanded category. Standard two-state
+// checkbox + monospace value text. Long values get end-truncated;
+// the full string lives in the title attribute for hover. When the
+// same literal occurred multiple times in the source, a small `×N`
+// chip on the right communicates that one decision covers all N
+// occurrences.
+function ValueRow({
+  kind,
+  value,
+  occurrences,
+  checked,
+  interactive,
+  onClick,
+}: {
+  kind: string
+  value: string
+  occurrences: number
+  checked: boolean
+  interactive: boolean
+  onClick?: () => void
+}) {
+  const valueContent = (
+    <>
+      <ValueCheckbox checked={checked} interactive={interactive} />
+      <span
+        className={`flex-1 min-w-0 truncate text-[11px] font-mono ${
+          checked
+            ? 'text-warm-text dark:text-dark-text'
+            : 'text-accent dark:text-accent-dark'
+        }`}
+      >
+        {displayValue(value, kind)}
+      </span>
+      {occurrences > 1 && (
+        <span
+          title={`Appears ${occurrences} times in the source`}
+          className="flex-none text-[10px] text-warm-faint dark:text-dark-muted font-mono tabular-nums"
+        >
+          {occurrences}
+        </span>
+      )}
+    </>
+  )
+  // Left padding `pl-5` aligns the checkbox under the parent
+  // category's label (which sits ~20px past the bulk checkbox
+  // edge), establishing a clear parent/child visual nest.
+  if (!interactive) {
+    return (
+      <div
+        title={value}
+        className="px-1 py-1 rounded flex items-center gap-2 cursor-default"
+      >
+        {valueContent}
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={value}
+      className="px-1 py-1 rounded flex items-center gap-2 text-left transition-colors focus:outline-none hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60"
+    >
+      {valueContent}
+    </button>
+  )
+}
+
+function ValueCheckbox({ checked, interactive }: { checked: boolean; interactive: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`flex-none w-[12px] h-[12px] inline-flex items-center justify-center rounded-[3px] ${
+        checked
+          ? interactive
+            ? 'bg-accent dark:bg-accent-dark'
+            : 'bg-accent/60 dark:bg-accent-dark/60'
+          : 'bg-transparent border border-accent/60 dark:border-accent-dark/60'
+      }`}
+    >
+      {checked && (
+        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 5L4 7L8 3" />
+        </svg>
+      )}
+    </span>
+  )
+}
+
+function displayValue(raw: string, kind?: string): string {
+  // Flatten whitespace so multi-line matches (PEM blocks, INI
+  // sections) collapse to a single row. Full original lives in the
+  // title attribute regardless.
+  const flat = raw.replace(/\s+/g, ' ').trim()
+  const MAX = 56
+  if (flat.length <= MAX) return flat
+  // URL-shaped kinds carry distinguishing info at the END (host,
+  // path) — preserve both ends with a middle ellipsis so two
+  // different URLs don't render as visual duplicates.
+  if (kind === 'url-creds' || kind === 'connection-string') {
+    const head = flat.slice(0, 28)
+    const tail = flat.slice(-16)
+    return `${head}…${tail}`
+  }
+  return `${flat.slice(0, MAX - 1)}…`
+}
+
 function ViewTab({
   active,
   onClick,
   children,
   testId,
+  badge,
 }: {
   active: boolean
   onClick: () => void
   children: React.ReactNode
   testId?: string
+  /** Inline count chip — used by the Privacy tab to make
+   *  detected-leak count visible without entering the view. */
+  badge?: number
 }) {
   return (
     <button
@@ -215,14 +667,152 @@ function ViewTab({
       onClick={onClick}
       aria-selected={active}
       {...(testId ? { 'data-testid': testId } : {})}
-      className={`h-6 px-2.5 rounded text-[11.5px] font-medium transition-colors ${
+      className={`h-6 px-2.5 rounded text-[11.5px] font-medium transition-colors inline-flex items-center gap-1.5 ${
         active
           ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-[0_1px_1px_rgba(0,0,0,0.2)]'
           : 'bg-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
-      {children}
+      <span>{children}</span>
+      {badge !== undefined && (
+        <span
+          data-testid={testId ? `${testId}-badge` : undefined}
+          className="text-[9.5px] font-semibold leading-none px-1.5 py-[3px] rounded-full bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark"
+        >
+          {badge}
+        </span>
+      )}
     </button>
+  )
+}
+
+// Standalone Privacy view — peer of Style and Messages tabs. Pulled
+// out of the Style scroll surface so high-stakes safety controls
+// aren't fighting for space with aesthetic options, and so the tab
+// itself can carry a count badge for at-a-glance leak visibility.
+function PrivacyView({
+  opts,
+  setOpts,
+  pii,
+  totalRedactions,
+}: {
+  opts: EditorOpts
+  setOpts: (next: EditorOpts) => void
+  pii: ReturnType<typeof detectPII>
+  totalRedactions: number
+}) {
+  // How many sensitive occurrences would be VISIBLE in the shared
+  // / exported artifact under the current policy. Drives both the
+  // header count line and decides whether to show the Reset button.
+  const excludedKinds = new Set(opts.redactExclude?.kinds ?? [])
+  const excludedHashes = new Set(opts.redactExclude?.valueHashes ?? [])
+  const isValueAllowed = (v: string) =>
+    excludedHashes.size > 0 && excludedHashes.has(hashValueForRedactExclude(v))
+  let visibleOccurrences = 0
+  if (opts.redact) {
+    for (const g of pii.groups) {
+      const kindIsAllowed = excludedKinds.has(g.kind)
+      for (const v of g.values) {
+        if (kindIsAllowed || isValueAllowed(v.value)) visibleOccurrences += v.count
+      }
+    }
+    if (excludedKinds.has(SYNTHETIC_KIND_AUTHOR)) visibleOccurrences += pii.names.length
+    else visibleOccurrences += pii.names.filter((n) => isValueAllowed(n)).length
+    if (excludedKinds.has(SYNTHETIC_KIND_MANUAL)) visibleOccurrences += pii.manual.length
+    else visibleOccurrences += pii.manual.filter((v) => isValueAllowed(v)).length
+  } else {
+    visibleOccurrences = totalRedactions
+  }
+  const hasAnyExclusion =
+    (opts.redactExclude?.kinds?.length ?? 0) > 0 ||
+    (opts.redactExclude?.valueHashes?.length ?? 0) > 0
+  const handleReset = () => {
+    const { redactExclude: _drop, ...rest } = opts
+    setOpts(rest as EditorOpts)
+  }
+
+  // Headline only the actionable side. Total/masked counts are
+  // implied by the master toggle being on + the list below; the
+  // user really wants to know "what will leak?" — so only the
+  // visible count carries the warning weight.
+  let countLabel: string
+  if (totalRedactions === 0) countLabel = 'none detected'
+  else if (!opts.redact) countLabel = `${totalRedactions} will be visible`
+  else if (visibleOccurrences === 0) countLabel = `${totalRedactions} items`
+  else countLabel = `${visibleOccurrences} visible`
+
+  return (
+    <div
+      data-testid="share-editor-privacy-panel"
+      className="flex-1 min-h-0 overflow-y-auto scrollbar-none"
+    >
+      <div className="px-4 pt-3 pb-4">
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
+            Redactions
+          </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              data-testid="share-editor-privacy-count"
+              className={`flex-none text-[11px] leading-none ${
+                opts.redact && visibleOccurrences > 0
+                  ? 'text-accent dark:text-accent-dark'
+                  : 'text-warm-faint dark:text-dark-muted'
+              }`}
+            >
+              {countLabel}
+            </div>
+            {hasAnyExclusion && (
+              <button
+                type="button"
+                onClick={handleReset}
+                aria-label="Reset all redaction exceptions"
+                data-testid="share-editor-privacy-reset"
+                title="Mask everything detected (clear all exceptions)"
+                className="flex-none w-4 h-4 inline-flex items-center justify-center rounded text-warm-faint/70 dark:text-dark-muted/70 hover:text-accent dark:hover:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors focus:outline-none"
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M2 5.5A3.5 3.5 0 1 1 3 8" />
+                  <path d="M1 3v2.5h2.5" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+        <Toggle
+          testId="share-editor-toggle-redact"
+          label="Redact sensitive info"
+          value={opts.redact}
+          onChange={(v) => setOpts({ ...opts, redact: v })}
+        />
+        {opts.redact && (
+          <RedactSummary
+            groups={pii.groups}
+            authorNames={pii.names}
+            manualValues={pii.manual}
+            opts={opts}
+            setOpts={setOpts}
+          />
+        )}
+        {!opts.redact && totalRedactions > 0 && (
+          <div
+            data-testid="share-editor-privacy-warning"
+            className="mt-3 px-3 py-2.5 rounded-md border leading-snug"
+            style={{ borderColor: `${opts.accentHex}4D`, background: `${opts.accentHex}1A` }}
+          >
+            <div
+              className="text-[11.5px] font-medium"
+              style={{ color: opts.accentHex }}
+            >
+              {totalRedactions} sensitive item{totalRedactions === 1 ? '' : 's'} will be visible
+            </div>
+            <div className="mt-0.5 text-[11px] text-warm-muted dark:text-dark-muted">
+              Enable redaction before sharing or exporting
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
