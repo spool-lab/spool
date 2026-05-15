@@ -6,6 +6,7 @@ import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
+import Menu from './Menu.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,11 @@ export default function SettingsPanel({
   useHotkeys({ Escape: onClose }, { modal: true })
 
   return (
-    <div data-testid="settings-panel" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div
+      data-testid="settings-panel"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
       <div className="w-[720px] h-[560px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar */}
         <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
@@ -115,7 +120,7 @@ export default function SettingsPanel({
                 type="button"
                 aria-pressed={tab === def.id}
                 onClick={() => setTab(def.id)}
-                className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
+                className={`flex w-full items-center gap-2 rounded-[6px] px-3 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
                   tab === def.id
                     ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
                     : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg/70 dark:hover:bg-dark-bg/60'
@@ -127,9 +132,7 @@ export default function SettingsPanel({
             ))}
           </div>
           <div className="flex-1" />
-          <div className="px-4 py-2 text-[10px] text-warm-faint dark:text-dark-muted">
-            {t('settings.localData_footer')}
-          </div>
+          <FooterPath text={t('settings.localData_footer')} />
         </div>
 
         {/* Content */}
@@ -406,7 +409,7 @@ function AgentTab() {
                 key={agent.id}
                 onClick={() => isReady && updateConfig({ defaultAgent: agent.id })}
                 disabled={!isReady}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-[8px] text-left transition-colors ${
+                className={`w-full flex items-center gap-3 px-3 py-3 border rounded-[6px] text-left transition-colors ${
                   isSelected
                     ? 'bg-accent-bg dark:bg-[#2A1800] border-accent/30 dark:border-accent-dark/30'
                     : isReady
@@ -420,7 +423,7 @@ function AgentTab() {
                     <span className={`text-xs font-medium ${isReady ? 'text-warm-text dark:text-dark-text' : 'text-warm-faint dark:text-dark-muted'}`}>
                       {agent.name}
                     </span>
-                    <span className="text-[9px] font-mono text-warm-faint dark:text-dark-muted px-1.5 py-0.5 bg-warm-surface2 dark:bg-dark-surface2 rounded">
+                    <span className="text-[10px] font-mono text-warm-faint dark:text-dark-muted px-1.5 py-0.5 bg-warm-surface2 dark:bg-dark-surface2 rounded-[4px]">
                       {modeLabel(agent.acpMode)}
                     </span>
                   </div>
@@ -428,7 +431,7 @@ function AgentTab() {
                     {isReady ? agent.path : `${agent.id} — ${t('settings.agentStatus_not_found')}`}
                   </span>
                 </div>
-                <span className={`text-[10px] font-medium flex-none ${isReady ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
+                <span className={`text-[10px] font-medium flex-none ${isReady ? 'text-status-success dark:text-status-success-dark' : 'text-warm-faint dark:text-dark-muted'}`}>
                   {isReady ? t('settings.agentStatus_ready') : t('settings.agentStatus_not_found')}
                 </span>
               </button>
@@ -448,7 +451,7 @@ function AgentTab() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase mb-2">
+      <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.08em] uppercase mb-2">
         {title}
       </h4>
       {children}
@@ -466,7 +469,7 @@ function BuiltInSource({ name, color, count }: { name: string; color: string; co
         {count === null ? '…' : t('sidebar.sessionCount_other', { count })}
       </span>
       <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.06em] text-warm-faint dark:text-dark-muted">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-none" />
+        <span className="w-1.5 h-1.5 rounded-full bg-status-success dark:bg-status-success-dark flex-none" />
         auto
       </span>
     </div>
@@ -484,16 +487,51 @@ function RadioDot({ selected }: { selected: boolean }) {
 }
 
 function SmallSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  const current = options.find(o => o.value === value) ?? options[0]
   return (
-    <div className="relative flex-none">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="appearance-none h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface pl-2.5 pr-7 text-xs text-warm-text dark:text-dark-text outline-none transition-colors hover:border-warm-border2 dark:hover:border-dark-border2 focus:border-accent"
-      >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown />
+    <Menu
+      align="right"
+      items={options.map(o => ({
+        label: o.label,
+        active: o.value === value,
+        onSelect: () => onChange(o.value),
+      }))}
+      trigger={({ open, toggle }) => (
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={toggle}
+          className={`inline-flex items-center gap-2 h-7 min-w-[140px] rounded-[6px] border bg-warm-surface dark:bg-dark-surface pl-3 pr-2 text-[12px] text-warm-text dark:text-dark-text outline-none transition-colors focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
+            open
+              ? 'border-accent dark:border-accent-dark'
+              : 'border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2'
+          }`}
+        >
+          <span className="flex-1 text-left truncate">{current?.label ?? value}</span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 12"
+            className={`h-3 w-3 flex-none text-warm-muted dark:text-dark-muted transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none"
+          >
+            <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+    />
+  )
+}
+
+function FooterPath({ text }: { text: string }) {
+  const path = '~/.spool/'
+  const idx = text.indexOf(path)
+  const lead = idx >= 0 ? text.slice(0, idx).replace(/[\s,，:：]+$/, '').trim() : text
+  const trail = idx >= 0 ? text.slice(idx + path.length).trim() : ''
+  return (
+    <div className="px-4 py-2 text-[11px] leading-snug text-warm-faint dark:text-dark-muted">
+      <span className="block">{lead}{trail ? ` ${trail}` : ''}</span>
+      {idx >= 0 && <span className="block mt-0.5 font-mono">{path}</span>}
     </div>
   )
 }
@@ -540,10 +578,3 @@ function ToggleRow({
   )
 }
 
-function ChevronDown() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 12 12" className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-warm-muted dark:text-dark-muted" fill="none">
-      <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}

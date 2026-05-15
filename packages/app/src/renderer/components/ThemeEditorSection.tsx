@@ -5,6 +5,7 @@ import { THEME_PRESETS } from '../theme/editorTypes.js'
 import { lightPresetSeed, darkPresetSeed } from '../theme/presetSeeds.js'
 import { parseHex, toHex, adaptiveCardTone, hexToRgba, mixHex } from '../theme/colorUtils.js'
 import SegmentedPill from './SegmentedPill.js'
+import Menu from './Menu.js'
 
 function colorInputValue(hex: string): string {
   const parsed = parseHex(hex)
@@ -12,7 +13,7 @@ function colorInputValue(hex: string): string {
 }
 
 const sideInputBase =
-  'rounded-full border outline-none transition-colors focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:ring-[var(--side-accent)]'
+  'rounded-[6px] border outline-none transition-colors focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:ring-[var(--side-accent)]'
 
 function tintForValue(hex: string) {
   const tone = adaptiveCardTone(hex)
@@ -28,55 +29,55 @@ function ColorRow(props: {
   label: string
   value: string
   tone: ReturnType<typeof adaptiveCardTone>
+  fieldBg: string
+  divider: string
   onChange: (next: string) => void
   /** Match outer card border — divide-y ignores parent borderColor (not inherited). */
   showTopRule?: boolean
   ruleColor: string
 }) {
   const { t } = useTranslation()
-  const { id, label, value, tone, onChange, showTopRule, ruleColor } = props
+  const { id, label, value, tone, fieldBg, divider, onChange, showTopRule, ruleColor } = props
   const swatch = tintForValue(colorInputValue(value))
 
   return (
     <div
-      className={`grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3 px-4 py-3 ${showTopRule ? 'border-t border-solid' : ''}`}
+      className={`flex items-center gap-3 px-4 py-3 ${showTopRule ? 'border-t border-solid' : ''}`}
       style={showTopRule ? { borderTopColor: ruleColor } : undefined}
     >
+      <div className="relative h-7 w-7 flex-none">
+        <input
+          id={`${id}-picker`}
+          name={`${id}-picker`}
+          type="color"
+          value={colorInputValue(value)}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className="absolute inset-0 cursor-pointer opacity-0"
+          aria-label={t('themeEditor.accent_color_aria', { label })}
+        />
+        <div className="h-full w-full rounded-full border shadow-sm" style={swatch} />
+      </div>
       <label
         htmlFor={`${id}-hex`}
-        className="text-[11px] font-medium"
+        className="flex-1 min-w-0 text-[12px] font-medium"
         style={{ color: tone.primary }}
       >
         {label}
       </label>
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="relative h-9 w-9 flex-none">
-          <input
-            id={`${id}-picker`}
-            name={`${id}-picker`}
-            type="color"
-            value={colorInputValue(value)}
-            onChange={(e) => onChange(e.target.value.toUpperCase())}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label={t('themeEditor.accent_color_aria', { label })}
-          />
-          <div className="h-full w-full rounded-full border shadow-sm" style={swatch} />
-        </div>
-        <input
-          id={`${id}-hex`}
-          name={`${id}-hex`}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          autoComplete="off"
-          className={`h-9 min-w-0 flex-1 px-3 font-mono text-[11px] ${sideInputBase}`}
-          style={swatch}
-          aria-label={t('themeEditor.accent_hex_aria', { label })}
-        />
-      </div>
+      <input
+        id={`${id}-hex`}
+        name={`${id}-hex`}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        className={`h-7 w-[112px] text-right px-2 font-mono text-[11px] tabular-nums ${sideInputBase}`}
+        style={{ backgroundColor: fieldBg, borderColor: divider, color: tone.primary }}
+        aria-label={t('themeEditor.accent_hex_aria', { label })}
+      />
     </div>
   )
 }
@@ -149,36 +150,57 @@ function SideBlock(props: {
         <div className="min-w-0">
           <h4 className="text-xs font-semibold" style={{ color: tone.primary }}>{title}</h4>
         </div>
-        <div className="relative min-w-[168px]">
-          <select
-            id={`${prefix}-preset`}
-            name={`${prefix}-preset`}
-            value={presetValue}
-            onChange={(e) => onPreset(e.target.value)}
-            className={`h-9 w-full appearance-none pl-3 pr-9 text-[11px] font-medium ${sideInputBase}`}
-            style={{
-              backgroundColor: fieldBg,
-              borderColor: divider,
-              color: tone.primary,
+        <div className="flex justify-end min-w-[168px]">
+          <Menu
+            align="right"
+            items={[
+              { value: 'spool', label: t('themeEditor.preset_spool') },
+              { value: 'solarized', label: t('themeEditor.preset_solarized') },
+              { value: 'everforest', label: t('themeEditor.preset_everforest') },
+              { value: 'custom', label: t('themeEditor.preset_custom') },
+            ].map(o => ({
+              label: o.label,
+              active: o.value === presetValue,
+              onSelect: () => onPreset(o.value),
+            }))}
+            trigger={({ open, toggle }) => {
+              const currentLabel = (() => {
+                switch (presetValue) {
+                  case 'spool': return t('themeEditor.preset_spool')
+                  case 'solarized': return t('themeEditor.preset_solarized')
+                  case 'everforest': return t('themeEditor.preset_everforest')
+                  default: return t('themeEditor.preset_custom')
+                }
+              })()
+              return (
+                <button
+                  type="button"
+                  id={`${prefix}-preset`}
+                  aria-haspopup="listbox"
+                  aria-expanded={open}
+                  aria-label={t('themeEditor.presetAria', { title })}
+                  onClick={toggle}
+                  className={`inline-flex min-w-[120px] items-center gap-2 h-8 rounded-[6px] border pl-3 pr-2 text-[11px] font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:ring-[var(--side-accent)]`}
+                  style={{
+                    backgroundColor: fieldBg,
+                    borderColor: open ? slot.accent : divider,
+                    color: tone.primary,
+                  }}
+                >
+                  <span className="flex-1 text-left truncate">{currentLabel}</span>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 12 12"
+                    className={`h-3 w-3 flex-none transition-transform ${open ? 'rotate-180' : ''}`}
+                    fill="none"
+                    style={{ color: tone.muted }}
+                  >
+                    <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )
             }}
-            aria-label={t('themeEditor.presetAria', { title })}
-          >
-            <>
-              <option value="spool">{t('themeEditor.preset_spool')}</option>
-              <option value="solarized">{t('themeEditor.preset_solarized')}</option>
-              <option value="everforest">{t('themeEditor.preset_everforest')}</option>
-              <option value="custom">{t('themeEditor.preset_custom')}</option>
-            </>
-          </select>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 12 12"
-            className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2"
-            fill="none"
-            style={{ color: tone.muted }}
-          >
-            <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          />
         </div>
       </div>
 
@@ -188,6 +210,8 @@ function SideBlock(props: {
           label={t('themeEditor.accent')}
           value={slot.accent}
           tone={tone}
+          fieldBg={fieldBg}
+          divider={divider}
           ruleColor={divider}
           onChange={(next) => patch({ accent: next })}
         />
@@ -196,6 +220,8 @@ function SideBlock(props: {
           label={t('themeEditor.background')}
           value={slot.background}
           tone={tone}
+          fieldBg={fieldBg}
+          divider={divider}
           showTopRule
           ruleColor={divider}
           onChange={(next) => patch({ background: next })}
@@ -205,38 +231,38 @@ function SideBlock(props: {
           label={t('themeEditor.foreground')}
           value={slot.foreground}
           tone={tone}
+          fieldBg={fieldBg}
+          divider={divider}
           showTopRule
           ruleColor={divider}
           onChange={(next) => patch({ foreground: next })}
         />
 
         <div
-          className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3 border-t border-solid px-4 py-3"
+          className="flex items-center gap-3 border-t border-solid px-4 py-3"
           style={{ borderTopColor: divider }}
         >
           <label
             htmlFor={`${prefix}-contrast`}
-            className="text-[11px] font-medium"
+            className="flex-1 text-[12px] font-medium"
             style={{ color: tone.primary }}
           >
             {t('themeEditor.contrast')}
           </label>
-          <div className="flex items-center gap-3">
-            <input
-              id={`${prefix}-contrast`}
-              name={`${prefix}-contrast`}
-              type="range"
-              min={0}
-              max={100}
-              value={slot.contrast}
-              onChange={(e) => onSlotChange({ ...slot, contrast: Number(e.target.value) })}
-              className="w-full"
-              style={{ accentColor: slot.accent }}
-            />
-            <span className="w-8 text-right font-mono text-[11px] tabular-nums" style={{ color: tone.faint }}>
-              {slot.contrast}
-            </span>
-          </div>
+          <input
+            id={`${prefix}-contrast`}
+            name={`${prefix}-contrast`}
+            type="range"
+            min={0}
+            max={100}
+            value={slot.contrast}
+            onChange={(e) => onSlotChange({ ...slot, contrast: Number(e.target.value) })}
+            className="w-[180px] h-1.5"
+            style={{ accentColor: slot.accent }}
+          />
+          <span className="w-7 text-right font-mono text-[11px] tabular-nums" style={{ color: tone.muted }}>
+            {slot.contrast}
+          </span>
         </div>
       </div>
     </section>
@@ -300,7 +326,7 @@ export default function ThemeEditorSection(props: {
   return (
     <div className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-        <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em] uppercase">
+        <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.08em] uppercase">
           {t('themeEditor.title')}
         </h4>
         <SegmentedPill
