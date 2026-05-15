@@ -69,7 +69,7 @@ export const geminiSource: ParserSource = {
     return {
       source: 'gemini',
       sourceLabel: 'Gemini',
-      origin: { kind: 'pasted', platform: 'Gemini' },
+      origin: { kind: 'web-share', platform: 'Gemini', url },
       title,
       shareUrl: url,
       createdAt: humanDate(),

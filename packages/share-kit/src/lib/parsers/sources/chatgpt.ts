@@ -62,7 +62,7 @@ export const chatgptSource: ParserSource = {
     return {
       source: 'chatgpt',
       sourceLabel: 'ChatGPT',
-      origin: { kind: 'pasted', platform: 'ChatGPT' },
+      origin: { kind: 'web-share', platform: 'ChatGPT', url },
       title: cleanedTitle,
       shareUrl: url,
       createdAt: humanDate(),

@@ -59,7 +59,7 @@ async function seedSensitiveDraft(window: Page, title: string): Promise<string> 
     conversation: {
       source: 'claude',
       sourceLabel: 'Claude',
-      origin: { kind: 'pasted', platform: 'Claude' },
+      origin: { kind: 'web-share', platform: 'Claude' },
       title,
       shareUrl: null,
       createdAt: new Date().toISOString(),
@@ -352,7 +352,7 @@ test('No sensitive data → empty state', async () => {
     conversation: {
       source: 'claude',
       sourceLabel: 'Claude',
-      origin: { kind: 'pasted', platform: 'Claude' },
+      origin: { kind: 'web-share', platform: 'Claude' },
       title: draftTitle,
       shareUrl: null,
       createdAt: new Date().toISOString(),

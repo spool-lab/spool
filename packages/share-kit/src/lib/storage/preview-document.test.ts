@@ -16,7 +16,7 @@ function makeDoc(turns: Turn[], optsOverrides: Partial<typeof DEFAULT_OPTS> = {}
     conversation: {
       source: 'claude',
       sourceLabel: 'Claude',
-      origin: { kind: 'pasted', platform: 'Claude' },
+      origin: { kind: 'web-share', platform: 'Claude' },
       title: 'Test',
       shareUrl: null,
       createdAt: '2026-05-14T00:00:00.000Z',

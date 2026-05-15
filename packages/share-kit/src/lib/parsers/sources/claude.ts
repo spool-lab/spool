@@ -56,7 +56,7 @@ export const claudeSource: ParserSource = {
     return {
       source: 'claude',
       sourceLabel: 'Claude',
-      origin: { kind: 'pasted', platform: 'Claude' },
+      origin: { kind: 'web-share', platform: 'Claude', url },
       title,
       shareUrl: url,
       createdAt,
