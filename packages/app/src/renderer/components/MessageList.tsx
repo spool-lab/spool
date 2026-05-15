@@ -60,13 +60,18 @@ function makeDividerLabel(today: string, yesterday: string, locale: string | und
 }
 
 /** Build the virtualised row list. A divider is inserted whenever the
- *  message's local day differs from the previous row, including before the
- *  very first message. `showAvatar` is pre-computed here so itemContent
- *  stays cheap and so role-grouping resets across day boundaries (the
- *  first message after a divider always shows its avatar). */
+ *  message's local day differs from the previous row — except before the
+ *  very first message, since the session header already shows the start
+ *  date and a duplicate divider there just reads as chrome noise.
+ *  `showAvatar` is pre-computed here so itemContent stays cheap and so
+ *  role-grouping resets across day boundaries (the first message after
+ *  a divider always shows its avatar). */
 function buildRows(messages: Message[], label: DividerLabel): Row[] {
   const rows: Row[] = []
-  let prevDay: string | null = null
+  // Seed prevDay with the first message's day so the divider branch
+  // only fires on actual day transitions — the leading divider above
+  // the very first message is suppressed without a separate guard.
+  let prevDay: string | null = messages[0] ? localDayKey(messages[0].timestamp) : null
   let prevMsg: Message | null = null
   const now = new Date()
   for (const msg of messages) {
