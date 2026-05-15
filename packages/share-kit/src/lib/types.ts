@@ -271,8 +271,8 @@ export interface SpoolDocument {
 /** Source-color dot palette, used by the SourceChip component. */
 export const SOURCE_DOTS: Record<Platform, { light: string; dark: string }> = {
   ChatGPT: { light: '#10A37F', dark: '#20C38F' },
-  Claude: { light: '#6B5B8A', dark: '#9B8BBF' },
-  Gemini: { light: '#1A6B9F', dark: '#4A9BD4' },
+  Claude: { light: '#C26A4E', dark: '#E89A7C' },
+  Gemini: { light: '#5887D0', dark: '#8AB0E5' },
 }
 
 export const TEMPLATES: { id: Template; name: string; blurb: string }[] = [
