@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 }
 
 export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }: Props) {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
 
   async function toggle(event: React.MouseEvent | React.KeyboardEvent) {
@@ -40,8 +42,8 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') toggle(event)
       }}
-      title={pinned ? 'Unpin from project' : 'Pin to project'}
-      aria-label={pinned ? 'Unpin from project' : 'Pin to project'}
+      title={pinned ? t('sidebar.unpinFromProject') : t('sidebar.pinToProject')}
+      aria-label={pinned ? t('sidebar.unpinFromProject') : t('sidebar.pinToProject')}
       aria-pressed={pinned}
       className={`inline-flex items-center justify-center ${dim} rounded transition-colors ${
         pinned

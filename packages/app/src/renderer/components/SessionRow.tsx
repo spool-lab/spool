@@ -1,17 +1,21 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SquareTerminal, MoreHorizontal, Copy, Loader2, BookText } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
-import { formatRelativeDate } from '../../shared/formatDate.js'
+import { formatRelativeDate, type BucketKey } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 
 type Props = {
   session: Session
   pinned?: boolean
   showProject?: boolean
-  bucket?: string
+  /** Stable bucket key so formatRelativeDate can short-circuit the
+   *  redundant "today, …" / "yesterday, …" prefix when the row already
+   *  sits under a bucket header. */
+  bucket?: BucketKey
   onPinChange?: (uuid: string, pinned: boolean) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
@@ -19,10 +23,12 @@ type Props = {
 }
 
 export default function SessionRow({ session, pinned = false, showProject = false, bucket, onPinChange, onOpenSession, onCopySessionId, onShare }: Props) {
+  const { t } = useTranslation()
   const [resuming, setResuming] = useState(false)
 
-  const title = session.title?.trim() || '(no title)'
-  const date = formatRelativeDate(session.startedAt, { bucket })
+  const looseT = t as unknown as (k: string, o?: Record<string, unknown>) => string
+  const title = session.title?.trim() || t('common.noTitle')
+  const date = formatRelativeDate(session.startedAt, { ...(bucket ? { bucket } : {}), t: looseT })
   const model = compactModel(session.model)
 
   function handleOpen() {
@@ -75,7 +81,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
               {' · '}
             </>
           )}
-          {date} · {session.messageCount} {session.messageCount === 1 ? 'msg' : 'msgs'}
+          {date} · {t('session.msgs_other', { count: session.messageCount })}
           {model && ` · ${model}`}
         </p>
       </div>
@@ -102,7 +108,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={toggle}
-                aria-label="More actions"
+                aria-label={t('common.moreActions')}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
@@ -112,12 +118,12 @@ export default function SessionRow({ session, pinned = false, showProject = fals
             )}
             items={[
               ...(onShare ? [{
-                label: 'Open in share editor',
+                label: t('shareEditor.openNew'),
                 icon: <BookText size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => onShare(session.sessionUuid),
               }] : []),
               {
-                label: resuming ? 'Opening…' : 'Resume in Terminal',
+                label: resuming ? t('common.openingTerminal') : t('session.resume_inTerminal'),
                 icon: resuming
                   ? <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
                   : <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />,
@@ -125,12 +131,12 @@ export default function SessionRow({ session, pinned = false, showProject = fals
                 disabled: resuming,
               },
               ...(resumeCommand ? [{
-                label: 'Copy resume command',
+                label: t('common.copyResumeCommand'),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
               {
-                label: 'Copy session ID',
+                label: t('sidebar.copySessionId'),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyId() },
               },

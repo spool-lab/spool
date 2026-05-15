@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MoreHorizontal, Eye, SquareTerminal, BookText, Copy, Loader2 } from 'lucide-react'
 import type { FragmentResult } from '@spool-lab/core'
 import Menu from './Menu.js'
@@ -15,6 +16,7 @@ const ICON_SIZE = 14
 const ICON_STROKE = 1.6
 
 export default function ContinueActions({ result, onOpenSession, onCopySessionId, onShare }: Props) {
+  const { t } = useTranslation()
   const [copiedId, setCopiedId] = useState(false)
   const [copiedCommand, setCopiedCommand] = useState(false)
   const [resuming, setResuming] = useState(false)
@@ -42,17 +44,17 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
 
   const menuItems = [
     {
-      label: 'View session',
+      label: t('common.viewSession'),
       icon: <Eye size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: () => onOpenSession(result.sessionUuid, result.messageId),
     },
     ...(onShare ? [{
-      label: 'Open in share editor',
+      label: t('shareEditor.openNew'),
       icon: <BookText size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: onShare,
     }] : []),
     ...(resumeCommand ? [{
-      label: resuming ? 'Opening Terminal…' : 'Open in Terminal',
+      label: resuming ? t('common.openingTerminal') : t('session.resume_inTerminal'),
       icon: resuming
         ? <Loader2 size={ICON_SIZE} strokeWidth={ICON_STROKE} className="animate-spin" aria-hidden />
         : <SquareTerminal size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
@@ -60,12 +62,12 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
       disabled: resuming,
     }] : []),
     ...(resumeCommand ? [{
-      label: copiedCommand ? 'Copied resume command' : 'Copy resume command',
+      label: copiedCommand ? t('common.copiedResumeCommand') : t('common.copyResumeCommand'),
       icon: <Copy size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: () => { void handleCopyCommand() },
     }] : []),
     {
-      label: copiedId ? 'Copied session ID' : 'Copy session ID',
+      label: copiedId ? t('toast.copiedSessionId') : t('sidebar.copySessionId'),
       icon: <Copy size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
       onSelect: () => { void handleCopyId() },
     },
@@ -77,7 +79,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
       trigger={({ open, toggle }) => (
         <button
           type="button"
-          aria-label="More actions"
+          aria-label={t('common.moreActions')}
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={(event) => {

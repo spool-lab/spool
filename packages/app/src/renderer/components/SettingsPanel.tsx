@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
-import type { AgentInfo, AgentsConfig } from '../../preload/index.js'
+import { useTranslation } from 'react-i18next'
+import type { AgentInfo, AgentsConfig, LanguagePreference } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
 import ThemeEditorSection from './ThemeEditorSection.js'
@@ -11,15 +12,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
-const TERMINAL_OPTIONS = [
-  { value: '', label: 'Auto-detect' },
-  { value: 'Terminal', label: 'Terminal' },
-  { value: 'iTerm2', label: 'iTerm2' },
-  { value: 'Warp', label: 'Warp' },
-  { value: 'kitty', label: 'Kitty' },
-  { value: 'Alacritty', label: 'Alacritty' },
-  { value: 'WezTerm', label: 'WezTerm' },
-] as const
+const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm'] as const
 
 interface Props {
   onClose: () => void
@@ -29,22 +22,18 @@ interface Props {
   geminiCount: number | null
   themeEditor: ThemeEditorStateV1
   onThemeEditorChange: (next: ThemeEditorStateV1) => void
+  language: LanguagePreference
+  onLanguageChange: (next: LanguagePreference) => void
 }
 
 type Theme = 'system' | 'light' | 'dark'
 
-const MODE_LABELS: Record<string, string> = {
-  extension: 'ACP Extension',
-  native: 'ACP Native',
-  websocket: 'WebSocket',
-}
-
 // ── Sidebar tabs ───────────────────────────────────────────────────────────
 
-const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
+const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.tab_appearance' | 'settings.tab_sources' | 'settings.tab_agent'; icon: ReactNode }[] = [
   {
     id: 'general',
-    label: 'General',
+    labelKey: 'settings.tab_general',
     icon: (
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -53,7 +42,7 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
   },
   {
     id: 'appearance',
-    label: 'Appearance',
+    labelKey: 'settings.tab_appearance',
     icon: (
       <svg
         aria-hidden="true"
@@ -73,7 +62,7 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
   },
   {
     id: 'sources',
-    label: 'Sources',
+    labelKey: 'settings.tab_sources',
     icon: (
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="12 2 2 7 12 12 22 7 12 2"/>
@@ -84,7 +73,7 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
   },
   {
     id: 'agent',
-    label: 'Agent',
+    labelKey: 'settings.tab_agent',
     icon: (
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
@@ -103,8 +92,11 @@ export default function SettingsPanel({
   geminiCount,
   themeEditor,
   onThemeEditorChange,
+  language,
+  onLanguageChange,
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
+  const { t } = useTranslation()
 
   useHotkeys({ Escape: onClose }, { modal: true })
 
@@ -114,29 +106,29 @@ export default function SettingsPanel({
         {/* Sidebar */}
         <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
           <div className="px-4 mb-3">
-            <h2 className="text-sm font-semibold text-warm-text dark:text-dark-text">Settings</h2>
+            <h2 className="text-sm font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-0.5">
-            {TABS.map(t => (
+            {TAB_DEFS.map(def => (
               <button
-                key={t.id}
+                key={def.id}
                 type="button"
-                aria-pressed={tab === t.id}
-                onClick={() => setTab(t.id)}
+                aria-pressed={tab === def.id}
+                onClick={() => setTab(def.id)}
                 className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
-                  tab === t.id
+                  tab === def.id
                     ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
                     : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg/70 dark:hover:bg-dark-bg/60'
                 }`}
               >
-                {t.icon}
-                {t.label}
+                {def.icon}
+                {t(def.labelKey)}
               </button>
             ))}
           </div>
           <div className="flex-1" />
           <div className="px-4 py-2 text-[10px] text-warm-faint dark:text-dark-muted">
-            All data stays local in ~/.spool/
+            {t('settings.localData_footer')}
           </div>
         </div>
 
@@ -144,11 +136,11 @@ export default function SettingsPanel({
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex items-center justify-between px-5 py-3 border-b border-warm-border dark:border-dark-border">
             <h3 className="text-sm font-medium text-warm-text dark:text-dark-text">
-              {TABS.find(t => t.id === tab)?.label}
+              {t(TAB_DEFS.find(def => def.id === tab)?.labelKey ?? 'settings.tab_general')}
             </h3>
             <button
               type="button"
-              aria-label="Close settings"
+              aria-label={t('common.close')}
               onClick={onClose}
               className="rounded-[6px] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0"
             >
@@ -168,7 +160,7 @@ export default function SettingsPanel({
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {tab === 'general' && <GeneralTab />}
+            {tab === 'general' && <GeneralTab language={language} onLanguageChange={onLanguageChange} />}
             {tab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
@@ -183,7 +175,14 @@ export default function SettingsPanel({
 
 // ── General Tab ────────────────────────────────────────────────────────────
 
-function GeneralTab() {
+function GeneralTab({
+  language,
+  onLanguageChange,
+}: {
+  language: LanguagePreference
+  onLanguageChange: (next: LanguagePreference) => void
+}) {
+  const { t } = useTranslation()
   const [config, setConfig] = useState<AgentsConfig | null>(null)
 
   useEffect(() => {
@@ -207,67 +206,97 @@ function GeneralTab() {
     void window.spool?.setAgentsConfig(next)
   }
 
+  const searchSortLabel = (value: SearchSortOrder): string => {
+    switch (value) {
+      case 'relevance': return t('fragment.sort_relevance')
+      case 'newest': return t('fragment.sort_newest')
+      case 'oldest': return t('fragment.sort_oldest')
+    }
+  }
+  const searchSortOptions = SEARCH_SORT_OPTIONS.map(o => ({ value: o.value, label: searchSortLabel(o.value) }))
+
   return (
     <div className="space-y-6">
-      {/* Search */}
-      <Section title="Search">
+      {/* Language */}
+      <Section title={t('settings.language_label')}>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-warm-muted dark:text-dark-muted">Default sort</span>
+          <span className="text-xs text-warm-muted dark:text-dark-muted">{t('common.language')}</span>
+          <SmallSelect
+            value={language}
+            onChange={(v) => onLanguageChange(v as LanguagePreference)}
+            options={[
+              { value: 'system', label: t('settings.language_system') },
+              { value: 'en', label: t('settings.language_en') },
+              { value: 'zh-CN', label: t('settings.language_zh_CN') },
+              { value: 'zh-TW', label: t('settings.language_zh_TW') },
+            ]}
+          />
+        </div>
+        <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
+          {t('settings.language_help')}
+        </p>
+      </Section>
+
+      {/* Search */}
+      <Section title={t('search.placeholder_results')}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-warm-muted dark:text-dark-muted">{t('settings.defaultSearchSort_label')}</span>
           <SmallSelect
             value={config.defaultSearchSort ?? DEFAULT_SEARCH_SORT_ORDER}
             onChange={(v) => updateConfig({ defaultSearchSort: v as SearchSortOrder })}
-            options={SEARCH_SORT_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+            options={searchSortOptions}
           />
         </div>
       </Section>
 
       {/* Sidebar */}
-      <Section title="Sidebar">
+      <Section title={t('settings.sidebarOptions_title')}>
         <ToggleRow
-          label="Show source dots"
-          description="Colored dots on each project row indicating which CLIs the project has sessions from."
+          label={t('settings.sidebarShowSourceDots')}
           checked={config.sidebarShowSourceDots ?? true}
           onChange={(v) => updateConfig({ sidebarShowSourceDots: v })}
         />
         <div className="mt-3" />
         <ToggleRow
-          label="Show session count"
-          description="Number of sessions in each project, shown on the right of the row."
+          label={t('settings.sidebarShowSessionCount')}
           checked={config.sidebarShowSessionCount ?? true}
           onChange={(v) => updateConfig({ sidebarShowSessionCount: v })}
         />
       </Section>
 
       {/* Terminal */}
-      <Section title="Terminal">
+      <Section title={t('settings.terminal_label')}>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-warm-muted dark:text-dark-muted">Session resume</span>
+          <span className="text-xs text-warm-muted dark:text-dark-muted">{t('session.resume_inTerminal')}</span>
           <SmallSelect
             value={config.terminal ?? ''}
             onChange={handleTerminalChange}
-            options={TERMINAL_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+            options={TERMINAL_VALUES.map(v => ({
+              value: v,
+              label: v === '' ? t('settings.terminal_auto') : v,
+            }))}
           />
         </div>
         <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
-          Which terminal to open when resuming a session.
+          {t('settings.terminal_help')}
         </p>
       </Section>
 
       {/* Data */}
-      <Section title="Data">
+      <Section title={t('settings.data_section')}>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-warm-muted dark:text-dark-muted">Database</span>
+          <span className="text-xs text-warm-muted dark:text-dark-muted">{t('settings.data_database')}</span>
           <span className="text-[11px] font-mono text-warm-faint dark:text-dark-muted">~/.spool/spool.db</span>
         </div>
       </Section>
 
       {/* About */}
-      <Section title="About">
+      <Section title={t('settings.about_section')}>
         <p className="text-xs text-warm-muted dark:text-dark-muted">
-          Spool — a local search engine for your thinking.
+          {t('settings.about_tagline')}
         </p>
         <p className="text-[11px] text-warm-faint dark:text-dark-faint mt-1">
-          Spool™ is a trademark of TypeSafe Limited.
+          {t('settings.about_trademark')}
         </p>
       </Section>
     </div>
@@ -312,9 +341,10 @@ function AppearanceTab({
 // ── Sources Tab ────────────────────────────────────────────────────────────
 
 function SourcesTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
-      <Section title="Agent Sessions">
+      <Section title={t('settings.sources_title')}>
         <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
         <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
         <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
@@ -326,6 +356,7 @@ function SourcesTab({ claudeCount, codexCount, geminiCount }: { claudeCount: num
 // ── Agent Tab ──────────────────────────────────────────────────────────────
 
 function AgentTab() {
+  const { t } = useTranslation()
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [config, setConfig] = useState<AgentsConfig>({})
 
@@ -349,10 +380,19 @@ function AgentTab() {
     try { await window.spool.setAgentsConfig(next) } catch {}
   }
 
+  const modeLabel = (mode: AgentInfo['acpMode']): string => {
+    switch (mode) {
+      case 'extension': return t('settings.agentMode_extension')
+      case 'native': return t('settings.agentMode_native')
+      case 'websocket': return t('settings.agentMode_websocket')
+      default: return mode
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Installed Agents */}
-      <Section title="Installed Agents">
+      <Section title={t('settings.tab_agent')}>
         <div className="space-y-1.5">
           {cliAgents.map(agent => {
             const isReady = agent.status === 'ready'
@@ -377,23 +417,22 @@ function AgentTab() {
                       {agent.name}
                     </span>
                     <span className="text-[9px] font-mono text-warm-faint dark:text-dark-muted px-1.5 py-0.5 bg-warm-surface2 dark:bg-dark-surface2 rounded">
-                      {MODE_LABELS[agent.acpMode] ?? agent.acpMode}
+                      {modeLabel(agent.acpMode)}
                     </span>
                   </div>
                   <span className="block text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate">
-                    {isReady ? agent.path : `${agent.id} — not found in PATH`}
+                    {isReady ? agent.path : `${agent.id} — ${t('settings.agentStatus_not_found')}`}
                   </span>
                 </div>
                 <span className={`text-[10px] font-medium flex-none ${isReady ? 'text-green-500' : 'text-warm-faint dark:text-dark-muted'}`}>
-                  {isReady ? 'ready' : 'not found'}
+                  {isReady ? t('settings.agentStatus_ready') : t('settings.agentStatus_not_found')}
                 </span>
               </button>
             )
           })}
         </div>
         <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
-          Agents detected on your system.
-          Add custom agents in <span className="font-mono">~/.spool/agents.json</span>.
+          {t('settings.defaultAgent_help')}
         </p>
       </Section>
     </div>
@@ -414,12 +453,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function BuiltInSource({ name, color, count }: { name: string; color: string; count: number | null }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-3 py-1.5">
       <span className="w-2 h-2 rounded-full flex-none" style={{ background: color }} />
       <span className="flex-1 text-xs text-warm-text dark:text-dark-text">{name}</span>
       <span className="text-[11px] text-warm-faint dark:text-dark-muted tabular-nums font-mono">
-        {count === null ? '…' : `${count} sessions`}
+        {count === null ? '…' : t('sidebar.sessionCount_other', { count })}
       </span>
       <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.06em] text-warm-faint dark:text-dark-muted">
         <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-none" />

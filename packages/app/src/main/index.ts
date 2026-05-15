@@ -405,6 +405,21 @@ ipcMain.handle('spool:get-runtime-info', () => {
   }
 })
 
+ipcMain.handle('spool:get-system-locale', () => {
+  // app.getLocale() can return tags like "zh-CN", "zh-Hans-CN", "zh-TW",
+  // "zh-Hant-HK". Normalize to one of Spool's supported locales — script
+  // subtag wins when present (zh-Hans → zh-CN, zh-Hant → zh-TW), otherwise
+  // fall back to region. Everything else lands on English.
+  const raw = app.getLocale().toLowerCase()
+  if (raw.startsWith('zh')) {
+    if (raw.includes('hans')) return 'zh-CN'
+    if (raw.includes('hant')) return 'zh-TW'
+    if (raw.includes('-tw') || raw.includes('-hk') || raw.includes('-mo')) return 'zh-TW'
+    return 'zh-CN'
+  }
+  return 'en'
+})
+
 ipcMain.handle('spool:sync-now', () => {
   return runSyncWorker()
 })

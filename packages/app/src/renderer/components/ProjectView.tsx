@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowDownUp } from 'lucide-react'
 import type { ProjectGroup, Session, SessionSource, ProjectSessionSortOrder } from '@spool-lab/core'
 import SessionRow from './SessionRow.js'
@@ -25,6 +26,15 @@ export default function ProjectView({
   onCopySessionId,
   onShare,
 }: Props) {
+  const { t } = useTranslation()
+  const projectSortLabel = (value: ProjectSessionSortOrder): string => {
+    switch (value) {
+      case 'recent': return t('project.sort_recent')
+      case 'oldest': return t('project.sort_oldest')
+      case 'most_messages': return t('project.sort_most_messages')
+      case 'title': return t('project.sort_title')
+    }
+  }
   const [group, setGroup] = useState<ProjectGroup | null>(null)
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [pinnedSessions, setPinnedSessions] = useState<Session[]>([])
@@ -162,11 +172,13 @@ export default function ProjectView({
   }, [sessions])
 
   const showGrouped = (unpinnedGroups?.length ?? 0) >= 2 && isolatedCwd === null
+  const looseT = t as unknown as (k: string, o?: Record<string, unknown>) => string
   const meta = useMemo(() => {
     if (!group) return null
-    const lastActivity = group.lastSessionAt ? formatRelativeDate(group.lastSessionAt) : null
+    const lastActivity = group.lastSessionAt ? formatRelativeDate(group.lastSessionAt, { t: looseT }) : null
     return { count: group.sessionCount, lastActivity, sources: group.sources }
-  }, [group])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group, t])
 
   function toggleSource(source: SessionSource) {
     setActiveSources(prev => {
@@ -193,8 +205,8 @@ export default function ProjectView({
         <div className="mt-1 flex items-center gap-2 flex-wrap">
           {meta && (
             <p className="text-xs text-warm-muted dark:text-dark-muted flex items-center gap-2 flex-wrap min-w-0">
-              <span>{meta.count} {meta.count === 1 ? 'session' : 'sessions'}</span>
-              {meta.lastActivity && <><span aria-hidden>·</span><span>Updated {meta.lastActivity}</span></>}
+              <span>{t('project.sessionCount_other', { count: meta.count })}</span>
+              {meta.lastActivity && <><span aria-hidden>·</span><span>{t('project.updatedWhen', { when: meta.lastActivity })}</span></>}
               {meta.sources.length > 0 && (
                 <>
                   <span aria-hidden>·</span>
@@ -249,18 +261,18 @@ export default function ProjectView({
                   type="button"
                   data-testid="project-sort"
                   data-value={sortOrder}
-                  aria-label="Sort sessions"
+                  aria-label={t('fragment.sortAriaLabel')}
                   aria-haspopup="menu"
                   aria-expanded={open}
                   onClick={toggle}
                   className="inline-flex items-center gap-1.5 h-7 px-2 text-xs font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
                 >
                   <ArrowDownUp size={13} strokeWidth={1.5} aria-hidden />
-                  <span>Sort · {PROJECT_SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Recent'}</span>
+                  <span>{t('fragment.sortLabel', { value: projectSortLabel(sortOrder) })}</span>
                 </button>
               )}
               items={PROJECT_SORT_OPTIONS.map(option => ({
-                label: option.label,
+                label: projectSortLabel(option.value),
                 active: sortOrder === option.value,
                 onSelect: () => onSortOrderChange(option.value),
               }))}
@@ -291,11 +303,11 @@ export default function ProjectView({
       <div className="flex-1 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]">
         {sessions === null ? (
           <div className="px-4 py-8 text-center text-sm text-warm-faint dark:text-dark-muted">
-            Loading sessions…
+            {t('common.loading')}
           </div>
         ) : visibleUnpinned.length === 0 && visiblePinned.length === 0 ? (
           <div className="px-4 py-12 text-center">
-            <p className="text-sm text-warm-muted dark:text-dark-muted">No sessions match these filters.</p>
+            <p className="text-sm text-warm-muted dark:text-dark-muted">{t('project.noSessions')}</p>
             <div className="mt-2 flex items-center justify-center gap-3 text-xs">
               {activeSources.size > 0 && (
                 <button
@@ -303,7 +315,7 @@ export default function ProjectView({
                   onClick={() => setActiveSources(new Set())}
                   className="text-accent hover:underline"
                 >
-                  Clear source filter
+                  {t('project.clearSourceFilter')}
                 </button>
               )}
               {isolatedCwd !== null && (
@@ -312,7 +324,7 @@ export default function ProjectView({
                   onClick={() => setIsolatedCwd(null)}
                   className="text-accent hover:underline"
                 >
-                  Clear directory filter
+                  {t('project.clearDirectoryFilter')}
                 </button>
               )}
             </div>
@@ -321,7 +333,7 @@ export default function ProjectView({
           <>
             {visiblePinned.length > 0 && (
               <CollapsibleSection
-                label={`PINNED · ${visiblePinned.length} ${visiblePinned.length === 1 ? 'session' : 'sessions'}`}
+                label={t('library.section_pinned', { count: visiblePinned.length })}
                 testId="project-view-pinned"
               >
                 <div>
@@ -431,6 +443,7 @@ function DirectoryGroupSection({
   onCopySessionId: (source: Session['source']) => void
   onShare?: (uuid: string) => void
 }) {
+  const { t } = useTranslation()
   const { name } = formatCwdLabel(cwd, projectDisplayPath)
   const count = sessions.length
   const tooltip = cwd === '(unknown)' ? undefined : cwd
@@ -441,7 +454,7 @@ function DirectoryGroupSection({
         type="button"
         onClick={onToggleOpen}
         aria-expanded={open}
-        aria-label={open ? 'Collapse directory' : 'Expand directory'}
+        aria-label={open ? t('project.collapseDirectory') : t('project.expandDirectory')}
         title={tooltip}
         className="group w-full flex items-center gap-2 px-6 pt-3 pb-1 text-left text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
       >

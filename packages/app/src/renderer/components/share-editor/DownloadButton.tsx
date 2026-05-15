@@ -1,25 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUpToLine, Loader2 } from 'lucide-react'
 
 export type ExportFormat = 'png' | 'pdf' | 'md' | 'spool'
 
 type FormatDef = {
   k: ExportFormat
-  /** Dropdown menu label. */
-  l: string
-  /** Primary button label when this format is selected (used as
-   *  accessible name for screen readers; the visual label is always
-   *  the static "Export"). */
-  b: string
-  /** Dropdown sub-copy (mono). */
-  s: string
+  /** Translation key for the dropdown menu label. */
+  labelKey: string
+  /** Translation key for the screen-reader / aria label. */
+  btnKey: string
+  /** Translation key for the dropdown sub-copy (mono). */
+  subKey: string
 }
 
 const FORMATS: FormatDef[] = [
-  { k: 'png', l: 'PNG image', b: 'Export PNG', s: '3× pixel ratio · social-feed friendly' },
-  { k: 'pdf', l: 'PDF', b: 'Export PDF', s: 'A4 paginated · print-ready' },
-  { k: 'md', l: 'Markdown', b: 'Export .md', s: 'Plain text · Obsidian / GitHub friendly' },
-  { k: 'spool', l: 'Spool file', b: 'Export .spool', s: 'Editable in Spool · keeps your styling' },
+  { k: 'png', labelKey: 'shareEditorPanel.download_png_label', btnKey: 'shareEditorPanel.download_png_btn', subKey: 'shareEditorPanel.download_png_sub' },
+  { k: 'pdf', labelKey: 'shareEditorPanel.download_pdf_label', btnKey: 'shareEditorPanel.download_pdf_btn', subKey: 'shareEditorPanel.download_pdf_sub' },
+  { k: 'md', labelKey: 'shareEditorPanel.download_md_label', btnKey: 'shareEditorPanel.download_md_btn', subKey: 'shareEditorPanel.download_md_sub' },
+  { k: 'spool', labelKey: 'shareEditorPanel.download_spool_label', btnKey: 'shareEditorPanel.download_spool_btn', subKey: 'shareEditorPanel.download_spool_sub' },
 ]
 
 const STORAGE_KEY = 'spool:share:lastFormat'
@@ -37,6 +36,8 @@ type Props = {
 }
 
 export function DownloadButton({ saving, onExport }: Props) {
+  const { t } = useTranslation()
+  const tx = t as unknown as (k: string, o?: Record<string, unknown>) => string
   const [format, setFormat] = useState<ExportFormat>(loadInitial)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -82,13 +83,13 @@ export function DownloadButton({ saving, onExport }: Props) {
         data-format={format}
         onClick={trigger}
         disabled={saving}
-        aria-label={`Export ${current.l} (Cmd+S)`}
+        aria-label={t('shareEditorPanel.download_ariaPrimary', { label: tx(current.labelKey) })}
         className="inline-flex items-center gap-1.5 h-6 px-2 rounded-l text-[13px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {saving
           ? <Loader2 size={13} strokeWidth={1.75} className="animate-spin" aria-hidden />
           : <ArrowUpToLine size={13} strokeWidth={1.75} aria-hidden />}
-        <span>Export</span>
+        <span>{t('shareEditorPanel.download_button')}</span>
       </button>
       {/* Format chooser — caret-only opener. Keeps "action" (Download)
        *  and "selection" (format) as distinct, narrow click targets;
@@ -98,7 +99,7 @@ export function DownloadButton({ saving, onExport }: Props) {
         type="button"
         data-testid="share-editor-download-caret"
         onClick={() => setOpen(o => !o)}
-        aria-label={`Format: ${current.l}, click to change`}
+        aria-label={t('shareEditorPanel.download_ariaCaret', { label: tx(current.labelKey) })}
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={saving}
@@ -152,10 +153,10 @@ export function DownloadButton({ saving, onExport }: Props) {
                       active ? 'text-accent dark:text-accent-dark' : 'text-warm-text dark:text-dark-text'
                     }`}
                   >
-                    {f.l}
+                    {tx(f.labelKey)}
                   </span>
                   <span className="font-mono text-[11px] text-warm-muted dark:text-dark-muted leading-snug">
-                    {f.s}
+                    {tx(f.subKey)}
                   </span>
                 </span>
               </button>

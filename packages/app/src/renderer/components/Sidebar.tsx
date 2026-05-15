@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Library as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, BookText } from 'lucide-react'
+import { MessagesSquare as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, BookText } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -40,6 +41,21 @@ type Props = {
 }
 
 export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
+  const { t } = useTranslation()
+  const sidebarSortLabel = (value: SidebarSortOrder): string => {
+    switch (value) {
+      case 'recent': return t('sidebar.sort_recent')
+      case 'name': return t('sidebar.sort_name')
+      case 'most_sessions': return t('sidebar.sort_most_sessions')
+    }
+  }
+  const pinnedSortLabel = (value: PinnedSortOrder): string => {
+    switch (value) {
+      case 'recent_pinned': return t('sidebar.sort_recent_pinned')
+      case 'recent': return t('sidebar.sort_recent_used')
+      case 'name': return t('sidebar.sort_name')
+    }
+  }
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [pinned, setPinned] = useState<Session[] | null>(null)
@@ -84,12 +100,12 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
       data-testid="sidebar"
       className="w-60 flex-none bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
     >
-      <nav className="px-2 pt-1 pb-2 flex-none flex flex-col gap-0.5" aria-label="Primary">
+      <nav className="px-2 pt-1 pb-2 flex-none flex flex-col gap-0.5" aria-label={t('sidebar.library')}>
         {onSelectHome && (
           <NavRow
             testId="sidebar-library"
             icon={<LibraryIcon size={14} strokeWidth={1.75} />}
-            label="Library"
+            label={t('sidebar.library')}
             active={isLibraryActive}
             onClick={onSelectHome}
           />
@@ -98,7 +114,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
           <NavRow
             testId="sidebar-shares"
             icon={<SharesIcon size={14} strokeWidth={1.75} />}
-            label="Shares"
+            label={t('sidebar.shares')}
             active={isSharesActive}
             onClick={onSelectShares}
           />
@@ -107,7 +123,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
           <NavRow
             testId="sidebar-search"
             icon={<SearchIcon size={14} strokeWidth={1.75} />}
-            label="Search"
+            label={t('sidebar.search')}
             trailing={<KbdHint>⌘K</KbdHint>}
             onClick={onOpenSearch}
           />
@@ -118,7 +134,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         {sortedPinned && sortedPinned.length > 0 && onSelectSession && (
           <>
             <SectionHeader
-              label="Pinned"
+              label={t('sidebar.pinned')}
               open={pinnedOpen}
               onToggle={() => setPinnedOpen(open => !open)}
               testId="sidebar-pinned-toggle"
@@ -131,8 +147,8 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                       type="button"
                       data-testid="sidebar-pinned-sort-trigger"
                       onClick={toggle}
-                      title="Sort pinned"
-                      aria-label="Sort pinned"
+                      title={t('sidebar.sortBy')}
+                      aria-label={t('sidebar.sortBy')}
                       aria-haspopup="menu"
                       aria-expanded={open}
                       className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
@@ -145,7 +161,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                     </button>
                   )}
                   items={PINNED_SORT_OPTIONS.map(option => ({
-                    label: option.label,
+                    label: pinnedSortLabel(option.value),
                     active: pinnedSortOrder === option.value,
                     onSelect: () => onPinnedSortOrderChange(option.value),
                   }))}
@@ -170,7 +186,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         )}
 
         <SectionHeader
-          label="Projects"
+          label={t('sidebar.projects')}
           open={projectsOpen}
           onToggle={() => setProjectsOpen(open => !open)}
           testId="sidebar-projects-toggle"
@@ -183,8 +199,8 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                   type="button"
                   data-testid="sidebar-sort-trigger"
                   onClick={toggle}
-                  title="Sort projects"
-                  aria-label="Sort projects"
+                  title={t('sidebar.sortBy')}
+                  aria-label={t('sidebar.sortBy')}
                   aria-haspopup="menu"
                   aria-expanded={open}
                   className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
@@ -197,7 +213,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                 </button>
               )}
               items={SIDEBAR_SORT_OPTIONS.map(option => ({
-                label: option.label,
+                label: sidebarSortLabel(option.value),
                 active: sortOrder === option.value,
                 onSelect: () => onSortOrderChange(option.value),
               }))}
@@ -211,7 +227,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
               <SidebarSkeleton />
             ) : projectGroups.length === 0 && !looseGroup ? (
               <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">
-                No sessions yet
+                {t('sidebar.noProjects')}
               </p>
             ) : (
               <>
@@ -307,7 +323,8 @@ function SidebarStatus({
   status: StatusInfo | null
   onSettingsClick?: () => void
 }) {
-  const text = getSyncStatusText(syncStatus, status)
+  const { t } = useTranslation()
+  const text = getSyncStatusText(syncStatus, status, t as unknown as StatusT)
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
@@ -323,8 +340,8 @@ function SidebarStatus({
           type="button"
           data-testid="settings-button"
           onClick={onSettingsClick}
-          title="Settings"
-          aria-label="Settings"
+          title={t('sidebar.settings')}
+          aria-label={t('sidebar.settings')}
           className="flex-none inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
         >
           <SettingsIcon size={13} strokeWidth={1.75} />
@@ -341,6 +358,7 @@ type UpdateStatus = {
 }
 
 function UpdateBanner() {
+  const { t } = useTranslation()
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
   // Tracks the last status that wasn't 'error' so we can decide whether
   // an error event interrupted a user-visible action (download in
@@ -398,12 +416,12 @@ function UpdateBanner() {
   }
 
   const label =
-    pending === 'preparing' ? 'Preparing download…' :
-    pending === 'restarting' ? 'Restarting…' :
-    update?.status === 'available' ? `Update available${update.version ? ` · v${update.version}` : ''}` :
-    update?.status === 'ready' ? 'Restart to update' :
-    update?.status === 'error' ? 'Update failed — retry' :
-    update?.percent != null ? `Downloading update… ${update.percent}%` : 'Downloading update…'
+    pending === 'preparing' ? t('update.downloading', { percent: 0 }) :
+    pending === 'restarting' ? t('update.restart') :
+    update?.status === 'available' ? `${t('update.available')}${update.version ? ` · v${update.version}` : ''}` :
+    update?.status === 'ready' ? t('update.ready') :
+    update?.status === 'error' ? t('common.retry') :
+    update?.percent != null ? t('update.downloading', { percent: update.percent }) : t('update.downloading', { percent: 0 })
 
   const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text transition-all duration-150'
 
@@ -448,8 +466,8 @@ function UpdateBanner() {
           type="button"
           data-testid="update-banner-error-retry"
           onClick={onClick}
-          title="Retry download"
-          aria-label="Retry update download"
+          title={t('common.retry')}
+          aria-label={t('common.retry')}
           className="flex-1 min-w-0 flex items-center gap-2 -mx-1 px-1 rounded cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.04] active:bg-black/[0.08] dark:active:bg-white/[0.08] active:scale-[0.99] transition-all duration-150"
         >
           {icon}
@@ -459,8 +477,8 @@ function UpdateBanner() {
           type="button"
           data-testid="update-banner-error-dismiss"
           onClick={(e) => { e.stopPropagation(); setErrorDismissed(true) }}
-          title="Dismiss"
-          aria-label="Dismiss update error"
+          title={t('common.close')}
+          aria-label={t('common.close')}
           className="flex-none inline-flex items-center justify-center w-6 h-6 rounded cursor-pointer text-warm-faint dark:text-dark-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-warm-text dark:hover:text-dark-text active:bg-black/[0.1] dark:active:bg-white/[0.1] active:scale-[0.95] transition-all duration-150"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -486,33 +504,36 @@ function UpdateBanner() {
   )
 }
 
+type StatusT = (key: string, opts?: Record<string, unknown>) => string
+
 function getSyncStatusText(
   syncStatus: { phase: string; count: number; total: number } | null,
   status: StatusInfo | null,
+  t: StatusT,
 ): string {
   if (syncStatus) {
-    if (syncStatus.phase === 'scanning') return 'Scanning…'
-    if (syncStatus.phase === 'syncing') return `Indexing ${syncStatus.count}/${syncStatus.total} files`
-    if (syncStatus.phase === 'indexing') return 'Building index…'
+    if (syncStatus.phase === 'scanning') return t('status.scanning')
+    if (syncStatus.phase === 'syncing') return t('status.indexing', { count: syncStatus.count, total: syncStatus.total })
+    if (syncStatus.phase === 'indexing') return t('status.building')
     if (syncStatus.phase === 'done' && status) {
-      return `${status.totalSessions} sessions · now`
+      return t('status.sessionsNow_other', { count: status.totalSessions })
     }
   }
-  if (!status) return 'Loading…'
-  const lastSync = status.lastSyncedAt ? formatShortTimeAgo(status.lastSyncedAt) : 'never'
-  return `${status.totalSessions} sessions · ${lastSync}`
+  if (!status) return t('status.loading')
+  const lastSync = status.lastSyncedAt ? formatShortTimeAgo(status.lastSyncedAt, t) : t('status.never')
+  return t('status.sessionsAgo_other', { count: status.totalSessions, ago: lastSync })
 }
 
-function formatShortTimeAgo(iso: string): string {
+function formatShortTimeAgo(iso: string, t: StatusT): string {
   try {
     const utcIso = iso.endsWith('Z') ? iso : iso + 'Z'
     const diff = Date.now() - new Date(utcIso).getTime()
     const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return 'now'
-    if (minutes < 60) return `${minutes}m`
+    if (minutes < 1) return t('status.now')
+    if (minutes < 60) return t('status.minutesAgo', { count: minutes })
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h`
-    return `${Math.floor(hours / 24)}d`
+    if (hours < 24) return t('status.hoursAgo', { count: hours })
+    return t('status.daysAgo', { count: Math.floor(hours / 24) })
   } catch {
     return iso
   }
@@ -570,9 +591,10 @@ function PinnedRow({
   onCopySessionId?: (source: SessionSource) => void
   onShare?: (uuid: string) => void
 }) {
+  const { t } = useTranslation()
   const [resuming, setResuming] = useState(false)
   const [unpinning, setUnpinning] = useState(false)
-  const title = session.title?.trim() || '(no title)'
+  const title = session.title?.trim() || t('common.noTitle')
   const projectName = session.projectDisplayName || session.projectDisplayPath
   const resumeCommand = getSessionResumeCommand(session.source, session.sessionUuid)
 
@@ -633,7 +655,7 @@ function PinnedRow({
           data-testid="sidebar-pinned-unpin"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => { void handleUnpin() }}
-          aria-label="Unpin"
+          aria-label={t('sidebar.unpin')}
           disabled={unpinning}
           className="inline-flex items-center justify-center h-4 text-accent/80 dark:text-accent-dark/80 hover:text-accent dark:hover:text-accent-dark transition-colors disabled:opacity-50"
         >
@@ -647,7 +669,7 @@ function PinnedRow({
               data-testid="sidebar-pinned-menu-trigger"
               onMouseDown={(e) => e.preventDefault()}
               onClick={toggle}
-              aria-label="More actions"
+              aria-label={t('common.more')}
               aria-haspopup="menu"
               aria-expanded={open}
               className="inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
@@ -657,12 +679,12 @@ function PinnedRow({
           )}
           items={[
             ...(onShare ? [{
-              label: 'Open in share editor',
+              label: t('shareEditor.openNew'),
               icon: <BookText size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => onShare(session.sessionUuid),
             }] : []),
             {
-              label: resuming ? 'Opening…' : 'Resume in Terminal',
+              label: resuming ? t('common.loading') : t('session.resume_inTerminal'),
               icon: resuming
                 ? <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
                 : <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />,
@@ -670,12 +692,12 @@ function PinnedRow({
               disabled: resuming,
             },
             ...(resumeCommand ? [{
-              label: 'Copy resume command',
+              label: t('common.copyResumeCommand'),
               icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleCopyCommand() },
             }] : []),
             {
-              label: 'Copy session ID',
+              label: t('sidebar.copySessionId'),
               icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: () => { void handleCopyId() },
             },
@@ -699,10 +721,12 @@ function ProjectRow({
   showSessionCount: boolean
   onClick: () => void
 }) {
+  const { t } = useTranslation()
   const sourceList = group.sources.map(getSessionSourceLabel).join(', ')
+  const sessionCountText = t('sidebar.sessionCount_other', { count: group.sessionCount })
   const ariaLabel = sourceList
-    ? `${group.displayName}, ${sourceList}, ${group.sessionCount} sessions`
-    : `${group.displayName}, ${group.sessionCount} sessions`
+    ? `${group.displayName}, ${sourceList}, ${sessionCountText}`
+    : `${group.displayName}, ${sessionCountText}`
   return (
     <button
       data-testid="sidebar-project-row"

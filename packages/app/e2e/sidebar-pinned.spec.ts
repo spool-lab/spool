@@ -96,7 +96,7 @@ test('sidebar pinned kebab menu exposes Resume and Copy actions', async () => {
   await pinnedRow.hover()
   await pinnedRow.locator('[data-testid="sidebar-pinned-menu-trigger"]').click()
 
-  await expect(window.getByRole('menuitem', { name: /Resume in Terminal/ })).toBeVisible()
+  await expect(window.getByRole('menuitem', { name: /Resume in terminal/ })).toBeVisible()
   await expect(window.getByRole('menuitem', { name: /Copy session ID/ })).toBeVisible()
 
   // Close menu and cleanup

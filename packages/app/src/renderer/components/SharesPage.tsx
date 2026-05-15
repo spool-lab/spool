@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useShareDrafts } from '../hooks/useShareDrafts'
@@ -28,6 +29,7 @@ type Props = {
  * The tab strip lands in Phase 2 alongside the actual publish flow.
  */
 export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft }: Props) {
+  const { t } = useTranslation()
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -44,11 +46,11 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
     [onImportSpool],
   )
   const onRejectDrop = useCallback((files: File[]) => {
-    const name = files[0]?.name
-    toast.error(`Couldn't import ${name ?? 'file'}`, {
-      description: 'Only .spool files are supported.',
+    const name = files[0]?.name ?? 'file'
+    toast.error(t('shares.couldntImport', { name }), {
+      description: t('shares.onlySpoolSupported'),
     })
-  }, [])
+  }, [t])
   const { isDragActive, dragHandlers } = useSpoolDrop({
     enabled: Boolean(onImportSpool),
     onImport,
@@ -59,23 +61,23 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
     try {
       const full = await removeDraft(draft.draft_id)
       if (!full) return
-      const title = draft.title || 'Untitled'
-      toast(`Deleted “${title}”`, {
+      const title = draft.title || t('common.untitled')
+      toast(t('shares.deletedToast', { title }), {
         action: {
-          label: 'Undo',
+          label: t('common.undo'),
           onClick: () => {
             void restoreDraft(full).catch((err) => {
               console.error('Restore share draft failed:', err)
-              toast.error("Couldn't restore draft")
+              toast.error(t('shares.couldntRestoreDraft'))
             })
           },
         },
       })
     } catch (err) {
       console.error('Delete share draft failed:', err)
-      toast.error("Couldn't delete draft")
+      toast.error(t('shares.couldntDeleteDraft'))
     }
-  }, [removeDraft, restoreDraft])
+  }, [removeDraft, restoreDraft, t])
 
   return (
     <div data-testid="shares-page" className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
@@ -83,15 +85,15 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
       {hasDrafts && (
         <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
           <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-            {hasDrafts ? <>Drafts · {drafts.length}</> : null}
+            {hasDrafts ? <>{t('shares.title')} · {drafts.length}</> : null}
           </span>
           {onStartNewDraft && (
             <button
               type="button"
               data-testid="shares-new-draft"
               onClick={handleOpenPicker}
-              title="Start a draft from a session"
-              aria-label="Start a draft from a session"
+              title={t('shares.newDraft')}
+              aria-label={t('shares.newDraft')}
               className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
               <Plus size={13} strokeWidth={1.6} aria-hidden />
@@ -117,6 +119,9 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
 }
 
 function SpoolDropOverlay() {
+  const { t } = useTranslation()
+  // t('shares.dropToImport', { ext: '.spool' }) — render with monospace ext
+  const parts = t('shares.dropToImport', { ext: '.spool' }).split('.spool')
   return (
     <div
       data-testid="shares-spool-drop-overlay"
@@ -124,7 +129,9 @@ function SpoolDropOverlay() {
       className="absolute inset-2 z-20 pointer-events-none flex items-center justify-center rounded-[10px] border border-dashed border-accent/70 dark:border-accent-dark/70 bg-accent-bg/60 dark:bg-accent-bg-dark/60 backdrop-blur-[1px]"
     >
       <p className="text-sm font-medium text-accent dark:text-accent-dark">
-        Drop <span className="font-mono">.spool</span> to import
+        {parts.flatMap((p, i, arr) => i < arr.length - 1
+          ? [p, <span key={i} className="font-mono">.spool</span>]
+          : [p])}
       </p>
     </div>
   )
@@ -145,6 +152,7 @@ function DraftsList({
   onDeleteDraft: (draft: ShareDraftListItem) => void
   onStartNewDraft?: (() => void) | undefined
 }) {
+  const { t } = useTranslation()
   const [skeletonCount] = useState(readSkeletonCount)
   // Defer skeleton render by 150ms so sub-threshold loads (local sqlite is
   // usually <50ms) don't flash a meaningless placeholder. The same gate
@@ -167,20 +175,20 @@ function DraftsList({
     if (!showLoadingHint) return null
     return (
       <>
-        <span className="sr-only" role="status">Loading drafts…</span>
+        <span className="sr-only" role="status">{t('common.loading')}</span>
         {skeletonCount > 0 && <DraftsSkeleton count={skeletonCount} />}
       </>
     )
   }
   if (error) {
-    return <SmallEmptyState>Couldn't load drafts: {error}</SmallEmptyState>
+    return <SmallEmptyState>{`${t('common.error')}: ${error}`}</SmallEmptyState>
   }
   if (drafts.length === 0) {
     return (
       <FeaturedEmptyState
         icon={<Newspaper size={22} strokeWidth={1.5} />}
-        title="No shares yet"
-        hint="Start a share from any session or search result — drafts you create land here, ready to keep editing."
+        title={t('shares.empty_title')}
+        hint={t('shares.empty_body')}
         {...(onStartNewDraft ? {
           action: (
             <button
@@ -190,7 +198,7 @@ function DraftsList({
               className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
             >
               <Plus size={14} strokeWidth={2} aria-hidden />
-              <span>Start a draft</span>
+              <span>{t('shares.newDraft')}</span>
             </button>
           ),
         } : {})}
@@ -223,6 +231,7 @@ function DraftCard({
   onClick?: ((draft: ShareDraftListItem) => void) | undefined
   onDelete: (draft: ShareDraftListItem) => void
 }) {
+  const { t } = useTranslation()
   // The preview blob is a SpoolDocument-shaped subset: full opts +
   // conversation metadata + first ~6 turns. Card rendering only ever
   // reads at most that many turns (see thumbConvo below), so we never
@@ -254,7 +263,7 @@ function DraftCard({
     [doc.conversation],
   )
 
-  const title = doc.conversation.title || 'Untitled'
+  const title = doc.conversation.title || t('common.untitled')
   const [hover, setHover] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -273,7 +282,7 @@ function DraftCard({
       data-testid="shares-draft-row"
       onClick={() => onClick?.(draft)}
       disabled={!onClick}
-      aria-label={`Open ${title}`}
+      aria-label={`${t('shares.openDraft')} ${title}`}
       className="group relative block overflow-hidden rounded-md cursor-pointer disabled:cursor-default"
       style={{
         width: CARD_W,
@@ -335,7 +344,7 @@ function DraftCard({
             className="block w-1.5 h-1.5 rounded-full flex-none"
             style={{ background: getSessionSourceColor(doc.conversation.source) }}
           />
-          <span className="font-mono uppercase tracking-[0.04em] flex-none">{formatRelative(draft.updated_at)}</span>
+          <span className="font-mono uppercase tracking-[0.04em] flex-none">{formatRelative(draft.updated_at, t as unknown as RelativeT)}</span>
         </span>
       </span>
     </button>
@@ -364,6 +373,7 @@ function DraftCard({
  * its primed state after the user has moved on.
  */
 function DeleteChip({ confirming, onClick }: { confirming: boolean; onClick: () => void }) {
+  const { t } = useTranslation()
   return (
     <span
       role="button"
@@ -381,8 +391,8 @@ function DeleteChip({ confirming, onClick }: { confirming: boolean; onClick: () 
           onClick()
         }
       }}
-      aria-label={confirming ? 'Click again to confirm delete' : 'Delete draft'}
-      title={confirming ? 'Click again to confirm' : 'Delete draft'}
+      aria-label={confirming ? t('shares.deleteConfirm_aria') : t('shares.deleteDraft')}
+      title={confirming ? t('shares.deleteConfirm') : t('shares.deleteDraft')}
       className={`absolute top-1.5 right-1.5 z-10 h-5 min-w-5 inline-flex items-center justify-center rounded-full cursor-pointer select-none transition-[padding,background,color,border-color] duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.12)] font-sans text-[10.5px] font-medium tracking-[0.02em] whitespace-nowrap ${
         confirming
           ? 'bg-warm-text dark:bg-dark-text text-warm-bg dark:text-dark-bg border border-warm-text dark:border-dark-text px-2'
@@ -390,7 +400,7 @@ function DeleteChip({ confirming, onClick }: { confirming: boolean; onClick: () 
       }`}
     >
       {confirming ? (
-        'Delete'
+        t('shares.deleteLabel')
       ) : (
         <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
           <path d="M2 2l6 6M8 2l-6 6" />
@@ -455,9 +465,10 @@ function CorruptDraftCard({
   onClick?: unknown
   onDelete: (draft: ShareDraftListItem) => void
 }) {
+  const { t } = useTranslation()
   const ratio = FALLBACK_RATIO
   const cardH = Math.round(CARD_W * (ratio.h / ratio.w))
-  const title = draft.title || 'Untitled'
+  const title = draft.title || t('common.untitled')
   const [hover, setHover] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   return (
@@ -475,8 +486,8 @@ function CorruptDraftCard({
         style={{ width: CARD_W, height: cardH }}
       >
         <span className="font-medium text-warm-text dark:text-dark-text line-clamp-2">{title}</span>
-        <span>snapshot unreadable</span>
-        <span>edited {formatRelative(draft.updated_at)}</span>
+        <span>{t('shares.snapshotUnreadable')}</span>
+        <span>{t('shares.editedRelative', { when: formatRelative(draft.updated_at, t as unknown as RelativeT) })}</span>
       </div>
       {hover && (
         <DeleteChip
@@ -495,16 +506,30 @@ function CorruptDraftCard({
   )
 }
 
-function formatRelative(iso: string): string {
+type RelativeT = (key: string, opts?: Record<string, unknown>) => string
+
+function formatRelative(iso: string, t?: RelativeT): string {
   const parsed = Date.parse(iso.replace(' ', 'T') + 'Z')
   if (Number.isNaN(parsed)) return iso
   const diffSec = Math.max(0, Math.round((Date.now() - parsed) / 1000))
-  if (diffSec < 60) return 'just now'
+  const tx = t ?? ((k: string, o?: Record<string, unknown>) => {
+    if (k === 'shares.justNow') return 'just now'
+    if (k === 'shares.minutesAgo') return `${(o as { count?: number }).count}m ago`
+    if (k === 'shares.hoursAgo') return `${(o as { count?: number }).count}h ago`
+    if (k === 'shares.daysAgo') return `${(o as { count?: number }).count}d ago`
+    return k
+  })
+  if (diffSec < 60) return tx('shares.justNow')
   const diffMin = Math.round(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffMin < 60) return tx('shares.minutesAgo', { count: diffMin })
   const diffHr = Math.round(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
+  if (diffHr < 24) return tx('shares.hoursAgo', { count: diffHr })
   const diffDay = Math.round(diffHr / 24)
-  if (diffDay < 30) return `${diffDay}d ago`
-  return new Date(parsed).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (diffDay < 30) return tx('shares.daysAgo', { count: diffDay })
+  // Use the app's UI language (set on <html lang>) rather than the OS
+  // locale so an English macOS doesn't show "Mar 14" inside a Chinese UI.
+  const locale = typeof document !== 'undefined' && document.documentElement.lang
+    ? document.documentElement.lang
+    : undefined
+  return new Date(parsed).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }

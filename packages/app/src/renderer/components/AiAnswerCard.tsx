@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { FragmentResult } from '@spool-lab/core'
 
 interface ToolCallInfo {
@@ -27,6 +28,7 @@ const TOOL_KIND_ICONS: Record<string, string> = {
 }
 
 export default function AiAnswerCard({ answer, streaming, agentName, sources, error, onResume, toolCalls }: Props) {
+  const { t } = useTranslation()
   if (!answer && !streaming && !error) return null
 
   const activeToolCalls = toolCalls ? [...toolCalls.values()].filter(tc => tc.status === 'in_progress' || tc.status === 'pending') : []
@@ -38,10 +40,10 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-accent dark:text-accent-dark tracking-[0.05em] uppercase">
           <SparklesIcon />
-          {agentName} says
+          {t('aiAnswer.agentSays', { agent: agentName })}
         </span>
         <span className="ml-auto text-[10px] font-mono bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border px-2 py-0.5 rounded text-warm-muted dark:text-dark-muted">
-          via ACP · local · {agentName}
+          {t('aiAnswer.agentLabel', { agent: agentName })}
         </span>
       </div>
 
@@ -88,7 +90,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
       ) : streaming ? (
         <div className="flex items-center gap-2 text-[12px] text-warm-muted dark:text-dark-muted py-1">
           <span className="inline-block w-3.5 h-3.5 border-2 border-accent dark:border-accent-dark border-t-transparent rounded-full animate-spin" />
-          <span>Searching knowledge base...</span>
+          <span>{t('aiAnswer.searching')}</span>
         </div>
       ) : null}
 
@@ -113,7 +115,7 @@ export default function AiAnswerCard({ answer, streaming, agentName, sources, er
           onClick={onResume}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-accent dark:text-accent-dark bg-transparent border border-accent dark:border-accent-dark rounded-md px-3 py-1.5 cursor-pointer hover:bg-accent-bg dark:hover:bg-accent-bg-dark transition-colors"
         >
-          Continue in {agentName} →
+          {t('aiAnswer.continueIn', { agent: agentName })}
         </button>
       )}
     </div>

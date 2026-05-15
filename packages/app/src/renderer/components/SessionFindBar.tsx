@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
 type Props = {
@@ -26,6 +27,7 @@ export default function SessionFindBar({
   onPrevious,
   onClose,
 }: Props) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
   const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
@@ -79,8 +81,8 @@ export default function SessionFindBar({
   const statusLabel = !hasQuery
     ? ''
     : hasMatches
-      ? `${activeMatchOrdinal} of ${matches}`
-      : 'No matches'
+      ? t('session.find_matches_other', { current: activeMatchOrdinal, total: matches })
+      : t('session.find_noMatch')
 
   return (
     <div
@@ -112,7 +114,7 @@ export default function SessionFindBar({
             onClose()
           }
         }}
-        placeholder="Find in session…"
+        placeholder={t('session.find_placeholder')}
         className="flex-1 min-w-0 bg-transparent text-[13px] text-warm-text dark:text-dark-text outline-none placeholder:text-warm-faint dark:placeholder:text-dark-muted"
         autoComplete="off"
         spellCheck={false}
@@ -130,8 +132,8 @@ export default function SessionFindBar({
         onClick={onPrevious}
         disabled={!hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
-        aria-label={`Previous match (${previousShortcutLabel})`}
-        title={`Previous match (${previousShortcutLabel})`}
+        aria-label={`${t('session.find_prev')} (${previousShortcutLabel})`}
+        title={`${t('session.find_prev')} (${previousShortcutLabel})`}
       >
         <ChevronUp size={12} strokeWidth={1.8} aria-hidden />
       </button>
@@ -140,8 +142,8 @@ export default function SessionFindBar({
         onClick={onNext}
         disabled={!hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
-        aria-label={`Next match (${nextShortcutLabel})`}
-        title={`Next match (${nextShortcutLabel})`}
+        aria-label={`${t('session.find_next')} (${nextShortcutLabel})`}
+        title={`${t('session.find_next')} (${nextShortcutLabel})`}
       >
         <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
       </button>
@@ -149,8 +151,8 @@ export default function SessionFindBar({
         type="button"
         onClick={onClose}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors hover:bg-warm-surface hover:text-warm-text dark:hover:bg-dark-surface dark:hover:text-dark-text"
-        aria-label="Close find in session"
-        title="Close (Esc)"
+        aria-label={t('session.find_close')}
+        title={`${t('session.find_close')} (Esc)`}
       >
         <X size={12} strokeWidth={1.8} aria-hidden />
       </button>

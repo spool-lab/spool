@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, memo, startTransition, useDeferredValue } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { FragmentResult, SearchResult, StatusInfo } from '@spool-lab/core'
 import { type SearchMode } from './components/SearchBar.js'
@@ -29,6 +30,8 @@ import { defaultThemeEditorState, type ThemeEditorStateV1 } from './theme/editor
 import { applyEditorTheme } from './theme/applyEditorTheme.js'
 import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
+import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
+import type { LanguagePreference } from '../preload/index.js'
 import { FEATURES } from './featureFlags.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor'
@@ -51,6 +54,7 @@ interface RuntimeInfo {
 }
 
 export default function App() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [previewSuggestions, setPreviewSuggestions] = useState<SearchResult[]>([])
@@ -89,6 +93,8 @@ export default function App() {
   const [pinnedSortOrder, setPinnedSortOrder] = useState<PinnedSortOrder>(DEFAULT_PINNED_SORT_ORDER)
   const [projectSortOrder, setProjectSortOrder] = useState<ProjectSessionSortOrder>(DEFAULT_PROJECT_SORT_ORDER)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
+  const [language, setLanguage] = useState<LanguagePreference>('system')
+  useLanguageBootstrap(language)
   const themeHydrated = useRef(false)
   const deferredResults = useDeferredValue(results)
   const [lastCompletedPreviewQuery, setLastCompletedPreviewQuery] = useState('')
@@ -204,8 +210,8 @@ export default function App() {
     try {
       doc = await readSpoolFile(file)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not read file'
-      toast.error(`Couldn't import ${file.name}`, { description: message })
+      const message = err instanceof Error ? err.message : t('toast.importFailed_readError')
+      toast.error(t('toast.importFailed_title', { name: file.name }), { description: message })
       return
     }
     try {
@@ -230,7 +236,7 @@ export default function App() {
       }, 'shares')
     } catch (err) {
       console.error('Failed to persist imported .spool draft:', err)
-      toast.error(`Couldn't import ${file.name}`, { description: 'Saving the draft failed.' })
+      toast.error(t('toast.importFailed_title', { name: file.name }), { description: t('toast.importFailed_saveError') })
     }
   }, [openShareEditor])
 
@@ -348,6 +354,7 @@ export default function App() {
       setSidebarSortOrder(config.sidebarSortOrder ?? DEFAULT_SIDEBAR_SORT_ORDER)
       setPinnedSortOrder(config.pinnedSortOrder ?? DEFAULT_PINNED_SORT_ORDER)
       setProjectSortOrder(config.projectSortOrder ?? DEFAULT_PROJECT_SORT_ORDER)
+      setLanguage(config.language ?? 'system')
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -375,6 +382,17 @@ export default function App() {
     try {
       const config = await window.spool.getAgentsConfig()
       await window.spool.setAgentsConfig({ ...config, pinnedSortOrder: next })
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  const handleLanguageChange = useCallback(async (next: LanguagePreference) => {
+    setLanguage(next)
+    if (!window.spool?.setAgentsConfig) return
+    try {
+      const config = await window.spool.getAgentsConfig()
+      await window.spool.setAgentsConfig({ ...config, language: next })
     } catch (err) {
       console.error(err)
     }
@@ -671,18 +689,18 @@ export default function App() {
   const handleCopySessionId = useCallback((source: FragmentResult['source']) => {
     const command = getSessionResumeCommandPrefix(source)
     if (!command) return
-    toast.success('Copied session ID', {
+    toast.success(t('toast.copiedSessionId'), {
       id: 'resume-command',
       description: (
         <span>
-          Paste after{' '}
+          {t('toast.copiedSessionId_description')}{' '}
           <code className="rounded bg-warm-bg dark:bg-dark-bg px-1.5 py-0.5 font-mono text-[11px]">
             {command}
           </code>
         </span>
       ),
     })
-  }, [])
+  }, [t])
 
   const activeAgentInfo = availableAgents.find(a => a.id === aiAgent) ?? availableAgents[0]
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
@@ -768,6 +786,8 @@ export default function App() {
             geminiCount={status?.geminiSessions ?? null}
             themeEditor={themeEditor}
             onThemeEditorChange={setThemeEditor}
+            language={language}
+            onLanguageChange={handleLanguageChange}
           />
         )}
         <SearchOverlay
@@ -886,8 +906,8 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleClearResults}
-                  aria-label="Back"
-                  title="Back"
+                  aria-label={t('common.back')}
+                  title={t('common.back')}
                   className="flex-none flex items-center justify-center w-6 h-6 rounded-md text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
                 >
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -895,12 +915,12 @@ export default function App() {
                   </svg>
                 </button>
                 <p className="text-xs text-warm-muted dark:text-dark-muted">
-                  Results for <span className="font-mono text-warm-text dark:text-dark-text">"{query}"</span>
+                  {t('search.resultsFor')} <span className="font-mono text-warm-text dark:text-dark-text">"{query}"</span>
                   <span aria-hidden className="mx-1.5 text-warm-faint">·</span>
                   <span data-testid="results-scope-chip" className="text-warm-faint dark:text-dark-muted">
                     {searchScope === 'project' && activeProjectName
-                      ? <>in <span className="font-mono">{activeProjectName}</span></>
-                      : 'all projects'}
+                      ? t('search.scope_project', { project: activeProjectName })
+                      : t('search.scope_all')}
                   </span>
                 </p>
                 {searchMode === 'ai' && availableAgents.length > 0 && (
@@ -952,7 +972,7 @@ export default function App() {
                   )}
                   {searchMode === 'ai' && fragmentSources.length > 0 && (aiAnswer || aiStreaming) && (
                     <div className="px-4 pt-2 pb-1 text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.04em]">
-                      Sources used
+                      {t('search.sourcesUsed')}
                     </div>
                   )}
                   {searchMode === 'ai' && !aiAnswer && !aiStreaming && !aiError && fragmentSources.length === 0 && query.trim() ? (
@@ -960,7 +980,13 @@ export default function App() {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
                         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
                       </svg>
-                      <p className="text-sm text-warm-muted dark:text-dark-muted">Press <kbd className="font-mono bg-warm-surface dark:bg-dark-surface px-1.5 py-0.5 rounded text-xs border border-warm-border dark:border-dark-border">Enter</kbd> to ask the agent</p>
+                      <p className="text-sm text-warm-muted dark:text-dark-muted">
+                        {t('search.pressEnterToAsk', { key: 'Enter' })
+                          .split('Enter')
+                          .flatMap((part, i, arr) => i < arr.length - 1
+                            ? [part, <kbd key={i} className="font-mono bg-warm-surface dark:bg-dark-surface px-1.5 py-0.5 rounded text-xs border border-warm-border dark:border-dark-border">Enter</kbd>]
+                            : [part])}
+                      </p>
                     </div>
                   ) : (
                     <div className="flex-1 min-h-0">
@@ -995,6 +1021,8 @@ export default function App() {
           geminiCount={status?.geminiSessions ?? null}
           themeEditor={themeEditor}
           onThemeEditorChange={setThemeEditor}
+          language={language}
+          onLanguageChange={handleLanguageChange}
         />
       )}
 

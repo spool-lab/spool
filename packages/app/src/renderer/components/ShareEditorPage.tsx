@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { flushSync } from 'react-dom'
 import { Download, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -65,6 +66,7 @@ export default function ShareEditorPage({
   sidebarCollapsed,
   onToggleSidebar,
 }: Props) {
+  const { t } = useTranslation()
   const [opts, setOpts] = useState<EditorOpts>(initialOpts)
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [saveState, setSaveState] = useState<SaveState>('idle')
@@ -84,7 +86,7 @@ export default function ShareEditorPage({
   // autosave snapshot — has the renamed title merged in. Without this,
   // the rename modal updates the topbar but the rendered template + all
   // export paths keep the original `conversation.title`.
-  const effectiveTitle = title.trim() || 'Untitled'
+  const effectiveTitle = title.trim() || t('common.untitled')
   const liveConversation = useMemo(
     () => ({ ...conversation, title: effectiveTitle }),
     [conversation, effectiveTitle],
@@ -190,7 +192,7 @@ export default function ShareEditorPage({
     // and the user keeps a clean directory.
     const CANVAS_MAX_AXIS = 16384
     if (Math.max(width, height) > CANVAS_MAX_AXIS) {
-      toast.error("Couldn't export PNG", { description: 'Conversation too tall — try PDF instead.' })
+      toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.conversationTooTall') })
       return
     }
     // PRE-PICK on the live user gesture, before any async work. If we
@@ -199,7 +201,7 @@ export default function ShareEditorPage({
     // SecurityError.
     const filename = filenameForExport(liveConversation, opts.template, 'png')
     const slot = await openSaveSlot(filename, {
-      description: 'PNG image',
+      description: t('shareEditor.saveDialog_png'),
       mime: 'image/png',
       ext: '.png',
     })
@@ -210,7 +212,7 @@ export default function ShareEditorPage({
       const blob = await rasterizeToPngBlob(node, { width, height })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
-      toast.success(`Saved ${filename}`)
+      toast.success(t('shareEditor.savedFile', { filename }))
     } catch (err) {
       console.error('Export to PNG failed:', err)
       setSaveState('error')
@@ -225,9 +227,9 @@ export default function ShareEditorPage({
         }
       }
       if (err instanceof PngTooTallError) {
-        toast.error("Couldn't export PNG", { description: 'Conversation too tall — try PDF instead.' })
+        toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.conversationTooTall') })
       } else {
-        toast.error("Couldn't export PNG", { description: 'See console for details.' })
+        toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.seeConsole') })
       }
     }
   }, [beginSaving, liveConversation, opts.template])
@@ -249,14 +251,14 @@ export default function ShareEditorPage({
     } catch (err) {
       console.error('Export to PDF failed:', err)
       setSaveState('error')
-      toast.error("Couldn't export PDF", { description: 'See console for details.' })
+      toast.error(t('shareEditor.couldntExportPdf'), { description: t('shareEditor.seeConsole') })
     }
   }, [beginSaving, liveConversation, opts.template])
 
   const savePdfFromPreview = useCallback(async () => {
     if (!pdfPreview) return
     const slot = await openSaveSlot(pdfPreview.filename, {
-      description: 'PDF document',
+      description: t('shareEditor.saveDialog_pdf'),
       mime: 'application/pdf',
       ext: '.pdf',
     })
@@ -265,11 +267,11 @@ export default function ShareEditorPage({
       const res = await fetch(pdfPreview.url)
       const blob = await res.blob()
       await writeToSlot(slot, blob, pdfPreview.filename)
-      toast.success(`Saved ${pdfPreview.filename}`)
+      toast.success(t('shareEditor.savedFile', { filename: pdfPreview.filename }))
       setPdfPreview(null)
     } catch (err) {
       console.error('Save PDF failed:', err)
-      toast.error("Couldn't save PDF", { description: 'See console for details.' })
+      toast.error(t('shareEditor.couldntSavePdf'), { description: t('shareEditor.seeConsole') })
     }
   }, [pdfPreview])
 
@@ -282,7 +284,7 @@ export default function ShareEditorPage({
       await window.spool.shareDraft.delete(draftId)
     } catch (err) {
       console.error('Delete share draft failed:', err)
-      toast.error("Couldn't delete draft")
+      toast.error(t('shareEditor.couldntDeleteDraft'))
       return
     }
     onBack()
@@ -291,7 +293,7 @@ export default function ShareEditorPage({
   const exportMarkdown = useCallback(async () => {
     const filename = markdownFilenameFor(liveConversation)
     const slot = await openSaveSlot(filename, {
-      description: 'Markdown document',
+      description: t('shareEditor.markdownDescription'),
       mime: 'text/markdown',
       ext: '.md',
     })
@@ -303,11 +305,11 @@ export default function ShareEditorPage({
       const blob = new Blob([md], { type: 'text/markdown' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
-      toast.success(`Saved ${filename}`)
+      toast.success(t('shareEditor.savedFile', { filename }))
     } catch (err) {
       console.error('Export to Markdown failed:', err)
       setSaveState('error')
-      toast.error("Couldn't export Markdown", { description: 'See console for details.' })
+      toast.error(t('shareEditor.couldntExportMd'), { description: t('shareEditor.seeConsole') })
     }
   }, [beginSaving, liveConversation, opts])
 
@@ -316,7 +318,7 @@ export default function ShareEditorPage({
     // saveBlob's picker call still needs the user gesture.
     const filename = filenameForExport(liveConversation, opts.template, 'spool')
     const slot = await openSaveSlot(filename, {
-      description: 'Spool Share document',
+      description: t('shareEditor.spoolShareDescription'),
       mime: 'application/spool+json',
       ext: '.spool',
     })
@@ -333,11 +335,11 @@ export default function ShareEditorPage({
       const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/spool+json' })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
-      toast.success(`Saved ${filename}`)
+      toast.success(t('shareEditor.savedFile', { filename }))
     } catch (err) {
       console.error('Export to .spool failed:', err)
       setSaveState('error')
-      toast.error("Couldn't export .spool", { description: 'See console for details.' })
+      toast.error(t('shareEditor.couldntExportSpool'), { description: t('shareEditor.seeConsole') })
     }
   }, [beginSaving, liveConversation, opts])
 
@@ -346,8 +348,8 @@ export default function ShareEditorPage({
       <button
         type="button"
         onClick={onBack}
-        aria-label="Back"
-        title="Back"
+        aria-label={t('common.back')}
+        title={t('common.back')}
         className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -357,10 +359,10 @@ export default function ShareEditorPage({
       <div className="min-w-0 flex items-center gap-1.5">
         <h1
           data-testid="share-editor-title"
-          title={title.trim() || 'Untitled'}
+          title={title.trim() || t('common.untitled')}
           className="min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate"
         >
-          {title.trim() || 'Untitled'}
+          {title.trim() || t('common.untitled')}
         </h1>
         <Menu
           align="left"
@@ -369,8 +371,8 @@ export default function ShareEditorPage({
             <button
               type="button"
               onClick={toggle}
-              aria-label="More options"
-              title="More options"
+              aria-label={t('shareEditor.moreOptions')}
+              title={t('shareEditor.moreOptions')}
               className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
               <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
@@ -378,12 +380,12 @@ export default function ShareEditorPage({
           )}
           items={[
             {
-              label: 'Rename draft',
+              label: t('shareEditor.renameDraft'),
               icon: <Pencil size={13} strokeWidth={1.6} aria-hidden />,
               onSelect: () => setRenaming(true),
             },
             {
-              label: 'Delete draft',
+              label: t('shareEditor.deleteDraft'),
               icon: <Trash2 size={13} strokeWidth={1.6} aria-hidden />,
               onSelect: () => setConfirmingDelete(true),
             },
@@ -403,8 +405,8 @@ export default function ShareEditorPage({
       <button
         type="button"
         onClick={onTogglePanel}
-        title={panelOpen ? 'Hide style panel' : 'Show style panel'}
-        aria-label={panelOpen ? 'Hide style panel' : 'Show style panel'}
+        title={panelOpen ? t('shareEditor.hidePanel') : t('shareEditor.showPanel')}
+        aria-label={panelOpen ? t('shareEditor.hidePanel') : t('shareEditor.showPanel')}
         aria-pressed={panelOpen}
         className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
@@ -435,14 +437,14 @@ export default function ShareEditorPage({
               <div className="flex-none flex items-center gap-3 px-4 py-2.5 border-b border-warm-border dark:border-dark-border">
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-warm-text dark:text-dark-text truncate">{pdfPreview.filename}</p>
-                  <p className="text-[10.5px] text-warm-faint dark:text-dark-muted">PDF preview · click outside to dismiss</p>
+                  <p className="text-[10.5px] text-warm-faint dark:text-dark-muted">{t('shareEditor.pdfPreviewHint')}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPdfPreview(null)}
                   className="h-7 px-2.5 rounded-md text-[12px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -450,10 +452,10 @@ export default function ShareEditorPage({
                   className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
                 >
                   <Download size={12} strokeWidth={1.8} />
-                  Save PDF
+                  {t('shareEditor.savePdf')}
                 </button>
               </div>
-              <iframe src={pdfPreview.url} title="PDF preview" className="flex-1 w-full border-0 bg-white" />
+              <iframe src={pdfPreview.url} title={t('shareEditor.pdfPreviewTitle')} className="flex-1 w-full border-0 bg-white" />
             </div>
           </div>
         )}
@@ -477,7 +479,7 @@ export default function ShareEditorPage({
       )}
       {confirmingDelete && (
         <DeleteDraftModal
-          title={title.trim() || 'Untitled'}
+          title={title.trim() || t('common.untitled')}
           onConfirm={async () => {
             setConfirmingDelete(false)
             await handleDelete()
@@ -505,6 +507,7 @@ function RenameDraftModal({
   onSave: (next: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialTitle)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -544,10 +547,10 @@ function RenameDraftModal({
       >
         <div className="px-5 pt-5 pb-4">
           <h2 id="rename-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
-            Rename draft
+            {t('shareEditor.renameDraft')}
           </h2>
           <p className="mt-1 text-xs text-warm-faint dark:text-dark-muted">
-            Shown on the share card and in your Shares list.
+            {t('shareEditor.renameDraft_subtitle')}
           </p>
         </div>
         <div className="px-5 pb-4">
@@ -562,7 +565,7 @@ function RenameDraftModal({
                 commit()
               }
             }}
-            aria-label="Draft title"
+            aria-label={t('shareEditor.renameDraft_inputAria')}
             data-testid="rename-draft-input"
             className="w-full h-9 px-3 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted focus:outline-none focus:ring-1 focus:ring-warm-border2 dark:focus:ring-dark-border2"
           />
@@ -581,7 +584,7 @@ function RenameDraftModal({
             data-testid="rename-draft-save"
             className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            Save
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -607,6 +610,7 @@ function DeleteDraftModal({
   onConfirm: () => void | Promise<void>
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const deleteRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
@@ -639,11 +643,10 @@ function DeleteDraftModal({
       >
         <div className="px-5 pt-5 pb-4">
           <h2 id="delete-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
-            Delete draft?
+            {t('shareEditor.deleteDraft_confirm')}
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-warm-muted dark:text-dark-muted">
-            This will permanently remove “{title}” from your Shares. This cannot be undone —
-            autosave is already off for this draft once you confirm.
+            {t('shareEditor.deleteDraft_body', { title })}
           </p>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-5">
@@ -667,7 +670,7 @@ function DeleteDraftModal({
             }}
             className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-[color:var(--color-status-error)] dark:bg-[color:var(--color-status-error-dark)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-status-error)]/40"
           >
-            Delete
+            {t('shareEditor.deleteConfirmBtn')}
           </button>
         </div>
       </div>

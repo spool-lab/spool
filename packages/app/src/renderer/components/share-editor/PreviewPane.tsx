@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MoreHorizontal } from 'lucide-react'
 import {
   TemplateRender,
@@ -54,6 +55,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
   { convo, opts, zoom, setZoom },
   ref,
 ) {
+  const { t } = useTranslation()
   const ratio = TEMPLATE_RATIO[opts.template]
 
   const innerRef = useRef<HTMLDivElement>(null)
@@ -272,7 +274,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
           </div>
           {/* Footer chrome below. */}
           <div className="text-[10px] font-mono tracking-[0.04em] text-warm-faint dark:text-dark-muted">
-            1 / 1 · {convo.wordCount.toLocaleString()} words
+            1 / 1 · {t('shareEditorPanel.preview_wordCount_other', { count: convo.wordCount })}
           </div>
         </div>
       </div>
@@ -296,6 +298,7 @@ type ZoomControlProps = {
 }
 
 function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
+  const { t } = useTranslation()
   const minPercent = ZOOM_STEPS[0]! * 100
   const maxPercent = ZOOM_STEPS[ZOOM_STEPS.length - 1]! * 100
   const [expanded, setExpanded] = useState(false)
@@ -334,15 +337,15 @@ function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
     >
       {expanded && (
         <>
-          <ZoomBtn label="−" onClick={onOut} ariaLabel="Zoom out" disabled={percent <= minPercent} />
+          <ZoomBtn label="−" onClick={onOut} ariaLabel={t('shareEditorPanel.preview_zoomOut')} disabled={percent <= minPercent} />
           <span className="min-w-[26px] text-center select-none text-warm-text dark:text-dark-text tabular-nums">
             {percent}%
           </span>
-          <ZoomBtn label="+" onClick={onIn} ariaLabel="Zoom in" disabled={percent >= maxPercent} />
+          <ZoomBtn label="+" onClick={onIn} ariaLabel={t('shareEditorPanel.preview_zoomIn')} disabled={percent >= maxPercent} />
           <button
             type="button"
             onClick={onFit}
-            aria-label="Zoom to fit"
+            aria-label={t('shareEditorPanel.preview_zoomToFit')}
             aria-pressed={isFit}
             className={`px-1.5 h-5 rounded transition-colors ${
               isFit
@@ -350,16 +353,16 @@ function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
                 : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
             }`}
           >
-            Fit
+            {t('shareEditorPanel.preview_fit')}
           </button>
         </>
       )}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        aria-label={expanded ? 'Hide zoom controls' : 'Zoom controls'}
+        aria-label={expanded ? t('shareEditorPanel.preview_hideZoomControls') : t('shareEditorPanel.preview_zoomControls')}
         aria-expanded={expanded}
-        title="Zoom controls"
+        title={t('shareEditorPanel.preview_zoomControls')}
         className="w-5 h-5 grid place-items-center rounded text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
       >
         <MoreHorizontal size={11} strokeWidth={1.75} aria-hidden />
