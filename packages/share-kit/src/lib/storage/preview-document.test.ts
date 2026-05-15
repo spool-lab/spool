@@ -89,14 +89,14 @@ describe('buildPreviewDocument', () => {
   it('preserves non-selection opts (template, paper, typeface, colorway, accentHex)', () => {
     const doc = makeDoc(
       [makeTurn(0)],
-      { template: 'timeline', paper: 'graphite', typeface: 'fraunces', colorway: 'walnut', accentHex: '#8E6843' },
+      { template: 'timeline', paper: 'graphite', typeface: 'fraunces', colorway: 'walnut', accentHex: '#9F7A4C' },
     )
     const preview = buildPreviewDocument(doc)
     expect(preview.opts.template).toBe('timeline')
     expect(preview.opts.paper).toBe('graphite')
     expect(preview.opts.typeface).toBe('fraunces')
     expect(preview.opts.colorway).toBe('walnut')
-    expect(preview.opts.accentHex).toBe('#8E6843')
+    expect(preview.opts.accentHex).toBe('#9F7A4C')
   })
 
   it('preserves conversation metadata (source, title, createdAt)', () => {

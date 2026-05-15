@@ -21,7 +21,7 @@ test('opts mutations + title rename survive a full app restart', async () => {
   // Change a few opts.
   await ctx.window.locator('[data-testid="share-editor-template-atelier"]').click()
   await ctx.window.locator('[data-testid="share-editor-paper-ink"]').click()
-  await ctx.window.locator('[data-testid="share-editor-colorway-moss"]').click()
+  await ctx.window.locator('[data-testid="share-editor-colorway-sage"]').click()
 
   // Rename via the modal.
   await ctx.window.locator('[data-testid="share-editor-more"]').click()
@@ -51,7 +51,7 @@ test('opts mutations + title rename survive a full app restart', async () => {
   const preview = ctx.window.locator('[data-testid="share-preview-render"]')
   await expect(preview).toHaveAttribute('data-template', 'atelier')
   await expect(preview).toHaveAttribute('data-paper', 'ink')
-  await expect(preview).toHaveAttribute('data-colorway', 'moss')
+  await expect(preview).toHaveAttribute('data-colorway', 'sage')
 
   // Leave a clean state for the tests that follow.
   await ctx.window.getByRole('button', { name: 'Back' }).first().click()
