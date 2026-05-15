@@ -61,7 +61,7 @@ export interface Conversation {
   turns: Turn[]
 }
 
-export type Template = 'atelier' | 'letter' | 'timeline' | 'chat'
+export type Template = 'forum' | 'letter' | 'timeline' | 'chat'
 export type Paper = 'bone' | 'snow' | 'graphite' | 'ink'
 export type Typeface = 'inter' | 'geist' | 'fraunces' | 'hanken-grotesk'
 export type Density = 'compact' | 'relaxed'
@@ -278,7 +278,7 @@ export const SOURCE_DOTS: Record<Platform, { light: string; dark: string }> = {
 export const TEMPLATES: { id: Template; name: string; blurb: string }[] = [
   { id: 'chat', name: 'Chat', blurb: 'Messenger bubbles, native-app feel.' },
   { id: 'letter', name: 'Letter', blurb: 'Single-column, reading-first.' },
-  { id: 'atelier', name: 'Atelier', blurb: 'Editorial two-column, serif-free.' },
+  { id: 'forum', name: 'Forum', blurb: 'Threaded posts with avatars and post numbers.' },
   { id: 'timeline', name: 'Timeline', blurb: 'Rail of time with marker per turn.' },
 ]
 
@@ -299,7 +299,7 @@ export const COLORWAYS: Colorway[] = [
 ]
 
 export const TEMPLATE_RATIO: Record<Template, { w: number; h: number }> = {
-  atelier: { w: 720, h: 960 },
+  forum: { w: 720, h: 960 },
   letter: { w: 720, h: 960 },
   timeline: { w: 720, h: 960 },
   chat: { w: 720, h: 960 },

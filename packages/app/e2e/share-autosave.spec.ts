@@ -19,7 +19,7 @@ test('opts mutations + title rename survive a full app restart', async () => {
   await openShareEditorFromSessionDetail(ctx.window, SESSION_UUID)
 
   // Change a few opts.
-  await ctx.window.locator('[data-testid="share-editor-template-atelier"]').click()
+  await ctx.window.locator('[data-testid="share-editor-template-forum"]').click()
   await ctx.window.locator('[data-testid="share-editor-paper-ink"]').click()
   await ctx.window.locator('[data-testid="share-editor-colorway-sage"]').click()
 
@@ -49,7 +49,7 @@ test('opts mutations + title rename survive a full app restart', async () => {
 
   await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText('Autosave checkpoint')
   const preview = ctx.window.locator('[data-testid="share-preview-render"]')
-  await expect(preview).toHaveAttribute('data-template', 'atelier')
+  await expect(preview).toHaveAttribute('data-template', 'forum')
   await expect(preview).toHaveAttribute('data-paper', 'ink')
   await expect(preview).toHaveAttribute('data-colorway', 'sage')
 

@@ -187,8 +187,6 @@ export function Chat({ convo, opts }: Props) {
         <div
           style={{
             marginTop: 36,
-            paddingTop: 12,
-            borderTop: `1px solid ${t.border}`,
             display: 'flex',
             justifyContent: 'space-between',
             fontFamily: 'Geist Mono, monospace',
