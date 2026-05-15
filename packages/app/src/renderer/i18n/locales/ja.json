@@ -124,6 +124,7 @@
     "empty_title": "セッションはまだありません",
     "empty_body": "Claude Code、Codex、または Gemini を開いてセッションを始めると、Spool が自動でインデックスします。",
     "section_pinned_other": "ピン留め · {{count}} 件",
+    "section_recent": "最近",
     "bucket_today": "今日",
     "bucket_yesterday": "昨日",
     "bucket_earlierWeek": "今週",

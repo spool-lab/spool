@@ -346,7 +346,7 @@ export default function ProjectView({
         out.push({
           kind: 'header',
           id: 'recent',
-          label: 'RECENT',
+          label: t('library.section_recent'),
           testId: 'project-view-recent-header',
         })
       }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { MessagesSquare as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'

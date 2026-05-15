@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessagesSquare as LibraryIcon } from 'lucide-react'
+import { Layers3 as LibraryIcon } from 'lucide-react'
 import type { Session, SessionsCursor } from '@spool-lab/core'
 import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
 import { FeaturedEmptyState } from './EmptyState.js'
