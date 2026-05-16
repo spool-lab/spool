@@ -19,6 +19,11 @@ export interface LeadSession {
   source: SessionSource
   /** ISO 8601 timestamp. Determines sort order in Recent. */
   iso: string
+  /** Optional explicit turn list. When omitted, the default 2-turn stub is
+   *  used (`Help me with: <title>` + a single assistant reply). Provide
+   *  this to demo a richer conversation in the share editor. Each turn's
+   *  timestamp is derived from `iso + (i * 30s)`. */
+  turns?: Array<{ role: 'user' | 'assistant'; text: string }>
 }
 
 export interface ProjectSeed {
@@ -58,6 +63,11 @@ function toUuid(counter: number): string {
 }
 
 function workspacePath(tmpDir: string, name: string): string {
+  void tmpDir
+  return `/Users/demo/Code/${name}`
+}
+
+function fixtureWorkspaceDir(tmpDir: string, name: string): string {
   return join(tmpDir, 'workspaces', name)
 }
 
@@ -71,43 +81,55 @@ function writeText(path: string, value: string) {
   writeFileSync(path, value, 'utf8')
 }
 
-function makeClaudeSession(sessionId: string, cwd: string, title: string, iso: string): string {
-  const followupIso = new Date(Date.parse(iso) + 45_000).toISOString()
-  return [
+function makeClaudeSession(
+  sessionId: string,
+  cwd: string,
+  title: string,
+  iso: string,
+  turns?: Array<{ role: 'user' | 'assistant'; text: string }>,
+): string {
+  const lines: string[] = [
     JSON.stringify({
       type: 'custom-title',
       sessionId,
       cwd,
       customTitle: title,
     }),
-    JSON.stringify({
-      type: 'user',
+  ]
+
+  const dialog = turns ?? [
+    { role: 'user' as const, text: `Help me with: ${title}` },
+    {
+      role: 'assistant' as const,
+      text: `Working through ${title} with the latest shell and sidebar assumptions.`,
+    },
+  ]
+
+  let parentUuid: string | undefined
+  dialog.forEach((turn, i) => {
+    const uuid = `${sessionId}-${turn.role[0]}${i + 1}`
+    const timestamp = new Date(Date.parse(iso) + i * 30_000).toISOString()
+    const entry: Record<string, unknown> = {
+      type: turn.role,
       sessionId,
       cwd,
-      uuid: `${sessionId}-u1`,
-      timestamp: iso,
-      message: {
-        role: 'user',
-        content: `Help me with: ${title}`,
-      },
-    }),
-    JSON.stringify({
-      type: 'assistant',
-      uuid: `${sessionId}-a1`,
-      parentUuid: `${sessionId}-u1`,
-      timestamp: followupIso,
-      message: {
-        role: 'assistant',
-        model: 'claude-sonnet-4.20250514',
-        content: [
-          {
-            type: 'text',
-            text: `Working through ${title} with the latest shell and sidebar assumptions.`,
-          },
-        ],
-      },
-    }),
-  ].join('\n') + '\n'
+      uuid,
+      timestamp,
+      message:
+        turn.role === 'user'
+          ? { role: 'user', content: turn.text }
+          : {
+              role: 'assistant',
+              model: 'claude-sonnet-4.20250514',
+              content: [{ type: 'text', text: turn.text }],
+            },
+    }
+    if (parentUuid) entry.parentUuid = parentUuid
+    lines.push(JSON.stringify(entry))
+    parentUuid = uuid
+  })
+
+  return lines.join('\n') + '\n'
 }
 
 function makeCodexSession(sessionId: string, cwd: string, title: string, iso: string): string {
@@ -154,6 +176,7 @@ export function buildDemoFixtures(
 
   const fillerTopics = options.fillerTopics ?? DEFAULT_FILLER_TOPICS
   let sessionCounter = options.sessionCounterStart ?? 1
+  let fillerTitleIndex = 0
 
   mkdirSync(claudeDir, { recursive: true })
   mkdirSync(codexDir, { recursive: true })
@@ -169,7 +192,7 @@ export function buildDemoFixtures(
 
   for (const project of projects) {
     const cwd = workspacePath(tmpDir, project.name)
-    mkdirSync(cwd, { recursive: true })
+    mkdirSync(fixtureWorkspaceDir(tmpDir, project.name), { recursive: true })
 
     const sessions: LeadSession[] = [...project.leadSessions]
     const fillerCount = Math.max(0, project.total - project.leadSessions.length)
@@ -178,11 +201,16 @@ export function buildDemoFixtures(
       const dayOffset = 3 + Math.floor(i / 4)
       const hour = 17 - (i % 6)
       const minute = (i * 7) % 60
+      const topicIndex = fillerTitleIndex % fillerTopics.length
+      const wrapCount = Math.floor(fillerTitleIndex / fillerTopics.length)
+      const topic = fillerTopics[topicIndex] ?? `Follow-up task ${fillerTitleIndex + 1}`
+      const title = wrapCount > 0 ? `${topic} ${wrapCount + 1}` : topic
       sessions.push({
-        title: `${fillerTopics[i % fillerTopics.length]} ${i + 1}`,
+        title,
         source,
         iso: new Date(Date.UTC(2026, 4, Math.max(1, 10 - dayOffset), hour, minute, 0)).toISOString(),
       })
+      fillerTitleIndex += 1
     }
 
     sessions.forEach((session, index) => {
@@ -190,7 +218,7 @@ export function buildDemoFixtures(
       if (session.source === 'claude') {
         const relDir = join(claudeDir, project.name.toLowerCase())
         const filePath = join(relDir, `${project.name.toLowerCase()}-${String(index + 1).padStart(3, '0')}.jsonl`)
-        writeText(filePath, makeClaudeSession(sessionId, cwd, session.title, session.iso))
+        writeText(filePath, makeClaudeSession(sessionId, cwd, session.title, session.iso, session.turns))
         return
       }
 

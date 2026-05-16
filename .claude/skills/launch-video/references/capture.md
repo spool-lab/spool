@@ -14,6 +14,8 @@ Solution: capture the rectangular region the macOS window occupies via `screenca
 - `captureNativeWindow(app, path)` — single PNG (uses `screencapture -l <id>`).
 - `recordNativeWindow(app, path, seconds, perform)` — runs `screencapture -V <seconds> -R <rect>` while `perform()` drives the app concurrently.
 - `launchDemoApp(seed)` + `setDemoWindowBounds(ctx, 1080, 740)` — boot Electron with programmatic fixtures, force dark, set canonical size.
+- `installCursorOverlay(window)` — inject the synthetic DOM cursor that tracks Playwright's `mouse.move()` and pulses on `mousedown`. Call once after `waitForDemoSync(window)`; see `cursor-overlay.md` for details.
+- `cursorTo(window, selector, opts)` / `cursorClick(window, selector, opts)` / `cursorPark(window, x, y)` — replace bare `.click()` so the cursor's path is visibly filmed.
 - `emitUpdateStatus(app, payload)` — push updater banner state via IPC.
 - `pinFirstRowInProject(window, name)` — hover + pin first session row.
 
@@ -58,6 +60,7 @@ Structure:
 import { test } from '@playwright/test'
 import { launchDemoApp, setDemoWindowBounds, waitForDemoSync } from './helpers/demo-launch'
 import { recordNativeWindow } from './helpers/native-window-capture'
+import { installCursorOverlay, cursorClick, cursorPark } from './helpers/cursor-overlay'
 import { emitUpdateStatus, pinFirstRowInProject } from './helpers/demo-interactions'
 
 const PROJECTS = [/* per-release seed */]
@@ -65,15 +68,20 @@ const PROJECTS = [/* per-release seed */]
 const OUT_DIR = path.join(__dirname, '../../../videos/spool-vX.Y.Z/assets/live')
 
 test('record release clips', async () => {
-  test.setTimeout(180_000)
+  test.setTimeout(540_000)  // ~9min — relaxed pacing across 7 beats can take longer than the default 30s test timeout
 
   const ctx = await launchDemoApp(PROJECTS)
   await setDemoWindowBounds(ctx, 1080, 740)
   await waitForDemoSync(ctx.window)
+  await installCursorOverlay(ctx.window)         // synthetic cursor for the rest of the spec
+  await cursorPark(ctx.window, 120, 360)          // park off to the side before clip 1
 
   await recordNativeWindow(ctx.app, path.join(OUT_DIR, '01-home.mov'), 4.0, async () => {
-    // Drive the app for ~4s while screencapture records.
-    // e.g. ctx.window.mouse.wheel(0, 900)
+    await ctx.window.waitForTimeout(500)         // settle so the cursor is in the first filmed frame
+    await cursorClick(ctx.window, '[data-testid="sidebar-shares"]', {
+      preClickPause: 260, postClickPause: 280,
+    })
+    // ... drive the rest of the scene
   })
 
   // ... more clips per feature
@@ -85,7 +93,16 @@ test('record release clips', async () => {
 Run with:
 
 ```bash
-pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts --workers=1
+pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts \
+  --workers=1 --global-timeout=900000 --retries=0
+```
+
+`--global-timeout` is required for relaxed-pacing releases — Playwright's config default is 300s and a 7-beat spec with relaxed `postClickPause` values can easily exceed that. `--retries=0` because a flaky capture (Electron failing to focus, screencapture permission glitch) on first run can spawn a second Electron whose window overlaps the first — the capture then records the wrong app state. Better to fail loudly and re-run by hand than auto-retry and ship wrong frames.
+
+If the feature being demoed is behind a build-time flag (e.g. `VITE_FEATURE_SHARE`), build the app with the flag *before* running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time:
+
+```bash
+VITE_FEATURE_SHARE=1 pnpm --filter @spool/app run build:electron
 ```
 
 ## Capture-time constants
@@ -95,11 +112,13 @@ pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts --work
 | Window logical size | 1080×740 | Matches app default (`packages/app/src/main/index.ts`); the composition assumes this aspect |
 | Theme | dark forced | `nativeTheme.themeSource = 'dark'` in `setDemoWindowBounds()` |
 | GPU | disabled | `ELECTRON_DISABLE_GPU=1` for deterministic frames |
-| `screencapture` cursor | off | Default. Add `-C` to args if you want the system cursor in frame — usually you don't, the simulated cursors look unnatural |
+| `screencapture` cursor | off | Default; don't add `-C`. The real OS cursor doesn't move with Playwright, so capturing it would film a stationary system arrow in some corner. Use the synthetic DOM cursor from `cursor-overlay.md` instead |
 
 ## Common capture issues
 
 - **Window not found.** `screencapture -R` failures usually mean the Electron window hasn't focused. Call `app.focus({steal: true})` + `win.focus()` before recording.
-- **Playwright `mouse.click()` does NOT move the OS cursor.** It dispatches DOM events directly. If you need cursor-in-frame, drive the OS cursor separately (e.g. `cliclick`) — but this is usually a sign you should drop the cursor entirely and let the UI change carry the story.
+- **Playwright `mouse.click()` does NOT move the OS cursor.** It dispatches DOM events directly. If you need cursor-in-frame, install the synthetic DOM cursor from `cursor-overlay.md` — a real cursor that tracks Playwright input + a click pulse. Don't try to drive `cliclick` to move the real OS cursor; the timing is fiddly and the result still looks unnatural.
 - **First-frame black pixels in the output `.mov`.** `screencapture -V` has ~21ms latency before the first frame lands. Padded out at composition time via `tpad` (see `poster.md`).
 - **Timing slips between perform() and screencapture.** `recordNativeWindow` starts the recording, then runs `perform()`. There's a ~500ms lead-in where you can `waitForTimeout` to settle before the first action.
+- **Captures show test-suite fixtures instead of demo seed.** Symptom: clip 1 records the wrong Electron window's content (e.g. test-project fixtures with XYLOPHONE_CANARY data). Cause: a previous test left an Electron process running and Playwright auto-retried after a flake, spawning a second Electron whose Quartz window-id won the `nativeWindowInfo()` match. Fix: `pkill -9 -f Electron` before the spec, and run with `--retries=0` so flakes don't silently double up.
+- **Build-time feature flag not applied.** Symptom: test fails to find a feature-gated selector (e.g. `[data-testid="sidebar-shares"]`) even though the smoke test passes for unrelated selectors. Cause: built the app without `VITE_FEATURE_<NAME>=1`. Vite inlines `import.meta.env.VITE_FEATURE_<NAME>` at build time, not runtime, so setting the env var when running playwright is too late. Rebuild with the flag.
