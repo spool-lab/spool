@@ -45,6 +45,7 @@ import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
+import { hydrateBinaryCache } from './binaryCache.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -201,6 +202,13 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 }
 
 app.whenReady().then(async () => {
+  // Hydrate the agent-binary path cache from disk before anything has a
+  // chance to call `cachedResolveAsync`. Without this every cold launch
+  // re-runs `<user-shell> -ilc 'command -v ...'` once per agent — three
+  // serialised execSync-style spawns on a slow .zshrc are the dominant
+  // contributor to the launch beachball.
+  hydrateBinaryCache()
+
   // Set dock icon (dev mode doesn't pick up build config)
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
   try { app.dock?.setIcon(nativeImage.createFromPath(dockIconPath)) } catch {}
