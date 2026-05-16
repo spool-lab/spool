@@ -130,61 +130,61 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         )}
       </nav>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-3 scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)]">
-        {sortedPinned && sortedPinned.length > 0 && onSelectSession && (
-          <>
-            <SectionHeader
-              label={t('sidebar.pinned')}
-              open={pinnedOpen}
-              onToggle={() => setPinnedOpen(open => !open)}
-              testId="sidebar-pinned-toggle"
-              trailing={onPinnedSortOrderChange ? (
-                <Menu
-                  align="right"
-                  testId="sidebar-pinned-sort-menu"
-                  trigger={({ open, toggle }) => (
-                    <button
-                      type="button"
-                      data-testid="sidebar-pinned-sort-trigger"
-                      onClick={toggle}
-                      title={t('sidebar.sortBy')}
-                      aria-label={t('sidebar.sortBy')}
-                      aria-haspopup="menu"
-                      aria-expanded={open}
-                      className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
-                        open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
-                      }`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                        <path d="M1 3.5h12M2.5 7h9M5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  )}
-                  items={PINNED_SORT_OPTIONS.map(option => ({
-                    label: pinnedSortLabel(option.value),
-                    active: pinnedSortOrder === option.value,
-                    onSelect: () => onPinnedSortOrderChange(option.value),
-                  }))}
+      {sortedPinned && sortedPinned.length > 0 && onSelectSession && (
+        <div className="flex-none">
+          <SectionHeader
+            label={t('sidebar.pinned')}
+            open={pinnedOpen}
+            onToggle={() => setPinnedOpen(open => !open)}
+            testId="sidebar-pinned-toggle"
+            trailing={onPinnedSortOrderChange ? (
+              <Menu
+                align="right"
+                testId="sidebar-pinned-sort-menu"
+                trigger={({ open, toggle }) => (
+                  <button
+                    type="button"
+                    data-testid="sidebar-pinned-sort-trigger"
+                    onClick={toggle}
+                    title={t('sidebar.sortBy')}
+                    aria-label={t('sidebar.sortBy')}
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
+                      open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
+                    }`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                      <path d="M1 3.5h12M2.5 7h9M5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+                items={PINNED_SORT_OPTIONS.map(option => ({
+                  label: pinnedSortLabel(option.value),
+                  active: pinnedSortOrder === option.value,
+                  onSelect: () => onPinnedSortOrderChange(option.value),
+                }))}
+              />
+            ) : null}
+          />
+          {pinnedOpen && (
+            <div className="px-2 max-h-40 overflow-y-auto scrollbar-none">
+              {sortedPinned.map(session => (
+                <PinnedRow
+                  key={session.sessionUuid}
+                  session={session}
+                  active={session.sessionUuid === activeSessionUuid}
+                  onClick={() => onSelectSession(session.sessionUuid)}
+                  {...(onCopySessionId ? { onCopySessionId } : {})}
+                  {...(onShareSession ? { onShare: onShareSession } : {})}
                 />
-              ) : null}
-            />
-            {pinnedOpen && (
-              <div className="px-2 max-h-64 overflow-y-auto scrollbar-none">
-                {sortedPinned.map(session => (
-                  <PinnedRow
-                    key={session.sessionUuid}
-                    session={session}
-                    active={session.sessionUuid === activeSessionUuid}
-                    onClick={() => onSelectSession(session.sessionUuid)}
-                    {...(onCopySessionId ? { onCopySessionId } : {})}
-                    {...(onShareSession ? { onShare: onShareSession } : {})}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <SectionHeader
           label={t('sidebar.projects')}
           open={projectsOpen}
@@ -222,7 +222,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         />
 
         {projectsOpen && (
-          <div className="px-2">
+          <div className="flex-1 min-h-0 overflow-y-auto pb-3 px-2 scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)]">
             {groups === null ? (
               <SidebarSkeleton />
             ) : projectGroups.length === 0 && !looseGroup ? (
