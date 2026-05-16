@@ -3,7 +3,7 @@
 Your local AI session library.
 
 <p align="center">
-  <img src="docs/spool-v0.png" alt="Spool" width="720">
+  <img src="docs/spool-v1.png" alt="Spool" width="720">
 </p>
 
 Spool collects every Claude Code, Codex CLI, and Gemini CLI session you've ever had into a sidebar of projects you can browse, pin, and revisit. Press ⌘K to search across the whole archive.
