@@ -186,7 +186,6 @@ export function buildDemoFixtures(
   writeJson(join(dataDir, 'ui.json'), {
     themeSource: 'dark',
     sidebarCollapsed: false,
-    spoolDaemonNoticeShown: true,
   })
   writeJson(join(geminiHome, '.gemini', 'projects.json'), { projects: {} })
 

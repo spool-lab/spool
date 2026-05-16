@@ -28,7 +28,7 @@ process.on('uncaughtException', (err) => {
 })
 
 import {
-  getDB, wasNewDb, getInitialUserVersion, Syncer, SpoolWatcher,
+  getDB, Syncer, SpoolWatcher,
   searchFragments, searchSessionPreview, listRecentSessionsPage, getSessionWithMessages, getStatus,
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
@@ -44,7 +44,7 @@ import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
-import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSpoolDaemonNoticeShown, saveSidebarCollapsed } from './uiPreferences.js'
+import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -527,18 +527,6 @@ ipcMain.handle('spool:ai-cancel', () => {
   return { ok: true }
 })
 
-// ── Spool Daemon notice ──────────────────────────────────────────────────
-
-ipcMain.handle('spool:get-daemon-notice-pending', (): boolean => {
-  // Only nudge users who actually upgraded from a pre-M5 schema. Fresh
-  // installs land directly at user_version=5 with no DB beforehand —
-  // nothing to apologize for, no notice needed.
-  if (uiPreferences.spoolDaemonNoticeShown) return false
-  if (wasNewDb()) return false
-  const initialVersion = getInitialUserVersion()
-  return initialVersion !== null && initialVersion < 5
-})
-
 ipcMain.handle('spool:get-sidebar-collapsed', (): boolean => {
   return uiPreferences.sidebarCollapsed
 })
@@ -546,15 +534,6 @@ ipcMain.handle('spool:get-sidebar-collapsed', (): boolean => {
 ipcMain.handle('spool:set-sidebar-collapsed', (_e, { collapsed }: { collapsed: boolean }) => {
   uiPreferences.sidebarCollapsed = collapsed
   saveSidebarCollapsed(collapsed)
-  return { ok: true }
-})
-
-ipcMain.handle('spool:daemon-notice-action', (_e, { action }: { action: 'install' | 'dismiss' }) => {
-  uiPreferences.spoolDaemonNoticeShown = true
-  saveSpoolDaemonNoticeShown()
-  if (action === 'install') {
-    void shell.openExternal('https://spool.pro/daemon')
-  }
   return { ok: true }
 })
 

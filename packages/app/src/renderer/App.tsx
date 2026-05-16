@@ -7,7 +7,6 @@ import FragmentResults from './components/FragmentResults.js'
 import SessionDetail from './components/SessionDetail.js'
 import AiAnswerCard from './components/AiAnswerCard.js'
 import SettingsPanel from './components/SettingsPanel.js'
-import DaemonNoticeModal from './components/DaemonNoticeModal.js'
 import Sidebar from './components/Sidebar.js'
 import ProjectView from './components/ProjectView.js'
 import LibraryLanding from './components/LibraryLanding.js'
@@ -84,7 +83,6 @@ export default function App() {
 
   // Settings & modals
   const [showSettings, setShowSettings] = useState(false)
-  const [showDaemonNotice, setShowDaemonNotice] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const [defaultSearchSort, setDefaultSearchSort] = useState<SearchSortOrder>(DEFAULT_SEARCH_SORT_ORDER)
   const [sidebarShowSourceDots, setSidebarShowSourceDots] = useState(true)
@@ -309,13 +307,6 @@ export default function App() {
       .finally(() => {
         themeHydrated.current = true
       })
-  }, [])
-
-  useEffect(() => {
-    if (!window.spool?.getDaemonNoticePending) return
-    window.spool.getDaemonNoticePending()
-      .then(pending => { if (pending) setShowDaemonNotice(true) })
-      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -1024,10 +1015,6 @@ export default function App() {
           language={language}
           onLanguageChange={handleLanguageChange}
         />
-      )}
-
-      {showDaemonNotice && (
-        <DaemonNoticeModal onClose={() => setShowDaemonNotice(false)} />
       )}
 
       <SearchOverlay

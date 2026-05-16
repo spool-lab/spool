@@ -10,7 +10,8 @@ import {
 interface UIConfigFile {
   themeSource?: unknown
   themeEditor?: unknown
-  spoolDaemonNoticeShown?: unknown
+  // `spoolDaemonNoticeShown` written by older builds is silently ignored on
+  // read — left out of the type but tolerated in the on-disk JSON.
   sidebarCollapsed?: unknown
 }
 
@@ -19,7 +20,6 @@ const UI_CONFIG_PATH = join(SPOOL_DIR, 'ui.json')
 export interface UIPreferences {
   themeSource: ThemeSource
   themeEditor: ThemeEditorStateV1 | null
-  spoolDaemonNoticeShown: boolean
   sidebarCollapsed: boolean
 }
 
@@ -46,7 +46,6 @@ export function loadUIPreferences(): UIPreferences {
   return {
     themeSource: normalizeThemeSource(config.themeSource),
     themeEditor: normalizeThemeEditorState(config.themeEditor),
-    spoolDaemonNoticeShown: config.spoolDaemonNoticeShown === true,
     sidebarCollapsed: config.sidebarCollapsed === true,
   }
 }
@@ -54,11 +53,6 @@ export function loadUIPreferences(): UIPreferences {
 export function saveSidebarCollapsed(sidebarCollapsed: boolean): void {
   const config = readUIConfig()
   writeUIConfig({ ...config, sidebarCollapsed })
-}
-
-export function saveSpoolDaemonNoticeShown(): void {
-  const config = readUIConfig()
-  writeUIConfig({ ...config, spoolDaemonNoticeShown: true })
 }
 
 export function saveThemeSource(themeSource: ThemeSource): void {
