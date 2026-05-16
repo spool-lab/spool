@@ -1,3 +1,6 @@
+// execSync below is only used by getLoginShellEnv, which fires on the
+// first user-triggered ACP query — never on the launch path. Safe.
+// eslint-disable-next-line no-restricted-imports
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
