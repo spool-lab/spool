@@ -19,6 +19,23 @@ const fallbackT: LooseT = (key, opts) => {
   }
 }
 
+// Intl.DateTimeFormat instantiation is expensive on CJK locales (V8 has to
+// load ICU data on the main thread), and the home view calls this once per
+// session row. Memoize by (locale, shape) so we pay the cost once per
+// locale switch, not once per row.
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
+export function getMonthDayFormatter(locale: string | undefined, withYear: boolean): Intl.DateTimeFormat {
+  const key = `${locale ?? ''}|${withYear ? 'ymd' : 'md'}`
+  let fmt = formatterCache.get(key)
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, withYear
+      ? { month: 'short', day: 'numeric', year: 'numeric' }
+      : { month: 'short', day: 'numeric' })
+    formatterCache.set(key, fmt)
+  }
+  return fmt
+}
+
 export function formatRelativeDate(
   iso: string,
   opts?: { bucket?: BucketKey | undefined; t?: LooseT | undefined },
@@ -44,10 +61,7 @@ export function formatRelativeDate(
     const locale = typeof document !== 'undefined' && document.documentElement.lang
       ? document.documentElement.lang
       : undefined
-    if (d.getFullYear() === now.getFullYear()) {
-      return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(d)
-    }
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(d)
+    return getMonthDayFormatter(locale, d.getFullYear() !== now.getFullYear()).format(d)
   } catch {
     return iso.slice(0, 10)
   }
