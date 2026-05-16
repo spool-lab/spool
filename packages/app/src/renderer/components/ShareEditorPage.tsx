@@ -23,6 +23,7 @@ import { ControlPanel } from './share-editor/ControlPanel.js'
 import { DownloadButton } from './share-editor/DownloadButton.js'
 import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
+import { useUndoableState } from '../hooks/useUndoableState.js'
 
 type Props = {
   /** Stable id of the share_drafts row to autosave into. */
@@ -67,19 +68,80 @@ export default function ShareEditorPage({
   onToggleSidebar,
 }: Props) {
   const { t } = useTranslation()
-  const [opts, setOpts] = useState<EditorOpts>(initialOpts)
+  // opts + title share one undo stack — Cmd+Z reverts whichever was
+  // edited last, which matches how users think about "undo my last
+  // change" in editors. Zoom, panel collapse, save state, and modal
+  // open/close are intentionally outside the stack so undo doesn't
+  // walk back through navigation/UI noise the user didn't intend to
+  // record.
+  type EditableState = { opts: EditorOpts; title: string }
+  const editable = useUndoableState<EditableState>({
+    opts: initialOpts,
+    title: conversation.title,
+  })
+  const opts = editable.state.opts
+  const title = editable.state.title
+  const setOpts = useCallback(
+    (next: EditorOpts) => editable.set(prev => ({ ...prev, opts: next })),
+    [editable],
+  )
+  const setTitle = useCallback(
+    (next: string) => editable.set(prev => ({ ...prev, title: next })),
+    [editable],
+  )
+
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  // Draft title state. Mirrors share_drafts.title; we override
-  // conversation.title at save time so the snapshot stays in sync.
-  // Renamed via a modal (the Pencil button next to the title opens it).
-  // Empty strings persist as-is during the edit but resolve to a sane
-  // fallback ("Untitled") at render time so the Shares grid never shows
-  // a blank card label.
-  const [title, setTitle] = useState<string>(conversation.title)
+  // Draft title state lives in `editable.state.title` above; the rename
+  // modal still uses `title` / `setTitle` directly. Empty strings persist
+  // as-is during the edit but resolve to a sane fallback ("Untitled") at
+  // render time so the Shares grid never shows a blank card label.
   const [renaming, setRenaming] = useState(false)
+
+  // Refs hold the latest hook callbacks so the effects below can keep
+  // empty deps and avoid rebinding on every snapshot change. Without
+  // this, the keydown listener would add+remove on every edit (since
+  // `editable` is a fresh object per render).
+  const editableResetRef = useRef(editable.reset)
+  const editableUndoRef = useRef(editable.undo)
+  const editableRedoRef = useRef(editable.redo)
+  editableResetRef.current = editable.reset
+  editableUndoRef.current = editable.undo
+  editableRedoRef.current = editable.redo
+
+  // Switching to a different draft reuses this component instance (no
+  // `key={draftId}` upstream), so the undo stack would otherwise carry
+  // edits from the previous draft into the new one. Reset on draftId
+  // change captures the new initial state as the bottom of the stack.
+  useEffect(() => {
+    editableResetRef.current({ opts: initialOpts, title: conversation.title })
+    // Only fire when the draft identity changes; conversation/initialOpts
+    // identity changes within the same draft are user edits already
+    // routed through editable.set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId])
+
+  useEffect(() => {
+    function handleKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return
+      const target = event.target as HTMLElement | null
+      // Native undo handles inputs/textareas; intercepting here would
+      // break typing. The rename modal's title field, search inputs etc.
+      // all want their own undo behaviour.
+      if (target && target.matches('input, textarea, [contenteditable="true"]')) return
+      const key = event.key.toLowerCase()
+      const isUndo = key === 'z' && !event.shiftKey
+      const isRedo = (key === 'z' && event.shiftKey) || key === 'y'
+      if (!isUndo && !isRedo) return
+      event.preventDefault()
+      if (isRedo) editableRedoRef.current()
+      else editableUndoRef.current()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   // The "live" conversation passed to the preview, exporters, and the
