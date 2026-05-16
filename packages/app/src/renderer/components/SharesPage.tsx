@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useTranslation } from 'react-i18next'
 import { Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getMonthDayFormatter } from '../../shared/formatDate.js'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
@@ -531,5 +532,5 @@ function formatRelative(iso: string, t?: RelativeT): string {
   const locale = typeof document !== 'undefined' && document.documentElement.lang
     ? document.documentElement.lang
     : undefined
-  return new Date(parsed).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  return getMonthDayFormatter(locale, false).format(new Date(parsed))
 }

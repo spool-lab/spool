@@ -34,6 +34,20 @@ function writeCachedLocale(locale: SupportedLocale): void {
   } catch { /* ignore */ }
 }
 
+// Initial language: cached value if available, else en. The renderer will
+// call `applyLanguage` once it resolves the user's preference.
+const initialLocale: SupportedLocale = readCachedLocale() ?? 'en'
+
+// Set <html lang> synchronously here so anything that reads it on first
+// paint (Intl.DateTimeFormat in formatDate.ts, CSS `:lang(...)`, ATs) sees
+// the right locale immediately. Otherwise dates render under the browser
+// default and only switch to the cached locale once `applyLanguage` runs
+// for the first time, which is visible as a flash + a beachball on CJK
+// locales where V8 has to instantiate ICU data on the main thread.
+if (typeof document !== 'undefined' && document.documentElement.lang !== initialLocale) {
+  document.documentElement.lang = initialLocale
+}
+
 i18n
   .use(initReactI18next)
   .init({
@@ -46,9 +60,7 @@ i18n
       de: { translation: de },
       fr: { translation: fr },
     },
-    // Initial language: cached value if available, else en. The renderer
-    // will call `applyLanguage` once it resolves the user's preference.
-    lng: readCachedLocale() ?? 'en',
+    lng: initialLocale,
     fallbackLng: 'en',
     supportedLngs: SUPPORTED_LOCALES,
     interpolation: { escapeValue: false },

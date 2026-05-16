@@ -6,9 +6,16 @@ import { applyLanguage, resolveLocale, type LanguagePreference, type SupportedLo
  * their preference. Reads `AgentsConfig.language` (a `LanguagePreference` —
  * `'system'` or one of the supported locales) from main, falls back to the
  * OS locale exposed by `spool:get-system-locale`, and applies it to i18next.
+ *
+ * Pass `undefined` while the preference is still loading — the hook will
+ * no-op so the locale picked up from the localStorage cache during i18n init
+ * stays in place. Applying with `'system'` before the config has loaded
+ * would otherwise momentarily flip the UI to the OS locale, causing a flash
+ * (e.g. zh-CN → en → zh-CN for a Chinese user on an English macOS).
  */
 export function useLanguageBootstrap(preference: LanguagePreference | undefined): void {
   useEffect(() => {
+    if (preference === undefined) return
     let cancelled = false
     const apply = async () => {
       let systemLocale: SupportedLocale = 'en'

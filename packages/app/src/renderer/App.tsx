@@ -93,7 +93,11 @@ export default function App() {
   const [pinnedSortOrder, setPinnedSortOrder] = useState<PinnedSortOrder>(DEFAULT_PINNED_SORT_ORDER)
   const [projectSortOrder, setProjectSortOrder] = useState<ProjectSessionSortOrder>(DEFAULT_PROJECT_SORT_ORDER)
   const [themeEditor, setThemeEditor] = useState<ThemeEditorStateV1>(() => defaultThemeEditorState())
-  const [language, setLanguage] = useState<LanguagePreference>('system')
+  // undefined until AgentsConfig has loaded — useLanguageBootstrap skips
+  // until then so the cached locale (set by the last applyLanguage call)
+  // isn't transiently overwritten by the system fallback while config IPC
+  // is still in flight. Otherwise users see zh-CN → en → zh-CN flash.
+  const [language, setLanguage] = useState<LanguagePreference | undefined>(undefined)
   useLanguageBootstrap(language)
   const themeHydrated = useRef(false)
   const deferredResults = useDeferredValue(results)
@@ -786,7 +790,7 @@ export default function App() {
             geminiCount={status?.geminiSessions ?? null}
             themeEditor={themeEditor}
             onThemeEditorChange={setThemeEditor}
-            language={language}
+            language={language ?? 'system'}
             onLanguageChange={handleLanguageChange}
           />
         )}
@@ -1021,7 +1025,7 @@ export default function App() {
           geminiCount={status?.geminiSessions ?? null}
           themeEditor={themeEditor}
           onThemeEditorChange={setThemeEditor}
-          language={language}
+          language={language ?? 'system'}
           onLanguageChange={handleLanguageChange}
         />
       )}
