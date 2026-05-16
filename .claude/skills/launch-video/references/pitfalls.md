@@ -2,19 +2,22 @@
 
 What we tried during v0.4.11 that looked bad in motion, and what to do instead. Read this **before** improvising on the proven layout.
 
-## 1. Faked cursors look uncanny
+## 1. Cursors that don't track real input look uncanny
 
-We built three iterations of an overlaid SVG cursor that flew across the screen to "click" buttons. Every version felt wrong:
+We built three iterations of a *standalone* GSAP cursor that flew across the screen on its own to "click" buttons. Every version felt wrong:
 
 - Linear motion → robotic
 - Bezier + overshoot → bouncy in a video-game way
-- Designed amber dot with click pulse → still felt artificial because it wasn't synced to anything physical in the clip
+- Designed amber dot with click pulse → still artificial because it wasn't synced to anything physical in the clip
 
-**Why:** the real clip has no cursor. Adding one creates a disconnect between the cursor's "intent" and the UI's actual response timing.
+**Why:** a cursor with no input event behind it is the problem. The viewer's brain reads "this isn't a real interaction" within ~100ms.
 
-**Do instead:** drop the cursor entirely. Use amber annotation rectangles to call out the *result* of an interaction (the new pinned section, the status banner change). The viewer doesn't need to see the click — they see the effect.
+**Do instead, depending on the scene:**
 
-If you absolutely need to show a click for clarity, a single amber pulse ring at the click point (no cursor) is the most you should add.
+- **No cursor at all** — for scenes where the change carries the story (new pinned strip appears, updater banner flips state). Use amber annotation rectangles to call out the *result*.
+- **Synthetic cursor that tracks Playwright** — for scenes where the *click* is the story (clicking + opens a picker; clicking a template re-flows the preview). Inject a DOM cursor that follows real `mousemove` events and pulses on real `mousedown`. See `cursor-overlay.md`. The cursor is now driven by genuine input, so the click rhythm matches the UI's response. This was the v0.5.0 fix and it works.
+
+The hard rule is: **a cursor in frame must trace real input.** A cursor that floats on its own is worse than no cursor at all.
 
 ## 2. Decorative chrome adds nothing
 
@@ -74,3 +77,71 @@ The video has ~6–8 strong beats from the BGM. Don't try to land every scene cu
 Early v0.4.11 attempts (livecut v1–v6) used a hand-built HTML mockup of the Spool UI inside the composition. It iterated for hours and still looked uncanny — wrong row heights, wrong icons, wrong rhythm.
 
 **Lesson:** always record the real Electron app. The capture pipeline exists for a reason. Don't try to recreate the UI in HTML, ever.
+
+(Exception: an *artifact* scene — a stylised post-demo card showing what the export "looks like" — is fine because the cards are explicitly not the app UI; they're documents. See `composition.md` § Artifact fan.)
+
+## 11. Clip-boundary gap (the silent full-screen flash)
+
+The most insidious bug from v0.5.0. Two adjacent video clips, both showing visually identical editor states at the boundary, *should* swap invisibly. But on rendered output we'd see a single frame of near-black at the exact cut, reading as a full-screen flash.
+
+**Root cause:** clip A's `data-duration` ended before clip B's `data-start` began. Even by 0.13s. During that gap, neither video element was "playing" — clip A had ended (browsers show a frozen last frame, but the HyperFrames renderer may release the buffer), clip B wasn't seekable yet. The result was a frame the renderer composed against an empty video element.
+
+**The math you have to satisfy:**
+
+```
+prev_clip.data_start + prev_clip.data_duration ≥ next_clip.data_start + 0.10
+```
+
+In English: the previous clip must still be playing when the next clip starts to take over. Aim for ≥ 0.20s overlap. Tighten the next clip's `data-start` earlier rather than extending the previous clip's `data-duration` past the end of the actual `.mov` file (a video element past its natural end may render unpredictably).
+
+**Bonus fix in the `clipCut` helper:** bring the incoming clip's opacity up *before* the boundary, not at it:
+
+```js
+function clipCut(outSel, inSel, at) {
+  tl.set(inSel,  { opacity: 1 }, at - 0.20);  // ← lead by 0.20s
+  tl.set(outSel, { opacity: 0 }, at + 0.10);  // ← outgoing lags 0.10s
+}
+```
+
+This gives the renderer time to decode the incoming clip's first frame before the outgoing one disappears. The 0.30s overlap is invisible because both clips show identical editor state at the boundary anyway.
+
+## 12. Pre-clip state resets cause a flash at the cut
+
+Between recording clip 3 and clip 4 in v0.5.0 we tried to "reset" the editor to a clean baseline (clicking different template / paper / typeface / colorway). When the composition cut from clip 3's end-state to clip 4's start-state, the editor visibly jumped from `Timeline / Bone / Walnut` to `Chat / Snow / Amber`. The viewer's brain registered it as a glitch even though both states were technically valid.
+
+**Why:** the reset clicks happened *outside* the recordings, so the viewer never saw the cause. A state change with no cause reads as a bug.
+
+**Do instead, in order of preference:**
+
+1. **Chain state.** Clip A ends with whatever state, clip B starts there. No reset between recordings. Design the demo flow so the natural state at each beat is what you want.
+2. **Reset *inside* a recording.** If you must change state mid-demo (e.g. to get back to Chat for the export beat), do it via visible cursor clicks during a recorded clip — the viewer sees the user making the choice.
+3. **Never** reset between clips and hope the panel transition will mask it. It won't.
+
+For the v0.5.0 export beat, the fix was to cycle Chat → Timeline → Chat *inside* clip 3, so by the time clips 4–7 ran, the editor was already on Chat and stayed there.
+
+## 13. Cognitive budget per scene
+
+A 5-second scene shows the viewer two channels in parallel: a panel headline + sub on the left, a demo action sequence on the right. You can fit either:
+
+- **One action + a full panel read** — cursor moves, one click, result settles. Viewer reads kicker + 2-line headline + 2-line sub.
+- **Up to 2 actions + a partial panel read** — cursor moves, click, settle ~1s, click again, settle. Viewer reads kicker + headline; the sub gets skimmed.
+
+**You cannot fit 3 actions in 5s with a panel.** The viewer's eyes can't track three template clicks on the right while reading a paragraph on the left. The third action might as well not exist.
+
+v0.5.0's original scene 3 cycled Chat → Letter → Forum → Timeline (3 clicks). The viewer absorbed the first and last; Letter and Forum slipped by uncounted. We trimmed it to Chat → Timeline → Chat (2 clicks across a longer beat) and the scene immediately read better.
+
+**Rule:** ≤ 2 clicks per scene if the panel has a sub. If you absolutely need to demo more variations, give it its own scene with a shorter panel.
+
+## 14. Panel must lead the spotlight by ~0.4s
+
+Synchronising `panelIn()` and `spotlightSnap()` at the same instant means the viewer's eyes have nowhere to land first — text on the left and a region lighting up on the right both demand attention, and they end up tracking neither.
+
+**Do:** fire `panelIn(...)` first, then `spotlightSnap(...)` 0.3–0.4s later, then the click another 0.3–0.5s after that. The viewer reads the headline → finds where to look → sees the action.
+
+```js
+panelIn("#panel4", 14.85);                          // 0.00s: text anchors
+spotlightSnap(F.editorPreview, 15.25, F.paperRow);  // 0.40s: highlight arrives
+// clip 04's paper-bone click happens at ~16.16     // ~1.30s: action lands
+```
+
+This is the single most impactful timing rule for readability. Without it the video reads as "everything happening at once and I can't follow." With it the video has a natural rhythm.
