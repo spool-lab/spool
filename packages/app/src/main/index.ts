@@ -46,6 +46,16 @@ import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
 import { hydrateBinaryCache } from './binaryCache.js'
+import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
+
+// Start the main-process event-loop lag monitor before any other module
+// has a chance to do work. Cheap (a C++ histogram in node:perf_hooks).
+// Exposed only when SPOOL_E2E_TEST=1, via a global the e2e harness can
+// reach with `electronApp.evaluate(...)` — no production IPC surface.
+startEventLoopMonitor()
+if (process.env['SPOOL_E2E_TEST'] === '1') {
+  ;(globalThis as { __spoolEventLoopLag?: typeof snapshotEventLoopLag }).__spoolEventLoopLag = snapshotEventLoopLag
+}
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
