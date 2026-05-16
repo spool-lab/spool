@@ -45,8 +45,19 @@ import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
 import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
+import { hydrateBinaryCache } from './binaryCache.js'
+import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
+
+// Start the main-process event-loop lag monitor before any other module
+// has a chance to do work. Cheap (a C++ histogram in node:perf_hooks).
+// Exposed only when SPOOL_E2E_TEST=1, via a global the e2e harness can
+// reach with `electronApp.evaluate(...)` — no production IPC surface.
+startEventLoopMonitor()
+if (process.env['SPOOL_E2E_TEST'] === '1') {
+  ;(globalThis as { __spoolEventLoopLag?: typeof snapshotEventLoopLag }).__spoolEventLoopLag = snapshotEventLoopLag
+}
 
 const isDevMode = Boolean(process.env['ELECTRON_RENDERER_URL'])
 const customUserDataDir = process.env['SPOOL_ELECTRON_USER_DATA_DIR']?.trim()
@@ -201,6 +212,13 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 }
 
 app.whenReady().then(async () => {
+  // Hydrate the agent-binary path cache from disk before anything has a
+  // chance to call `cachedResolveAsync`. Without this every cold launch
+  // re-runs `<user-shell> -ilc 'command -v ...'` once per agent — three
+  // serialised execSync-style spawns on a slow .zshrc are the dominant
+  // contributor to the launch beachball.
+  hydrateBinaryCache()
+
   // Set dock icon (dev mode doesn't pick up build config)
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
   try { app.dock?.setIcon(nativeImage.createFromPath(dockIconPath)) } catch {}

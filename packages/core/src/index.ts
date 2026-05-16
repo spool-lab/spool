@@ -10,5 +10,13 @@ export * from './sync/syncer.js'
 export * from './sync/watcher.js'
 export * from './projects/groups.js'
 export * from './projects/sessions.js'
-export { resolveSystemBinary, cachedResolve, clearResolveCache } from './util/resolve-bin.js'
+export {
+  resolveSystemBinary,
+  resolveSystemBinaryAsync,
+  cachedResolve,
+  cachedResolveAsync,
+  clearResolveCache,
+  hydrateResolveCache,
+  getResolveCacheSnapshot,
+} from './util/resolve-bin.js'
 export * from './doctor/index.js'

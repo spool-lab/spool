@@ -1,11 +1,14 @@
+// execSync below is only used by getLoginShellEnv, which fires on the
+// first user-triggered ACP query — never on the launch path. Safe.
+// eslint-disable-next-line no-restricted-imports
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import WebSocketImpl from 'ws'
+import { cachedResolveAsyncPersistent } from './binaryCache.js'
 import {
-  cachedResolve,
   getDB,
   getOrCreateAskProject,
   getSourceId,
@@ -119,7 +122,7 @@ interface AgentConfig {
   acpArgs?: string[]          // native mode: args to start ACP server (default: ['acp'])
   wsEndpoint?: string         // websocket mode: WebSocket URL
   healthCheck?: string        // websocket mode: HTTP health check URL
-  envSetup?: () => Record<string, string>
+  envSetup?: () => Promise<Record<string, string>>
 }
 
 const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
@@ -127,8 +130,8 @@ const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Claude Code',
     bin: 'claude',
     acpMode: 'extension',
-    envSetup: () => {
-      const claudePath = cachedResolve('claude')
+    envSetup: async () => {
+      const claudePath = await cachedResolveAsyncPersistent('claude')
       return claudePath ? { CLAUDE_CODE_EXECUTABLE: claudePath } : {}
     },
   },
@@ -245,24 +248,27 @@ export class AcpManager {
   private activeSession: AcpSession | null = null
   private activeWs: { close: () => void } | null = null
 
-  /** Detect all agent CLIs installed on the machine */
+  /** Detect all agent CLIs installed on the machine. Resolves each agent's
+   *  binary in parallel via the async resolver — important on cold launch
+   *  where each lookup would otherwise pay for an interactive shell spawn
+   *  serially on the main-process event loop. */
   async detectAgents(): Promise<AgentInfo[]> {
     const configs = getEffectiveConfigs()
-    const agents: AgentInfo[] = []
+    const entries = await Promise.all(
+      Object.entries(configs).map(async ([id, config]) => {
+        const p = await cachedResolveAsyncPersistent(config.bin)
+        return {
+          id,
+          name: config.name,
+          path: p ?? '',
+          status: (p ? 'ready' : 'not_found') as 'ready' | 'not_found',
+          acpMode: config.acpMode,
+        }
+      }),
+    )
 
-    for (const [id, config] of Object.entries(configs)) {
-      const p = cachedResolve(config.bin)
-      agents.push({
-        id,
-        name: config.name,
-        path: p ?? '',
-        status: p ? 'ready' : 'not_found',
-        acpMode: config.acpMode,
-      })
-    }
-
-    this.detectedAgents = agents
-    return agents
+    this.detectedAgents = entries
+    return entries
   }
 
   /** Get/save user config */
@@ -334,14 +340,14 @@ export class AcpManager {
     const agentEnv = {
       ...process.env as Record<string, string>,
       ...shellEnv,
-      ...config.envSetup?.() ?? {},
+      ...(config.envSetup ? await config.envSetup() : {}),
     }
 
     let proc: ChildProcess
 
     if (config.acpMode === 'native') {
       // Native ACP: the CLI itself is the ACP server
-      const binPath = cachedResolve(config.bin)
+      const binPath = await cachedResolveAsyncPersistent(config.bin)
       if (!binPath) throw new Error(`Could not find ${config.bin}. Ensure it is installed and in PATH.`)
       const acpArgs = config.acpArgs ?? ['acp']
       proc = spawn(binPath, acpArgs, {
@@ -358,7 +364,7 @@ export class AcpManager {
           env: agentEnv,
         })
       } else {
-        const nodePath = cachedResolve('node')
+        const nodePath = await cachedResolveAsyncPersistent('node')
         if (!nodePath) throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
         proc = spawn(nodePath, [agentBin], {
           stdio: ['pipe', 'pipe', 'pipe'],

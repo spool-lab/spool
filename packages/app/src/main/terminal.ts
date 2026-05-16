@@ -20,6 +20,9 @@
  * terminal choice doesn't change mid-session.
  */
 
+// execSync only fires when the user clicks "Resume in terminal", a
+// deliberate user gesture long after launch. Not on the cold-launch path.
+// eslint-disable-next-line no-restricted-imports
 import { execSync, spawn } from 'node:child_process'
 import { existsSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
