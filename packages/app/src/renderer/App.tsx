@@ -12,6 +12,7 @@ import ProjectView from './components/ProjectView.js'
 import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
 import AppTopBar from './components/AppTopBar.js'
+import SidebarRail from './components/SidebarRail.js'
 import AppToaster from './components/AppToaster.js'
 import SharesPage from './components/SharesPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
@@ -841,13 +842,7 @@ export default function App() {
         onToggleSidebar={toggleSidebar}
       />
       <div className="flex flex-1 min-h-0">
-      <div
-        className={[
-          'flex-none overflow-hidden transition-[width] duration-200 ease-out',
-          sidebarCollapsed ? 'w-0' : 'w-60',
-        ].join(' ')}
-        aria-hidden={sidebarCollapsed}
-      >
+      <SidebarRail collapsed={sidebarCollapsed}>
       <Sidebar
         activeIdentityKey={activeProjectKey}
         activeSessionUuid={view === 'session' ? selectedSession : null}
@@ -893,7 +888,7 @@ export default function App() {
         {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
         onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
       />
-      </div>
+      </SidebarRail>
       <div className="relative flex flex-col flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-h-0 relative">
         {isSharesView ? (
