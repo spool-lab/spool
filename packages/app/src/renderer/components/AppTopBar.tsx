@@ -33,7 +33,7 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
       <div className="absolute inset-0 flex pointer-events-none" aria-hidden="true">
         <div
           className={[
-            'flex-none transition-[width] duration-200 ease-out bg-warm-surface dark:bg-dark-surface',
+            'flex-none transition-[width] duration-[280ms] ease-out bg-warm-surface dark:bg-dark-surface',
             sidebarCollapsed ? 'w-0' : 'w-60',
           ].join(' ')}
         />
@@ -58,12 +58,16 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
             <PanelLeft size={13} strokeWidth={1.75} />
           </button>
         </div>
+        {/* Animates over the same 280ms and the same Tailwind ease-out
+         *  curve as the bg sidebar layer above and the sidebar wrapper
+         *  below, so the page slot's left edge stays in lock-step with
+         *  the sidebar fold. Per-pixel velocity is lower than the
+         *  sidebar's (this spacer is 134px, sidebar is 240px), but the
+         *  motions share start/end frames so the eye reads them as one
+         *  unified fold rather than two separate animations. */}
         <div
           className={[
-            // No transition — animating this with sidebar's width
-            // caused the slot content to re-truncate every frame.
-            'flex-none',
-            // Sidebar w-60 (240px); gutter+button = 106px; remainder = 134.
+            'flex-none transition-[width] duration-[280ms] ease-out',
             sidebarCollapsed ? 'w-0' : 'w-[134px]',
           ].join(' ')}
           aria-hidden="true"

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import AppTopBar from './AppTopBar.js'
+import SidebarRail, { FOLD_EASE } from './SidebarRail.js'
 
 const RIGHT_PANEL_WIDTH = 280
 
@@ -52,28 +53,29 @@ export default function PageLayout({
         {topBar}
       </AppTopBar>
       <div className="flex flex-1 min-h-0">
-        <div
-          className="flex-none overflow-hidden"
-          style={{
-            width: sidebarCollapsed ? 0 : 240,
-            transition: 'width 200ms ease-out',
-          }}
-          aria-hidden={sidebarCollapsed}
-        >
-          {sidebar}
-        </div>
+        <SidebarRail collapsed={sidebarCollapsed}>{sidebar}</SidebarRail>
         <div className="relative flex flex-col flex-1 min-w-0">
           {children}
         </div>
+        {/* Outer animates width 0 ↔ 280; inner is hardcoded to
+         *  RIGHT_PANEL_WIDTH so ControlPanel's ~1000-node subtree doesn't
+         *  re-lay out each frame — outer just clips. (Sidebar's content
+         *  gets the same treatment for free because Sidebar's root is
+         *  `w-60 flex-none`; ControlPanel's root is `w-full` so we apply
+         *  the fixed width here.) Duration is scaled so per-pixel velocity
+         *  matches the sidebar's 280ms / 240px ≈ 1.17ms/px — otherwise the
+         *  wider right panel would snap ~17% faster than the sidebar. */}
         <div
           className="flex-none overflow-hidden"
           style={{
             width: rightPanelOpen ? RIGHT_PANEL_WIDTH : 0,
-            transition: 'width 200ms ease-out',
+            transition: `width 327ms ${FOLD_EASE}`,
           }}
           aria-hidden={!rightPanelOpen}
         >
-          {rightPanel}
+          <div style={{ width: RIGHT_PANEL_WIDTH, height: '100%' }}>
+            {rightPanel}
+          </div>
         </div>
       </div>
     </div>
