@@ -148,6 +148,7 @@
     "tab_shortcuts": "Tastenkürzel",
     "tab_sources": "Quellen",
     "tab_agent": "Agent",
+    "tab_labs": "Labs",
     "language_label": "Sprache",
     "language_help": "Wählen Sie die in der Spool-Oberfläche verwendete Sprache.",
     "language_system": "System",
@@ -504,19 +505,22 @@
     "download_ready": "Gespeichert",
     "download_failed": "Download fehlgeschlagen",
     "filename_default": "Spool-Konversation",
-    "download_ariaPrimary": "{{label}} exportieren (Cmd+S)",
-    "download_ariaCaret": "Format: {{label}}, klicken zum Ändern",
     "download_png_label": "PNG-Bild",
-    "download_png_btn": "PNG exportieren",
     "download_png_sub": "3× Pixelverhältnis · Social-Media-tauglich",
     "download_pdf_label": "PDF",
-    "download_pdf_btn": "PDF exportieren",
     "download_pdf_sub": "A4 paginiert · druckfertig",
     "download_md_label": "Markdown",
-    "download_md_btn": ".md exportieren",
     "download_md_sub": "Klartext · Obsidian-/GitHub-kompatibel",
     "download_spool_label": "Spool-Datei",
-    "download_spool_btn": ".spool exportieren",
     "download_spool_sub": "In Spool bearbeitbar · Stil bleibt erhalten"
+  },
+  "labs": {
+    "intro": "Frühe Features. Können sich vor der Veröffentlichung ändern oder wegfallen.",
+    "share": {
+      "title": "Sitzungen teilen",
+      "description": "Exportiere jede Sitzung als ansprechendes Bild, PDF oder Markdown — mit Datenschutzoptionen.",
+      "feedback": "Sag uns, wie es sich anfühlt",
+      "disabled_toast": "Teilen ist aus."
+    }
   }
 }

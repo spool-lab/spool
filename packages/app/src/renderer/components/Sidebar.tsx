@@ -639,7 +639,7 @@ function PinnedRow({
         }
       }}
       aria-label={projectName ? `${title}, ${projectName}` : title}
-      className={`group w-full text-left flex items-center gap-1 px-2 py-1 rounded-md transition-colors duration-75 cursor-pointer focus:outline-none ${
+      className={`group w-full text-left flex items-center gap-1 px-2 py-1 rounded-md transition-colors duration-75 focus:outline-none ${
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'

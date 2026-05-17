@@ -148,6 +148,7 @@
     "tab_shortcuts": "Shortcuts",
     "tab_sources": "Sources",
     "tab_agent": "Agent",
+    "tab_labs": "Labs",
     "language_label": "Language",
     "language_help": "Choose the language used across Spool's interface.",
     "language_system": "System",
@@ -504,19 +505,22 @@
     "download_ready": "Saved",
     "download_failed": "Couldn't download",
     "filename_default": "Spool conversation",
-    "download_ariaPrimary": "Export {{label}} (Cmd+S)",
-    "download_ariaCaret": "Format: {{label}}, click to change",
     "download_png_label": "PNG image",
-    "download_png_btn": "Export PNG",
     "download_png_sub": "3× pixel ratio · social-feed friendly",
     "download_pdf_label": "PDF",
-    "download_pdf_btn": "Export PDF",
     "download_pdf_sub": "A4 paginated · print-ready",
     "download_md_label": "Markdown",
-    "download_md_btn": "Export .md",
     "download_md_sub": "Plain text · Obsidian / GitHub friendly",
     "download_spool_label": "Spool file",
-    "download_spool_btn": "Export .spool",
     "download_spool_sub": "Editable in Spool · keeps your styling"
+  },
+  "labs": {
+    "intro": "Early features. May change or disappear before they ship.",
+    "share": {
+      "title": "Share sessions",
+      "description": "Export any session as a polished image, PDF, or Markdown file — with privacy controls.",
+      "feedback": "Tell us how it feels",
+      "disabled_toast": "Share is off."
+    }
   }
 }

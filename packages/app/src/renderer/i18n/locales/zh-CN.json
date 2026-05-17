@@ -140,6 +140,7 @@
     "tab_shortcuts": "快捷键",
     "tab_sources": "数据源",
     "tab_agent": "Agent",
+    "tab_labs": "实验中",
     "language_label": "语言",
     "language_help": "选择 Spool 界面所使用的语言。",
     "language_system": "系统",
@@ -485,19 +486,22 @@
     "download_ready": "已保存",
     "download_failed": "下载失败",
     "filename_default": "Spool 对话",
-    "download_ariaPrimary": "导出 {{label}} (Cmd+S)",
-    "download_ariaCaret": "格式：{{label}}，点击切换",
     "download_png_label": "PNG 图片",
-    "download_png_btn": "导出 PNG",
     "download_png_sub": "3× 像素比 · 社交媒体友好",
     "download_pdf_label": "PDF",
-    "download_pdf_btn": "导出 PDF",
     "download_pdf_sub": "A4 分页 · 可直接打印",
     "download_md_label": "Markdown",
-    "download_md_btn": "导出 .md",
     "download_md_sub": "纯文本 · 兼容 Obsidian / GitHub",
     "download_spool_label": "Spool 文件",
-    "download_spool_btn": "导出 .spool",
     "download_spool_sub": "可在 Spool 中编辑 · 保留样式"
+  },
+  "labs": {
+    "intro": "早期功能。可能在发布前变化或消失。",
+    "share": {
+      "title": "分享会话",
+      "description": "把会话导出成一张精致的图片、PDF 或 Markdown 文件，自带隐私控制。",
+      "feedback": "告诉我们感受",
+      "disabled_toast": "分享已关闭。"
+    }
   }
 }

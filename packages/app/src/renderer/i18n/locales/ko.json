@@ -140,6 +140,7 @@
     "tab_shortcuts": "단축키",
     "tab_sources": "데이터 소스",
     "tab_agent": "Agent",
+    "tab_labs": "실험실",
     "language_label": "언어",
     "language_help": "Spool 인터페이스에서 사용할 언어를 선택하세요.",
     "language_system": "시스템",
@@ -485,19 +486,22 @@
     "download_ready": "저장됨",
     "download_failed": "다운로드 실패",
     "filename_default": "Spool 대화",
-    "download_ariaPrimary": "{{label}} 내보내기 (Cmd+S)",
-    "download_ariaCaret": "형식: {{label}}, 클릭하여 변경",
     "download_png_label": "PNG 이미지",
-    "download_png_btn": "PNG 내보내기",
     "download_png_sub": "3× 픽셀 비율 · SNS 친화적",
     "download_pdf_label": "PDF",
-    "download_pdf_btn": "PDF 내보내기",
     "download_pdf_sub": "A4 페이지 분할 · 인쇄 가능",
     "download_md_label": "Markdown",
-    "download_md_btn": ".md 내보내기",
     "download_md_sub": "일반 텍스트 · Obsidian / GitHub 호환",
     "download_spool_label": "Spool 파일",
-    "download_spool_btn": ".spool 내보내기",
     "download_spool_sub": "Spool에서 편집 가능 · 스타일 유지"
+  },
+  "labs": {
+    "intro": "초기 기능. 출시 전에 바뀌거나 사라질 수 있습니다.",
+    "share": {
+      "title": "세션 공유",
+      "description": "세션을 깔끔한 이미지, PDF, Markdown으로 내보내기 — 개인정보 보호 옵션 포함.",
+      "feedback": "느낌을 들려주세요",
+      "disabled_toast": "공유를 껐습니다."
+    }
   }
 }

@@ -8,10 +8,12 @@ import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessi
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
+import LabsTab from './LabsTab.js'
+import Toggle from './Toggle.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm'] as const
@@ -32,7 +34,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 // ── Sidebar tabs ───────────────────────────────────────────────────────────
 
-const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.tab_appearance' | 'settings.tab_shortcuts' | 'settings.tab_sources' | 'settings.tab_agent'; icon: ReactNode }[] = [
+const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.tab_appearance' | 'settings.tab_shortcuts' | 'settings.tab_sources' | 'settings.tab_agent' | 'settings.tab_labs'; icon: ReactNode }[] = [
   {
     id: 'general',
     labelKey: 'settings.tab_general',
@@ -89,6 +91,17 @@ const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.
     icon: (
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'labs',
+    labelKey: 'settings.tab_labs',
+    icon: (
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2v6a2 2 0 00.245.96l5.51 10.08A2 2 0 0118 22H6a2 2 0 01-1.755-2.96l5.51-10.08A2 2 0 0010 8V2"/>
+        <path d="M6.453 15h11.094"/>
+        <path d="M8.5 2h7"/>
       </svg>
     ),
   },
@@ -181,6 +194,7 @@ export default function SettingsPanel({
             {tab === 'shortcuts' && <ShortcutsTab />}
             {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
             {tab === 'agent' && <AgentTab />}
+            {tab === 'labs' && <LabsTab />}
           </div>
         </div>
       </div>
@@ -567,25 +581,7 @@ function ToggleRow({
           <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">{description}</p>
         )}
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative flex-none w-8 h-[18px] rounded-full transition-colors focus:outline-none ${
-          checked
-            ? 'bg-accent dark:bg-accent-dark'
-            : 'bg-warm-border dark:bg-dark-border'
-        }`}
-      >
-        <span
-          aria-hidden
-          className={`absolute top-[2px] block w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all ${
-            checked ? 'left-[16px]' : 'left-[2px]'
-          }`}
-        />
-      </button>
+      <Toggle checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
   )
 }

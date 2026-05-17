@@ -18,8 +18,8 @@ test.afterAll(async () => {
   await ctx?.cleanup()
 })
 
-async function pickFormat(window: Awaited<ReturnType<typeof launchApp>>['window'], k: 'png' | 'pdf' | 'md' | 'spool') {
-  await window.locator('[data-testid="share-editor-download-caret"]').click()
+async function exportAs(window: Awaited<ReturnType<typeof launchApp>>['window'], k: 'png' | 'pdf' | 'md' | 'spool') {
+  await window.locator('[data-testid="share-editor-download-trigger"]').click()
   await window.locator(`[data-testid="share-editor-download-option-${k}"]`).click()
 }
 
@@ -29,8 +29,7 @@ test('.spool export captures a valid SpoolDocument', async () => {
   await openShareEditorFromSessionDetail(window, SESSION_UUID)
   await installSaveFilePickerMock(window)
 
-  await pickFormat(window, 'spool')
-  await window.locator('[data-testid="share-editor-download-trigger"]').click()
+  await exportAs(window, 'spool')
 
   const saved = await waitForSavedFile(window, '.spool')
   expect(saved.filename).toMatch(/\.spool$/)
@@ -52,8 +51,7 @@ test('Markdown export captures frontmatter + body', async () => {
   // Editor still open from the previous test in the same browser context.
   await installSaveFilePickerMock(window)
 
-  await pickFormat(window, 'md')
-  await window.locator('[data-testid="share-editor-download-trigger"]').click()
+  await exportAs(window, 'md')
 
   const saved = await waitForSavedFile(window, '.md')
   expect(saved.filename).toMatch(/\.md$/)
