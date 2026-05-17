@@ -4,11 +4,9 @@ import { setLabsFlag, type LabsFlag } from '../lib/labsFlags.js'
 import { useFeature } from '../featureFlags.js'
 import Toggle from './Toggle.js'
 
-// Discord channel for early-access feedback. NOTE: this is a channel
-// deep-link, not an invite — users who aren't already members hit a
-// dead end. Swap for `https://discord.gg/<code>` (permanent unlimited
-// invite) once one is generated.
-const FEEDBACK_URL = 'https://discord.com/channels/1487253181174911096/1487253182160703732'
+// Permanent Discord invite (same one used in README / CONTRIBUTING /
+// landing). Auto-joins the user to the server on click.
+const FEEDBACK_URL = 'https://discord.gg/aqeDxQUs5E'
 
 export default function LabsTab() {
   const { t } = useTranslation()
