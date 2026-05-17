@@ -6,14 +6,16 @@ import {
   splitAlternatives,
   type ShortcutEntry,
 } from '../data/shortcuts.js'
+import { useFeature } from '../featureFlags.js'
 
 export default function ShortcutsTab() {
   const { t } = useTranslation()
+  const shareEnabled = useFeature('share')
   const isMac = useMemo(
     () => typeof navigator !== 'undefined' && /mac/i.test(navigator.platform),
     [],
   )
-  const groups = useMemo(() => getShortcutGroups(), [])
+  const groups = useMemo(() => getShortcutGroups(shareEnabled), [shareEnabled])
 
   return (
     <div className="space-y-6">

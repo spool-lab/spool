@@ -140,6 +140,7 @@
     "tab_shortcuts": "ショートカット",
     "tab_sources": "データソース",
     "tab_agent": "Agent",
+    "tab_labs": "Labs",
     "language_label": "言語",
     "language_help": "Spool のインターフェースで使用する言語を選択します。",
     "language_system": "システム",
@@ -499,5 +500,14 @@
     "download_spool_label": "Spool ファイル",
     "download_spool_btn": ".spool をエクスポート",
     "download_spool_sub": "Spool で編集可 · スタイルを保持"
+  },
+  "labs": {
+    "intro": "初期機能。リリース前に変更されたり、なくなることがあります。",
+    "share": {
+      "title": "セッションを共有",
+      "description": "セッションを洗練された画像・PDF・Markdown としてエクスポート。プライバシー設定も使えます。",
+      "feedback": "感想を教えてください",
+      "disabled_toast": "共有をオフにしました。"
+    }
   }
 }

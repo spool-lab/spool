@@ -1,14 +1,9 @@
-import { FEATURES } from '../featureFlags.js'
-
 // Static catalog of user-visible keyboard shortcuts, grouped by context.
 //
 // `combo` uses the same syntax as `useHotkeys`: `mod` resolves to ⌘ on
 // macOS and Ctrl elsewhere. Multiple alternative bindings for a single
 // action are comma-separated (e.g. "arrowup,arrowdown") and rendered
 // side-by-side.
-//
-// The Share editor group is gated behind FEATURES.share so it disappears
-// from the Settings panel in production builds where the feature is off.
 
 export type ShortcutEntry = {
   /** i18n suffix — `settings.shortcuts_action_<id>` */
@@ -23,7 +18,7 @@ export type ShortcutGroup = {
   shortcuts: ShortcutEntry[]
 }
 
-export function getShortcutGroups(): ShortcutGroup[] {
+export function getShortcutGroups(shareEnabled: boolean): ShortcutGroup[] {
   const groups: ShortcutGroup[] = [
     {
       id: 'global',
@@ -51,7 +46,7 @@ export function getShortcutGroups(): ShortcutGroup[] {
       ],
     },
   ]
-  if (FEATURES.share) {
+  if (shareEnabled) {
     groups.push({
       id: 'shareEditor',
       shortcuts: [

@@ -140,6 +140,7 @@
     "tab_shortcuts": "快速鍵",
     "tab_sources": "資料來源",
     "tab_agent": "Agent",
+    "tab_labs": "實驗中",
     "language_label": "語言",
     "language_help": "選擇 Spool 介面所使用的語言。",
     "language_system": "系統",
@@ -499,5 +500,14 @@
     "download_spool_label": "Spool 檔案",
     "download_spool_btn": "匯出 .spool",
     "download_spool_sub": "可在 Spool 中編輯 · 保留樣式"
+  },
+  "labs": {
+    "intro": "早期功能。可能在發佈前變化或消失。",
+    "share": {
+      "title": "分享會話",
+      "description": "把會話導出成一張精緻的圖片、PDF 或 Markdown 文件，自帶隱私控制。",
+      "feedback": "告訴我們感受",
+      "disabled_toast": "分享已關閉。"
+    }
   }
 }

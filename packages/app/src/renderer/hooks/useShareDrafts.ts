@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ShareDraftListItem, ShareDraftRow } from '@spool-lab/core'
-import { FEATURES } from '../featureFlags.js'
+import { useFeature } from '../featureFlags.js'
 
 interface UseShareDraftsResult {
   drafts: ShareDraftListItem[]
@@ -85,10 +85,11 @@ export function useShareDrafts(opts: { limit?: number } = {}): UseShareDraftsRes
  * is off, and skips the IPC entirely in that case.
  */
 export function useDraftCountForSession(sessionUuid: string): number {
+  const shareEnabled = useFeature('share')
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    if (!FEATURES.share) {
+    if (!shareEnabled) {
       setCount(0)
       return
     }
@@ -97,7 +98,7 @@ export function useDraftCountForSession(sessionUuid: string): number {
       .then((n) => { if (!cancelled) setCount(n) })
       .catch(() => { if (!cancelled) setCount(0) })
     return () => { cancelled = true }
-  }, [sessionUuid])
+  }, [sessionUuid, shareEnabled])
 
   return count
 }
