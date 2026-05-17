@@ -20,7 +20,7 @@ export default function ContinueActions({ result, onOpenSession, onCopySessionId
   const [copiedId, setCopiedId] = useState(false)
   const [copiedCommand, setCopiedCommand] = useState(false)
   const [resuming, setResuming] = useState(false)
-  const resumeCommand = getSessionResumeCommand(result.source, result.sessionUuid)
+  const resumeCommand = getSessionResumeCommand(result.source, result.sessionUuid, result.cwd)
 
   async function handleCopyId() {
     await navigator.clipboard.writeText(result.sessionUuid)
