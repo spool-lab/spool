@@ -70,7 +70,12 @@ export function DownloadButton({ saving, onExport }: Props) {
   }
 
   return (
-    <div ref={rootRef} className="relative flex flex-none" data-testid="share-editor-download">
+    <div
+      ref={rootRef}
+      className="relative flex flex-none"
+      data-testid="share-editor-download"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       {/* Primary action: always "Download". The button width never
        *  reflows on format switch or while saving — only the icon
        *  swaps (Download → spinner) and the OS tooltip carries the

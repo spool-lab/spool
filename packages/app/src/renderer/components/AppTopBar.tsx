@@ -68,10 +68,13 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
           ].join(' ')}
           aria-hidden="true"
         />
+        {/* Slot inherits `drag` from the bar so whitespace around page
+            chrome remains a drag handle. Interactive elements injected
+            into this slot must opt out individually with
+            `WebkitAppRegion: 'no-drag'`. */}
         <div
           data-testid="app-top-bar-slot"
           className="flex-1 min-w-0 flex items-stretch"
-          style={noDragStyle}
         >
           {children}
         </div>
