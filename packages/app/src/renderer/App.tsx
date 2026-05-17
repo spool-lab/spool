@@ -34,7 +34,7 @@ import type { LanguagePreference } from '../preload/index.js'
 import { FEATURES } from './featureFlags.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor'
-type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
