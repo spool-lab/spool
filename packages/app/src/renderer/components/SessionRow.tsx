@@ -46,7 +46,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
     onCopySessionId(session.source)
   }
 
-  const resumeCommand = getSessionResumeCommand(session.source, session.sessionUuid)
+  const resumeCommand = getSessionResumeCommand(session.source, session.sessionUuid, session.cwd)
   async function handleCopyCommand() {
     if (!resumeCommand) return
     await navigator.clipboard.writeText(resumeCommand)

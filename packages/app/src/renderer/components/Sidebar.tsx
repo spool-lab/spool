@@ -596,7 +596,7 @@ function PinnedRow({
   const [unpinning, setUnpinning] = useState(false)
   const title = session.title?.trim() || t('common.noTitle')
   const projectName = session.projectDisplayName || session.projectDisplayPath
-  const resumeCommand = getSessionResumeCommand(session.source, session.sessionUuid)
+  const resumeCommand = getSessionResumeCommand(session.source, session.sessionUuid, session.cwd)
 
   async function handleResume() {
     setResuming(true)
