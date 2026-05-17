@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Search as SearchIcon } from 'lucide-react'
-import type { Session, SearchResult, SessionSource } from '@spool-lab/core'
+import { Search as SearchIcon, X as XIcon, ChevronDown } from 'lucide-react'
+import type { Session, SearchResult, SessionSource, ProjectGroup } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import Hint from './Hint.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { snippetToStrongHtml } from '../lib/snippet.js'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 
 type Props = {
   onSelect: (sessionUuid: string) => void
@@ -69,13 +71,29 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [projects, setProjects] = useState<ProjectGroup[] | null>(null)
+  const [scopeProject, setScopeProject] = useState<ProjectGroup | null>(null)
+  const [scopeOpen, setScopeOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const scopeTriggerRef = useRef<HTMLButtonElement>(null)
 
-  // Fetch recent on mount.
+  // Fetch project list once for the scope popover.
   useEffect(() => {
     let cancelled = false
-    window.spool.listSessions({ limit: RECENT_LIMIT })
+    window.spool.listProjectGroups()
+      .then((rows) => { if (!cancelled) setProjects(rows) })
+      .catch(() => { if (!cancelled) setProjects([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Fetch recent on mount and whenever scope changes.
+  useEffect(() => {
+    let cancelled = false
+    const req = scopeProject
+      ? window.spool.listSessionsByIdentity(scopeProject.identityKey, { limit: RECENT_LIMIT })
+      : window.spool.listSessions({ limit: RECENT_LIMIT })
+    req
       .then((page) => { if (!cancelled) setRecent(page.sessions) })
       .catch((err) => {
         if (cancelled) return
@@ -83,10 +101,12 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
         setRecent([])
       })
     return () => { cancelled = true }
-  }, [])
+  }, [scopeProject?.identityKey])
 
   // Debounced FTS search; falls back to "no results" until backend
-  // responds. Empty query clears results and re-shows recent.
+  // responds. Empty query clears results and re-shows recent. Project
+  // scope uses the full `search` API (identityKey filter) and dedupes
+  // fragments to one row per session.
   useEffect(() => {
     const q = query.trim()
     if (!q) {
@@ -97,10 +117,20 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
     setIsSearching(true)
     let cancelled = false
     const handle = setTimeout(() => {
-      window.spool.searchPreview(q, SEARCH_LIMIT)
+      const req = scopeProject
+        ? window.spool.search(q, SEARCH_LIMIT, undefined, false, scopeProject.identityKey)
+        : window.spool.searchPreview(q, SEARCH_LIMIT)
+      req
         .then((rows) => {
           if (cancelled) return
-          setResults(rows.map(r => searchResultToRow(r, noTitle)))
+          const seen = new Set<string>()
+          const unique: Row[] = []
+          for (const r of rows) {
+            if (seen.has(r.sessionUuid)) continue
+            seen.add(r.sessionUuid)
+            unique.push(searchResultToRow(r, noTitle))
+          }
+          setResults(unique)
           setIsSearching(false)
         })
         .catch(() => {
@@ -110,18 +140,11 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
         })
     }, DEBOUNCE_MS)
     return () => { cancelled = true; clearTimeout(handle) }
-  }, [query])
+  }, [query, scopeProject?.identityKey])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Modal layer. The scope popover stacks its own modal layer on top when
+  // open, so Escape there closes the popover first (top-of-stack wins).
+  useHotkeys({ Escape: onClose }, { modal: true })
 
   useEffect(() => {
     searchRef.current?.focus()
@@ -137,7 +160,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
     : []
 
   // Reset active index whenever the result set changes shape.
-  useEffect(() => { setActiveIndex(0) }, [rows?.length, inSearchMode])
+  useEffect(() => { setActiveIndex(0) }, [rows?.length, inSearchMode, scopeProject?.identityKey])
 
   // Keep the active row visible as the user navigates.
   useEffect(() => {
@@ -207,6 +230,50 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
           )}
         </div>
 
+        <div className="flex-none px-5 pb-2 flex items-center gap-0.5 relative">
+          <button
+            ref={scopeTriggerRef}
+            type="button"
+            data-testid="new-draft-picker-scope-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={scopeOpen}
+            onClick={() => setScopeOpen(v => !v)}
+            className={`text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
+              scopeProject
+                ? 'text-accent dark:text-accent-dark bg-accent/10 dark:bg-accent-dark/10 hover:bg-accent/15 dark:hover:bg-accent-dark/15'
+                : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
+            }`}
+          >
+            <span className="max-w-[220px] truncate">
+              {scopeProject ? scopeProject.displayName : t('newDraft.scopeAll')}
+            </span>
+            <ChevronDown size={10} strokeWidth={2} aria-hidden className="opacity-60" />
+          </button>
+          {scopeProject && (
+            <button
+              type="button"
+              data-testid="new-draft-picker-scope-clear"
+              onClick={() => setScopeProject(null)}
+              aria-label={t('newDraft.scopeClear')}
+              className="p-0.5 rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2"
+            >
+              <XIcon size={11} strokeWidth={2} aria-hidden />
+            </button>
+          )}
+          {scopeOpen && (
+            <ScopePopover
+              anchorRef={scopeTriggerRef}
+              projects={projects ?? []}
+              selectedKey={scopeProject?.identityKey ?? null}
+              onSelect={(p) => {
+                setScopeProject(p)
+                setScopeOpen(false)
+              }}
+              onClose={() => setScopeOpen(false)}
+            />
+          )}
+        </div>
+
         <div className="flex-1 min-h-0 overflow-y-auto">
           {rows === null ? (
             <PickerSkeleton count={6} />
@@ -218,7 +285,9 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
             <p className="px-5 py-8 text-center text-sm text-warm-muted dark:text-dark-muted">
               {inSearchMode
                 ? isSearching ? t('newDraft.searching') : t('newDraft.empty', { query: query.trim() })
-                : t('newDraft.emptyNoSessions')}
+                : scopeProject
+                  ? t('newDraft.emptyInProject', { project: scopeProject.displayName })
+                  : t('newDraft.emptyNoSessions')}
             </p>
           ) : (
             <ul ref={listRef} role="listbox">
@@ -234,6 +303,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
                     row={row}
                     queryTokens={queryTokens}
                     active={index === activeIndex}
+                    showProject={!scopeProject}
                     onSelect={() => onSelect(row.sessionUuid)}
                   />
                 </li>
@@ -271,11 +341,13 @@ function PickerRow({
   row,
   queryTokens,
   active,
+  showProject,
   onSelect,
 }: {
   row: Row
   queryTokens: string[]
   active: boolean
+  showProject: boolean
   onSelect: () => void
 }) {
   const { t } = useTranslation()
@@ -285,6 +357,7 @@ function PickerRow({
     ? snippetToStrongHtml(row.snippet)
     : null
   const activeBg = active ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
+  const projectVisible = showProject && row.projectLabel
 
   return (
     <button
@@ -297,8 +370,11 @@ function PickerRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <SourceBadge source={row.source} />
-          <span className="flex-1 min-w-0 text-sm text-warm-text dark:text-dark-text truncate">
-            {row.title}
+          <span className="flex-1 min-w-0 text-sm truncate">
+            <span className="text-warm-text dark:text-dark-text">{row.title}</span>
+            {projectVisible && (
+              <span className="text-warm-faint dark:text-dark-muted"> · {row.projectLabel}</span>
+            )}
           </span>
         </div>
         {snippetHtml && (
@@ -312,6 +388,130 @@ function PickerRow({
         {date}
       </span>
     </button>
+  )
+}
+
+function ScopePopover({
+  anchorRef,
+  projects,
+  selectedKey,
+  onSelect,
+  onClose,
+}: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>
+  projects: ProjectGroup[]
+  selectedKey: string | null
+  onSelect: (p: ProjectGroup | null) => void
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const trig = anchorRef.current
+    if (!trig) return
+    const measure = () => {
+      const r = trig.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [anchorRef])
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  useHotkeys({ Escape: onClose }, { active: true, modal: true })
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (rootRef.current?.contains(target)) return
+      if (anchorRef.current?.contains(target)) return
+      onClose()
+    }
+    // Capture phase so we run before the modal's inner-card `stopPropagation`
+    // on mousedown, which would otherwise hide outside clicks from window.
+    window.addEventListener('mousedown', handleMouseDown, true)
+    return () => window.removeEventListener('mousedown', handleMouseDown, true)
+  }, [onClose, anchorRef])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? projects.filter(p => p.displayName.toLowerCase().includes(q))
+      : projects
+    return [...list].sort((a, b) => (b.lastSessionAt ?? '').localeCompare(a.lastSessionAt ?? ''))
+  }, [projects, query])
+
+  if (!pos) return null
+
+  return createPortal(
+    <div
+      ref={rootRef}
+      data-testid="new-draft-picker-scope-popover"
+      role="dialog"
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{ top: pos.top, left: pos.left }}
+      className="fixed z-[60] w-[280px] rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-lg overflow-hidden"
+    >
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('newDraft.scopeSearchPlaceholder')}
+        className="w-full px-3 py-2 text-[12px] bg-transparent outline-none text-warm-text dark:text-dark-text placeholder:text-warm-faint border-b border-warm-border/50 dark:border-dark-border/50"
+      />
+      <div className="max-h-[240px] overflow-y-auto py-1">
+        <button
+          type="button"
+          data-testid="new-draft-picker-scope-option"
+          data-identity-key=""
+          onClick={() => onSelect(null)}
+          className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-warm-surface2 dark:hover:bg-dark-surface2 ${
+            selectedKey === null
+              ? 'text-warm-text dark:text-dark-text font-medium'
+              : 'text-warm-muted dark:text-dark-muted'
+          }`}
+        >
+          {t('newDraft.scopeAll')}
+        </button>
+        {filtered.length === 0 ? (
+          <p className="px-3 py-2 text-[11px] text-warm-faint dark:text-dark-muted">
+            {query.trim() ? t('newDraft.scopeNoMatch') : t('newDraft.scopeNoProjects')}
+          </p>
+        ) : (
+          filtered.map((p) => (
+            <button
+              key={p.identityKey}
+              type="button"
+              data-testid="new-draft-picker-scope-option"
+              data-identity-key={p.identityKey}
+              onClick={() => onSelect(p)}
+              className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] hover:bg-warm-surface2 dark:hover:bg-dark-surface2 ${
+                p.identityKey === selectedKey
+                  ? 'text-warm-text dark:text-dark-text font-medium'
+                  : 'text-warm-muted dark:text-dark-muted'
+              }`}
+            >
+              <span className="truncate">{p.displayName}</span>
+              <span className="flex-none font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums">
+                {p.sessionCount}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
