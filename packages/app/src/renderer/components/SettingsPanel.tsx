@@ -7,10 +7,11 @@ import ThemeEditorSection from './ThemeEditorSection.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
+import ShortcutsTab from './ShortcutsTab.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'appearance' | 'sources' | 'agent'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm'] as const
@@ -31,7 +32,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 // ── Sidebar tabs ───────────────────────────────────────────────────────────
 
-const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.tab_appearance' | 'settings.tab_sources' | 'settings.tab_agent'; icon: ReactNode }[] = [
+const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.tab_appearance' | 'settings.tab_shortcuts' | 'settings.tab_sources' | 'settings.tab_agent'; icon: ReactNode }[] = [
   {
     id: 'general',
     labelKey: 'settings.tab_general',
@@ -58,6 +59,16 @@ const TAB_DEFS: { id: SettingsTab; labelKey: 'settings.tab_general' | 'settings.
       >
         <path d="M12 3v2.5M12 18.5V21M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M3 12h2.5M18.5 12H21M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
         <circle cx="12" cy="12" r="4.25" />
+      </svg>
+    ),
+  },
+  {
+    id: 'shortcuts',
+    labelKey: 'settings.tab_shortcuts',
+    icon: (
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2" ry="2"/>
+        <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
       </svg>
     ),
   },
@@ -167,6 +178,7 @@ export default function SettingsPanel({
             {tab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
+            {tab === 'shortcuts' && <ShortcutsTab />}
             {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
             {tab === 'agent' && <AgentTab />}
           </div>
