@@ -370,13 +370,6 @@
     "empty": "没有匹配「{{query}}」的会话。",
     "emptyNoSessions": "暂无会话——先索引一些会话，它们会显示在这里。",
     "emptyInProject": "{{project}} 中暂无会话。",
-    "scopeLabel": "范围",
-    "scopeAll": "全部项目",
-    "scopeInProject": "{{project}}",
-    "scopeClear": "清除项目过滤",
-    "scopeSearchPlaceholder": "筛选项目…",
-    "scopeNoMatch": "没有匹配的项目。",
-    "scopeNoProjects": "暂无已索引项目。",
     "loadError": "无法加载会话：{{error}}",
     "searchingShort": "搜索中…",
     "searching": "搜索中…",
@@ -502,6 +495,16 @@
     "download_md_sub": "纯文本 · 兼容 Obsidian / GitHub",
     "download_spool_label": "Spool 文件",
     "download_spool_sub": "可在 Spool 中编辑 · 保留样式"
+  },
+  "scope": {
+    "any": "全部项目",
+    "clear": "清除项目过滤",
+    "searchPlaceholder": "筛选项目…",
+    "noMatch": "没有匹配的项目。",
+    "noProjects": "暂无已索引项目。"
+  },
+  "palette": {
+    "toggleOptions": "选项"
   },
   "labs": {
     "intro": "早期功能。可能在发布前变化或消失。",

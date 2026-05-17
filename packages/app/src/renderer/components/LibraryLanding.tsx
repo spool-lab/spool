@@ -317,11 +317,11 @@ type TranslateFn = (key: string) => string
 export function bucketSessionsByDate(sessions: Session[], t?: TranslateFn): DateBucket[] {
   const fallback: TranslateFn = (key: string) => {
     switch (key) {
-      case 'library.bucket_today': return 'TODAY'
-      case 'library.bucket_yesterday': return 'YESTERDAY'
-      case 'library.bucket_earlierWeek': return 'EARLIER THIS WEEK'
-      case 'library.bucket_earlierMonth': return 'EARLIER THIS MONTH'
-      case 'library.bucket_older': return 'OLDER'
+      case 'library.bucket_today': return 'Today'
+      case 'library.bucket_yesterday': return 'Yesterday'
+      case 'library.bucket_earlierWeek': return 'Earlier this week'
+      case 'library.bucket_earlierMonth': return 'Earlier this month'
+      case 'library.bucket_older': return 'Older'
       default: return key
     }
   }

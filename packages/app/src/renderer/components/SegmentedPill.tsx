@@ -45,9 +45,9 @@ export default function SegmentedPill<T extends string>({
             className={[
               'inline-flex items-center justify-center gap-1 rounded-full text-[11px] font-medium cursor-pointer transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0',
-              compact ? 'h-6 px-2' : 'h-7 px-2.5',
+              compact ? 'h-5 px-2' : 'h-7 px-2.5',
               active
-                ? 'bg-accent/12 dark:bg-accent-dark/15 text-accent dark:text-accent-dark'
+                ? 'bg-warm-bg dark:bg-dark-bg text-accent dark:text-accent-dark'
                 : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text',
             ].join(' ')}
           >

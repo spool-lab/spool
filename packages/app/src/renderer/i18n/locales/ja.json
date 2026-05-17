@@ -370,13 +370,6 @@
     "empty": "「{{query}}」に一致するセッションがありません。",
     "emptyNoSessions": "セッションがまだありません — 先にいくつかインデックスするとここに表示されます。",
     "emptyInProject": "{{project}} にセッションはまだありません。",
-    "scopeLabel": "範囲",
-    "scopeAll": "すべてのプロジェクト",
-    "scopeInProject": "{{project}}",
-    "scopeClear": "プロジェクトフィルタをクリア",
-    "scopeSearchPlaceholder": "プロジェクトを絞り込み…",
-    "scopeNoMatch": "一致するプロジェクトはありません。",
-    "scopeNoProjects": "まだインデックス済みのプロジェクトはありません。",
     "loadError": "セッションを読み込めませんでした: {{error}}",
     "searchingShort": "検索中…",
     "searching": "検索中…",
@@ -502,6 +495,16 @@
     "download_md_sub": "プレーンテキスト · Obsidian / GitHub 互換",
     "download_spool_label": "Spool ファイル",
     "download_spool_sub": "Spool で編集可 · スタイルを保持"
+  },
+  "scope": {
+    "any": "すべてのプロジェクト",
+    "clear": "プロジェクトフィルタをクリア",
+    "searchPlaceholder": "プロジェクトを絞り込み…",
+    "noMatch": "一致するプロジェクトはありません。",
+    "noProjects": "まだインデックス済みのプロジェクトはありません。"
+  },
+  "palette": {
+    "toggleOptions": "オプション"
   },
   "labs": {
     "intro": "初期機能。リリース前に変更されたり、なくなることがあります。",

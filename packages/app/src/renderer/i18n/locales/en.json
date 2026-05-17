@@ -129,14 +129,14 @@
     "viewAll": "View all",
     "empty_title": "No sessions yet",
     "empty_body": "Open Claude Code, Codex, or Gemini to start a session — Spool indexes it automatically.",
-    "section_pinned": "PINNED · {{count}} session",
-    "section_pinned_other": "PINNED · {{count}} sessions",
+    "section_pinned": "Pinned · {{count}} session",
+    "section_pinned_other": "Pinned · {{count}} sessions",
     "section_recent": "RECENT",
-    "bucket_today": "TODAY",
-    "bucket_yesterday": "YESTERDAY",
-    "bucket_earlierWeek": "EARLIER THIS WEEK",
-    "bucket_earlierMonth": "EARLIER THIS MONTH",
-    "bucket_older": "OLDER",
+    "bucket_today": "Today",
+    "bucket_yesterday": "Yesterday",
+    "bucket_earlierWeek": "Earlier this week",
+    "bucket_earlierMonth": "Earlier this month",
+    "bucket_older": "Older",
     "footer_loadingMore": "Loading older sessions…",
     "footer_endOf_one": "End of {{count}} session",
     "footer_endOf_other": "End of {{count}} sessions"
@@ -382,13 +382,6 @@
     "empty": "No sessions match \"{{query}}\".",
     "emptyNoSessions": "No sessions yet — index some first and they'll show up here.",
     "emptyInProject": "No sessions in {{project}} yet.",
-    "scopeLabel": "In",
-    "scopeAll": "Any project",
-    "scopeInProject": "{{project}}",
-    "scopeClear": "Clear project filter",
-    "scopeSearchPlaceholder": "Filter projects…",
-    "scopeNoMatch": "No projects match.",
-    "scopeNoProjects": "No projects indexed yet.",
     "loadError": "Couldn't load sessions: {{error}}",
     "searchingShort": "searching…",
     "searching": "Searching…",
@@ -521,6 +514,16 @@
     "download_md_sub": "Plain text · Obsidian / GitHub friendly",
     "download_spool_label": "Spool file",
     "download_spool_sub": "Editable in Spool · keeps your styling"
+  },
+  "scope": {
+    "any": "Any project",
+    "clear": "Clear project filter",
+    "searchPlaceholder": "Filter projects…",
+    "noMatch": "No projects match.",
+    "noProjects": "No projects indexed yet."
+  },
+  "palette": {
+    "toggleOptions": "Show options"
   },
   "labs": {
     "intro": "Early features. May change or disappear before they ship.",
