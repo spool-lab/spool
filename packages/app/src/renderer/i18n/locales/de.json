@@ -129,14 +129,14 @@
     "viewAll": "Alle anzeigen",
     "empty_title": "Noch keine Sitzungen",
     "empty_body": "Öffnen Sie Claude Code, Codex oder Gemini, um eine Sitzung zu starten – Spool indexiert sie automatisch.",
-    "section_pinned": "ANGEHEFTET · {{count}} Sitzung",
-    "section_pinned_other": "ANGEHEFTET · {{count}} Sitzungen",
+    "section_pinned": "Angeheftet · {{count}} Sitzung",
+    "section_pinned_other": "Angeheftet · {{count}} Sitzungen",
     "section_recent": "ZULETZT",
-    "bucket_today": "HEUTE",
-    "bucket_yesterday": "GESTERN",
-    "bucket_earlierWeek": "FRÜHER DIESE WOCHE",
-    "bucket_earlierMonth": "FRÜHER DIESEN MONAT",
-    "bucket_older": "ÄLTER",
+    "bucket_today": "Heute",
+    "bucket_yesterday": "Gestern",
+    "bucket_earlierWeek": "Früher diese Woche",
+    "bucket_earlierMonth": "Früher diesen Monat",
+    "bucket_older": "Älter",
     "footer_loadingMore": "Ältere Sitzungen werden geladen…",
     "footer_endOf_one": "Ende — {{count}} Sitzung",
     "footer_endOf_other": "Ende — {{count}} Sitzungen"
@@ -382,13 +382,6 @@
     "empty": "Keine Sitzungen passen zu „{{query}}\".",
     "emptyNoSessions": "Noch keine Sitzungen – indexieren Sie zunächst einige, dann erscheinen sie hier.",
     "emptyInProject": "Noch keine Sitzungen in {{project}}.",
-    "scopeLabel": "In",
-    "scopeAll": "Alle Projekte",
-    "scopeInProject": "{{project}}",
-    "scopeClear": "Projektfilter entfernen",
-    "scopeSearchPlaceholder": "Projekte filtern…",
-    "scopeNoMatch": "Keine passenden Projekte.",
-    "scopeNoProjects": "Noch keine Projekte indiziert.",
     "loadError": "Sitzungen konnten nicht geladen werden: {{error}}",
     "searchingShort": "Suche läuft…",
     "searching": "Suche läuft…",
@@ -521,6 +514,16 @@
     "download_md_sub": "Klartext · Obsidian-/GitHub-kompatibel",
     "download_spool_label": "Spool-Datei",
     "download_spool_sub": "In Spool bearbeitbar · Stil bleibt erhalten"
+  },
+  "scope": {
+    "any": "Alle Projekte",
+    "clear": "Projektfilter entfernen",
+    "searchPlaceholder": "Projekte filtern…",
+    "noMatch": "Keine passenden Projekte.",
+    "noProjects": "Noch keine Projekte indiziert."
+  },
+  "palette": {
+    "toggleOptions": "Optionen anzeigen"
   },
   "labs": {
     "intro": "Frühe Features. Können sich vor der Veröffentlichung ändern oder wegfallen.",

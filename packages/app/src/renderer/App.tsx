@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar.js'
 import ProjectView from './components/ProjectView.js'
 import LibraryLanding from './components/LibraryLanding.js'
 import SearchOverlay from './components/SearchOverlay.js'
+import type { ScopeValue } from './components/ScopeSelector.js'
 import AppTopBar from './components/AppTopBar.js'
 import SidebarRail from './components/SidebarRail.js'
 import AppToaster from './components/AppToaster.js'
@@ -105,7 +106,7 @@ export default function App() {
   const [activeProjectKey, setActiveProjectKey] = useState<string | null>(null)
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null)
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
-  const [searchScope, setSearchScope] = useState<'all' | 'project'>('all')
+  const [searchScopeProject, setSearchScopeProject] = useState<ScopeValue | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(true)
   /** Active share-editor session: conversation, the user's last
@@ -509,7 +510,7 @@ export default function App() {
     if (!q.trim()) { setResults([]); setIsSearching(false); return }
     const requestId = ++searchRequestSeq.current
     setIsSearching(true)
-    const scopedKey = searchScope === 'project' && activeProjectKey ? activeProjectKey : undefined
+    const scopedKey = searchScopeProject?.identityKey
     try {
       const res = window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : []
       if (requestId !== searchRequestSeq.current) return
@@ -521,7 +522,7 @@ export default function App() {
         setIsSearching(false)
       }
     }
-  }, [searchScope, activeProjectKey])
+  }, [searchScopeProject])
 
   const doPreviewSearch = useCallback(async (q: string) => {
     if (!q.trim() || !window.spool?.searchPreview) {
@@ -543,7 +544,7 @@ export default function App() {
     const q = (overrideQuery ?? query).trim()
     if (!q || !window.spool?.aiSearch) return
 
-    const scopedKey = searchScope === 'project' && activeProjectKey ? activeProjectKey : undefined
+    const scopedKey = searchScopeProject?.identityKey
     const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : [])
     if (ftsResults.length > 0 && results.length === 0) setResults(ftsResults)
     const fragmentContext = ftsResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
@@ -559,7 +560,7 @@ export default function App() {
       setAiError(String(err))
       setAiStreaming(false)
     })
-  }, [query, aiAgent, results, searchScope, activeProjectKey])
+  }, [query, aiAgent, results, searchScopeProject])
 
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
@@ -649,14 +650,15 @@ export default function App() {
     'mod+b': () => toggleSidebar(),
   })
 
-  // Default scope follows active project
+  // Default scope follows active project: entering a project context
+  // pre-fills the search scope to that project; leaving clears it.
   useEffect(() => {
-    if (activeProjectKey) {
-      setSearchScope('project')
+    if (activeProjectKey && activeProjectName) {
+      setSearchScopeProject({ identityKey: activeProjectKey, displayName: activeProjectName })
     } else {
-      setSearchScope('all')
+      setSearchScopeProject(null)
     }
-  }, [activeProjectKey])
+  }, [activeProjectKey, activeProjectName])
 
   // Resolve active project name for scope chip label
   useEffect(() => {
@@ -811,10 +813,10 @@ export default function App() {
         <SearchOverlay
           open={searchOverlayOpen}
           initialQuery={query}
-          scope={searchScope}
-          scopeProjectName={activeProjectName}
-          scopeProjectKey={activeProjectKey}
-          defaultScope={activeProjectKey ? 'project' : 'all'}
+          scope={searchScopeProject}
+          contextualScope={activeProjectKey && activeProjectName
+            ? { identityKey: activeProjectKey, displayName: activeProjectName }
+            : null}
           mode={searchMode}
           {...(hasAgents ? { onModeChange: setSearchMode } : {})}
           {...(hasAgents ? {
@@ -827,7 +829,7 @@ export default function App() {
             )
           } : {})}
           onClose={handleSearchClose}
-          onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
+          onScopeChange={setSearchScopeProject}
           onCommit={handleSearchCommit}
           onOpenResult={handleOpenResultFromOverlay}
         />
@@ -930,8 +932,8 @@ export default function App() {
                   {t('search.resultsFor')} <span className="font-mono text-warm-text dark:text-dark-text">"{query}"</span>
                   <span aria-hidden className="mx-1.5 text-warm-faint">·</span>
                   <span data-testid="results-scope-chip" className="text-warm-faint dark:text-dark-muted">
-                    {searchScope === 'project' && activeProjectName
-                      ? t('search.scope_project', { project: activeProjectName })
+                    {searchScopeProject
+                      ? t('search.scope_project', { project: searchScopeProject.displayName })
                       : t('search.scope_all')}
                   </span>
                 </p>
@@ -1041,10 +1043,10 @@ export default function App() {
       <SearchOverlay
         open={searchOverlayOpen}
         initialQuery={query}
-        scope={searchScope}
-        scopeProjectName={activeProjectName}
-        scopeProjectKey={activeProjectKey}
-        defaultScope={activeProjectKey ? 'project' : 'all'}
+        scope={searchScopeProject}
+        contextualScope={activeProjectKey && activeProjectName
+          ? { identityKey: activeProjectKey, displayName: activeProjectName }
+          : null}
         mode={searchMode}
         {...(hasAgents ? { onModeChange: setSearchMode } : {})}
         {...(hasAgents ? {
@@ -1057,7 +1059,7 @@ export default function App() {
           )
         } : {})}
         onClose={handleSearchClose}
-        onScopeChange={(next) => setSearchScope(activeProjectName ? next : 'all')}
+        onScopeChange={setSearchScopeProject}
         onCommit={handleSearchCommit}
         onOpenResult={handleOpenResultFromOverlay}
       />

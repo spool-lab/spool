@@ -370,13 +370,6 @@
     "empty": "沒有符合「{{query}}」的會話。",
     "emptyNoSessions": "尚無會話——先建立索引，它們會出現在這裡。",
     "emptyInProject": "{{project}} 中尚無會話。",
-    "scopeLabel": "範圍",
-    "scopeAll": "全部專案",
-    "scopeInProject": "{{project}}",
-    "scopeClear": "清除專案篩選",
-    "scopeSearchPlaceholder": "篩選專案…",
-    "scopeNoMatch": "沒有相符的專案。",
-    "scopeNoProjects": "尚無已索引的專案。",
     "loadError": "無法載入會話：{{error}}",
     "searchingShort": "搜尋中…",
     "searching": "搜尋中…",
@@ -502,6 +495,16 @@
     "download_md_sub": "純文字 · 相容 Obsidian / GitHub",
     "download_spool_label": "Spool 檔案",
     "download_spool_sub": "可在 Spool 中編輯 · 保留樣式"
+  },
+  "scope": {
+    "any": "全部專案",
+    "clear": "清除專案篩選",
+    "searchPlaceholder": "篩選專案…",
+    "noMatch": "沒有相符的專案。",
+    "noProjects": "尚無已索引的專案。"
+  },
+  "palette": {
+    "toggleOptions": "選項"
   },
   "labs": {
     "intro": "早期功能。可能在發佈前變化或消失。",

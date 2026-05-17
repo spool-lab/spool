@@ -51,6 +51,29 @@ test('row breadcrumb shows project label in default scope', async () => {
   await closePicker()
 })
 
+test('recents are bucketed by date header', async () => {
+  await openPicker()
+  // At least one bucket label (Today / Yesterday / Earlier this week / ...)
+  // must render above the rows.
+  const buckets = ctx.window.locator('[data-testid="new-draft-picker"] ul[role="listbox"] > li > div').first()
+  await expect(buckets).toBeVisible({ timeout: 3000 })
+  await expect(buckets).toContainText(/Today|Yesterday|Earlier|Older/i)
+  await closePicker()
+})
+
+test('options toggle hides and reveals the scope row', async () => {
+  await openPicker()
+  const row = ctx.window.locator('[data-testid="new-draft-picker-options-row"]')
+  // Default-open for NewDraftPicker (scoping is the core feature).
+  await expect(row).toBeVisible()
+  await ctx.window.locator('[data-testid="new-draft-picker-options-toggle"]').click()
+  await expect(row).toHaveCount(0)
+  await ctx.window.locator('[data-testid="new-draft-picker-options-toggle"]').click()
+  await expect(row).toBeVisible()
+  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')).toBeVisible()
+  await closePicker()
+})
+
 test('chip opens popover; Escape closes popover before modal', async () => {
   await openPicker()
   const chip = ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')
