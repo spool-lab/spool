@@ -411,6 +411,9 @@ export default function ShareEditorPage({
     }
   }, [beginSaving, liveConversation, opts])
 
+  // The AppTopBar slot inherits `drag` so whitespace remains a window
+  // drag handle — interactive elements must opt out individually.
+  const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
   const topBarContent = (
     <div className="flex-1 min-w-0 flex items-center gap-2 px-3">
       <button
@@ -419,6 +422,7 @@ export default function ShareEditorPage({
         aria-label={t('common.back')}
         title={t('common.back')}
         className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        style={noDragStyle}
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
@@ -442,6 +446,7 @@ export default function ShareEditorPage({
               aria-label={t('shareEditor.moreOptions')}
               title={t('shareEditor.moreOptions')}
               className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              style={noDragStyle}
             >
               <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
             </button>
@@ -477,6 +482,7 @@ export default function ShareEditorPage({
         aria-label={panelOpen ? t('shareEditor.hidePanel') : t('shareEditor.showPanel')}
         aria-pressed={panelOpen}
         className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        style={noDragStyle}
       >
         <PanelRight size={13} strokeWidth={1.75} />
       </button>
