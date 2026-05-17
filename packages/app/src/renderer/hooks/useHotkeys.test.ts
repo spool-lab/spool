@@ -1,15 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import {
   normalizeCombo,
-  eventToCombo,
+  eventToCombos,
   dispatchHotkey,
   type HotkeyLayer,
 } from './useHotkeys.js'
 
-function layer(bindings: Record<string, () => void>, modal = false): HotkeyLayer {
+function layer(
+  bindings: Record<string, () => void>,
+  opts: { modal?: boolean; skipInEditable?: boolean } = {},
+): HotkeyLayer {
   return {
     bindingsRef: { current: bindings },
-    modalRef: { current: modal },
+    modalRef: { current: opts.modal ?? false },
+    skipInEditableRef: { current: opts.skipInEditable ?? false },
   }
 }
 
@@ -35,44 +39,78 @@ describe('normalizeCombo', () => {
     expect(normalizeCombo('mod+left', true)).toBe('meta+arrowleft')
     expect(normalizeCombo('Esc', true)).toBe('escape')
   })
-})
 
-describe('eventToCombo', () => {
-  it('builds combo string from KeyboardEvent fields', () => {
-    expect(eventToCombo({
-      ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: 'k',
-    })).toBe('meta+k')
+  it('aliases printable-symbol names that would clash with the + separator', () => {
+    expect(normalizeCombo('mod+plus', true)).toBe('meta+plus')
+    expect(normalizeCombo('mod+minus', true)).toBe('meta+minus')
+    expect(normalizeCombo('mod+equal', true)).toBe('meta+equal')
   })
 
-  it('omits modifier keys when pressed alone', () => {
-    expect(eventToCombo({
+  it('preserves code:NAME tokens for layout-independent matching', () => {
+    expect(normalizeCombo('mod+code:Equal', true)).toBe('meta+code:equal')
+    expect(normalizeCombo('mod+code:NumpadAdd', true)).toBe('meta+code:numpadadd')
+  })
+})
+
+describe('eventToCombos', () => {
+  it('builds combo string from KeyboardEvent fields', () => {
+    expect(eventToCombos({
+      ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: 'k',
+    })).toContain('meta+k')
+  })
+
+  it('omits the key-based combo when a modifier was the only key pressed', () => {
+    expect(eventToCombos({
       ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: 'Meta',
-    })).toBe('meta')
+    })).toEqual([])
   })
 
   it('orders modifiers same as normalizeCombo so they match', () => {
     const event = { ctrlKey: false, metaKey: true, altKey: false, shiftKey: true, key: 'K' }
-    expect(eventToCombo(event)).toBe(normalizeCombo('mod+shift+k', true))
+    expect(eventToCombos(event)).toContain(normalizeCombo('mod+shift+k', true))
   })
 
   it('aliases ArrowLeft → arrowleft', () => {
-    expect(eventToCombo({
+    expect(eventToCombos({
       ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: 'ArrowLeft',
-    })).toBe('meta+arrowleft')
+    })).toContain('meta+arrowleft')
+  })
+
+  it('emits a code:NAME variant alongside the key-based combo', () => {
+    const combos = eventToCombos({
+      ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: '=', code: 'Equal',
+    })
+    expect(combos).toContain('meta+equal')
+    expect(combos).toContain('meta+code:equal')
+  })
+
+  it('emits a code:NAME variant for numpad keys whose printed key matches the numeric row', () => {
+    const combos = eventToCombos({
+      ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: '+', code: 'NumpadAdd',
+    })
+    expect(combos).toContain('meta+plus')
+    expect(combos).toContain('meta+code:numpadadd')
+  })
+
+  it('skips emitting a code-based combo when only modifier keys are pressed', () => {
+    const combos = eventToCombos({
+      ctrlKey: false, metaKey: true, altKey: false, shiftKey: false, key: 'Meta', code: 'MetaLeft',
+    })
+    expect(combos).toEqual([])
   })
 })
 
 describe('dispatchHotkey', () => {
   it('returns the matching handler from the top layer', () => {
     const fn = () => {}
-    const result = dispatchHotkey('escape', [layer({ escape: fn })])
+    const result = dispatchHotkey(['escape'], [layer({ escape: fn })])
     expect(result).toEqual({ kind: 'handled', layerIndex: 0, handler: fn })
   })
 
   it('top layer wins over lower layer for the same combo', () => {
     const lower = () => {}
     const upper = () => {}
-    const result = dispatchHotkey('escape', [
+    const result = dispatchHotkey(['escape'], [
       layer({ escape: lower }),
       layer({ escape: upper }),
     ])
@@ -85,9 +123,9 @@ describe('dispatchHotkey', () => {
 
   it('falls through to lower layer when top has no binding (non-modal)', () => {
     const lower = () => {}
-    const result = dispatchHotkey('meta+k', [
+    const result = dispatchHotkey(['meta+k'], [
       layer({ 'meta+k': lower }),
-      layer({ escape: () => {} }), // top layer, no meta+k
+      layer({ escape: () => {} }),
     ])
     expect(result.kind).toBe('handled')
     if (result.kind === 'handled') {
@@ -98,9 +136,9 @@ describe('dispatchHotkey', () => {
 
   it('modal layer swallows unbound combos so they do not fall through', () => {
     const lower = () => {}
-    const result = dispatchHotkey('meta+k', [
+    const result = dispatchHotkey(['meta+k'], [
       layer({ 'meta+k': lower }),
-      layer({ escape: () => {} }, true), // modal
+      layer({ escape: () => {} }, { modal: true }),
     ])
     expect(result).toEqual({ kind: 'swallowed' })
   })
@@ -108,20 +146,79 @@ describe('dispatchHotkey', () => {
   it('modal layer still serves its own bindings before swallowing', () => {
     const lowerFn = () => {}
     const modalEsc = () => {}
-    const result = dispatchHotkey('escape', [
+    const result = dispatchHotkey(['escape'], [
       layer({ 'meta+k': lowerFn }),
-      layer({ escape: modalEsc }, true),
+      layer({ escape: modalEsc }, { modal: true }),
     ])
     expect(result.kind).toBe('handled')
     if (result.kind === 'handled') expect(result.handler).toBe(modalEsc)
   })
 
   it('returns unhandled when no layer binds the combo', () => {
-    const result = dispatchHotkey('meta+x', [layer({ escape: () => {} })])
+    const result = dispatchHotkey(['meta+x'], [layer({ escape: () => {} })])
     expect(result).toEqual({ kind: 'unhandled' })
   })
 
   it('returns unhandled on empty stack', () => {
-    expect(dispatchHotkey('escape', [])).toEqual({ kind: 'unhandled' })
+    expect(dispatchHotkey(['escape'], [])).toEqual({ kind: 'unhandled' })
+  })
+
+  it('tries each emitted combo until one matches', () => {
+    const fn = () => {}
+    const result = dispatchHotkey(['meta+equal', 'meta+code:equal'], [
+      layer({ 'meta+code:equal': fn }),
+    ])
+    expect(result.kind).toBe('handled')
+    if (result.kind === 'handled') expect(result.handler).toBe(fn)
+  })
+
+  describe('skipInEditable', () => {
+    it('skips the layer entirely when focus is in an editable and the layer opted in', () => {
+      const fn = () => {}
+      const result = dispatchHotkey(
+        ['meta+z'],
+        [layer({ 'meta+z': fn }, { skipInEditable: true })],
+        true,
+      )
+      expect(result.kind).toBe('unhandled')
+    })
+
+    it('still handles the combo on a skipInEditable layer when focus is NOT editable', () => {
+      const fn = () => {}
+      const result = dispatchHotkey(
+        ['meta+z'],
+        [layer({ 'meta+z': fn }, { skipInEditable: true })],
+        false,
+      )
+      expect(result.kind).toBe('handled')
+    })
+
+    it('lets a non-skipping lower layer still handle when top opted out via editable focus', () => {
+      const lower = () => {}
+      const result = dispatchHotkey(
+        ['meta+z'],
+        [
+          layer({ 'meta+z': lower }),
+          layer({ 'meta+z': () => {} }, { skipInEditable: true }),
+        ],
+        true,
+      )
+      expect(result.kind).toBe('handled')
+      if (result.kind === 'handled') expect(result.handler).toBe(lower)
+    })
+
+    it('does NOT count a skipped layer as a modal barrier — combos pass through to lower layers', () => {
+      const lower = () => {}
+      const result = dispatchHotkey(
+        ['meta+k'],
+        [
+          layer({ 'meta+k': lower }),
+          layer({ escape: () => {} }, { modal: true, skipInEditable: true }),
+        ],
+        true,
+      )
+      expect(result.kind).toBe('handled')
+      if (result.kind === 'handled') expect(result.handler).toBe(lower)
+    })
   })
 })

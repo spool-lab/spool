@@ -106,6 +106,57 @@ test('rapid clicks within the coalesce window collapse into one undo step', asyn
   await expect(preview).toHaveAttribute('data-template', 'chat', { timeout: 2000 })
 })
 
+test('Cmd+= / Cmd+- / Cmd+0 step zoom in / out / back to fit', async () => {
+  const { window } = ctx
+  const canvas = window.locator('[data-testid="share-preview-canvas"]')
+
+  // Snap to fit as the starting baseline — the editor opens at fit, but
+  // prior tests may have left a custom step in place.
+  await window.keyboard.press('Meta+0')
+  await expect(canvas).toHaveAttribute('data-zoom', 'fit', { timeout: 2000 })
+
+  // ⌘+ (key='+', shifted-equals on US layout) snaps to a discrete step
+  // (the ZOOM_STEPS scale; first step at or above current).
+  await window.keyboard.press('Meta+Shift+Equal')
+  await expect(canvas).not.toHaveAttribute('data-zoom', 'fit', { timeout: 2000 })
+  const afterIn = await canvas.getAttribute('data-zoom')
+  expect(Number(afterIn)).toBeGreaterThan(0)
+
+  // ⌘- steps back down. With only one step above fit captured, this
+  // returns to the next-lower discrete step (not back to fit).
+  await window.keyboard.press('Meta+Minus')
+  const afterOut = await canvas.getAttribute('data-zoom')
+  expect(Number(afterOut)).toBeLessThan(Number(afterIn))
+
+  // ⌘0 snaps back to fit regardless of where we are.
+  await window.keyboard.press('Meta+0')
+  await expect(canvas).toHaveAttribute('data-zoom', 'fit', { timeout: 2000 })
+})
+
+test('zoom shortcut is suppressed when focus is in a control-panel input', async () => {
+  const { window } = ctx
+  const canvas = window.locator('[data-testid="share-preview-canvas"]')
+
+  // Start at fit.
+  await window.keyboard.press('Meta+0')
+  await expect(canvas).toHaveAttribute('data-zoom', 'fit', { timeout: 2000 })
+
+  // Focus an editable surface (the rename input is the simplest one —
+  // open the rename modal, focus its input, then press ⌘= which would
+  // normally zoom). The skipInEditable guard means zoom stays at fit.
+  await window.locator('[data-testid="share-editor-more"]').click()
+  await window.getByRole('menuitem', { name: 'Rename draft' }).click()
+  const renameInput = window.locator('[data-testid="rename-draft-input"]')
+  await expect(renameInput).toBeFocused({ timeout: 2000 })
+
+  await window.keyboard.press('Meta+Shift+Equal')
+  await expect(canvas).toHaveAttribute('data-zoom', 'fit')
+
+  // Dismiss the rename modal so subsequent tests start clean.
+  await window.getByRole('button', { name: 'Cancel' }).click()
+  await expect(window.locator('[data-testid="rename-draft-modal"]')).toBeHidden({ timeout: 2000 })
+})
+
 test('Back returns to SessionDetail', async () => {
   const { window } = ctx
   await window.getByRole('button', { name: 'Back' }).first().click()

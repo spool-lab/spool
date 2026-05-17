@@ -24,6 +24,7 @@ import { DownloadButton } from './share-editor/DownloadButton.js'
 import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
 import { useUndoableState } from '../hooks/useUndoableState.js'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 
 type Props = {
   /** Stable id of the share_drafts row to autosave into. */
@@ -123,25 +124,15 @@ export default function ShareEditorPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId])
 
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey)) return
-      const target = event.target as HTMLElement | null
-      // Native undo handles inputs/textareas; intercepting here would
-      // break typing. The rename modal's title field, search inputs etc.
-      // all want their own undo behaviour.
-      if (target && target.matches('input, textarea, [contenteditable="true"]')) return
-      const key = event.key.toLowerCase()
-      const isUndo = key === 'z' && !event.shiftKey
-      const isRedo = (key === 'z' && event.shiftKey) || key === 'y'
-      if (!isUndo && !isRedo) return
-      event.preventDefault()
-      if (isRedo) editableRedoRef.current()
-      else editableUndoRef.current()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [])
+  // Undo/redo dispatch through the shared hotkey stack so the modal layer
+  // (Settings, etc.) can swallow them, and so editing a text input — like the
+  // rename modal's title field — falls through to the browser's native undo
+  // instead of triggering the editor's state undo.
+  useHotkeys({
+    'mod+z': () => editableUndoRef.current(),
+    'mod+shift+z': () => editableRedoRef.current(),
+    'mod+y': () => editableRedoRef.current(),
+  }, { skipInEditable: true })
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   // The "live" conversation passed to the preview, exporters, and the

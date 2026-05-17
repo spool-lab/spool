@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MoreHorizontal } from 'lucide-react'
 import {
@@ -8,6 +8,7 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 
 export type Zoom = number | 'fit'
 
@@ -157,47 +158,44 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
   }
 
   // ⌘= / ⌘+ / ⌘- / ⌘0 — drive the same zoom state as the on-screen
-  // ZoomControl. Mounted only while the share editor is on screen (the
-  // editor view is itself FEATURES.share-gated upstream), and skipped
-  // when focus is in a typing context so users editing copy in the
-  // control panel don't trip the shortcuts. preventDefault on a match
-  // so Chromium / Electron doesn't apply its own browser-level zoom.
+  // ZoomControl. Routed through useHotkeys so Settings / other modal
+  // layers swallow it, and so it doesn't fire when the user is editing
+  // copy in the control panel. preventDefault is handled by the hook
+  // on match, which also keeps Chromium's browser-level zoom away.
   //
-  // The handler reads the live scale via a ref so a single listener
-  // covers all renders without churning on every zoom change. ⌘+ also
-  // ships as the Shift-modified form of ⌘= on US layouts — we accept
-  // both with-and-without Shift here.
+  // A scale ref lets each handler read the live scale without churning
+  // the binding identity on every zoom tick.
   const scaleRef = useRef(scale)
   scaleRef.current = scale
-  useEffect(() => {
-    const isTypingTarget = (el: EventTarget | null) => {
-      if (!(el instanceof HTMLElement)) return false
-      const tag = el.tagName
-      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+  const measureFitRef = useRef(measureFit)
+  measureFitRef.current = measureFit
+
+  const zoomBindings = useMemo(() => {
+    const zoomIn = () => setZoom(nextZoomStep(scaleRef.current, 1))
+    const zoomOut = () => setZoom(nextZoomStep(scaleRef.current, -1))
+    const zoomFit = () => {
+      setFitScale(measureFitRef.current())
+      setZoom('fit')
     }
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return
-      if (e.altKey) return
-      if (isTypingTarget(e.target)) return
-      // e.key handles shifted "+" too; e.code covers numeric-row "=" and
-      // numpad equivalents so the shortcut works regardless of layout.
-      const isIn = e.key === '=' || e.key === '+' || e.code === 'Equal' || e.code === 'NumpadAdd'
-      const isOut = e.key === '-' || e.code === 'Minus' || e.code === 'NumpadSubtract'
-      const isFit = e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0'
-      if (!isIn && !isOut && !isFit) return
-      // Disallow Shift on - and 0 so we don't intercept unrelated chords.
-      if ((isOut || isFit) && e.shiftKey) return
-      e.preventDefault()
-      if (isIn) setZoom(nextZoomStep(scaleRef.current, 1))
-      else if (isOut) setZoom(nextZoomStep(scaleRef.current, -1))
-      else {
-        setFitScale(measureFit())
-        setZoom('fit')
-      }
+    // ⌘+ ships as Shift-equals on US layouts; bind both the key-based
+    // forms AND code-based variants so non-US layouts and numpad keys
+    // hit the same path.
+    return {
+      'mod+equal': zoomIn,
+      'mod+shift+equal': zoomIn,
+      'mod+plus': zoomIn,
+      'mod+shift+plus': zoomIn,
+      'mod+code:equal': zoomIn,
+      'mod+code:numpadadd': zoomIn,
+      'mod+minus': zoomOut,
+      'mod+code:minus': zoomOut,
+      'mod+code:numpadsubtract': zoomOut,
+      'mod+0': zoomFit,
+      'mod+code:digit0': zoomFit,
+      'mod+code:numpad0': zoomFit,
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [setZoom, measureFit])
+  }, [setZoom])
+  useHotkeys(zoomBindings, { skipInEditable: true })
 
   // Stash the live ratio onto the forwarded ref's parent target via
   // useImperativeHandle pattern — but since we just need the unscaled
@@ -239,6 +237,8 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
               animates into the real scale, looking like a double zoom. */}
           <div
             ref={canvasRef}
+            data-testid="share-preview-canvas"
+            data-zoom={zoom === 'fit' ? 'fit' : `${Math.round(scale * 100)}`}
             className="relative overflow-hidden"
             style={{
               width: ratio.w * scale,
