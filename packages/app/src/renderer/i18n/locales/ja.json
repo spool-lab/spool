@@ -440,8 +440,6 @@
     "redact_mixed": "混在 — クリックで {{label}} をすべてマスク",
     "redact_allowAll": "クリックで {{label}} をすべて許可",
     "redact_appearsTimes_other": "原文中に {{count}} 回出現",
-    "toggle_showSourceMark": "ソースマークを表示",
-    "toggle_showSourceMark_sub": "Agent 発言の横に小さなマーク",
     "toggle_masthead": "ヘッダー",
     "toggle_masthead_sub": "上部に Spool ワードマークとテンプレート名",
     "toggle_colophon": "奥付",

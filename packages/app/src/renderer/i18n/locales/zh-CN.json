@@ -440,8 +440,6 @@
     "redact_mixed": "混合状态 — 点击全部脱敏 {{label}}",
     "redact_allowAll": "点击允许全部 {{label}}",
     "redact_appearsTimes_other": "在源中出现 {{count}} 次",
-    "toggle_showSourceMark": "显示来源标记",
-    "toggle_showSourceMark_sub": "在 Agent 回复旁显示小标识",
     "toggle_masthead": "页眉",
     "toggle_masthead_sub": "顶部显示 Spool 字标和模板名",
     "toggle_colophon": "版权页",

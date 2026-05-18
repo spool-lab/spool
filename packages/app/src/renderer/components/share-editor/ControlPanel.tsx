@@ -225,13 +225,6 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
           onChange={(v) => setOpts({ ...opts, showGaps: v })}
         />
         <Toggle
-          testId="share-editor-toggle-avatars"
-          label={t('shareEditorPanel.toggle_showSourceMark')}
-          sub={t('shareEditorPanel.toggle_showSourceMark_sub')}
-          value={opts.avatars}
-          onChange={(v) => setOpts({ ...opts, avatars: v })}
-        />
-        <Toggle
           testId="share-editor-toggle-showMasthead"
           label={t('shareEditorPanel.toggle_masthead')}
           sub={t('shareEditorPanel.toggle_masthead_sub')}

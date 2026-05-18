@@ -440,8 +440,6 @@
     "redact_mixed": "混合狀態 — 點擊全部脫敏 {{label}}",
     "redact_allowAll": "點擊允許全部 {{label}}",
     "redact_appearsTimes_other": "在原文中出現 {{count}} 次",
-    "toggle_showSourceMark": "顯示來源標記",
-    "toggle_showSourceMark_sub": "在 Agent 回覆旁顯示小標記",
     "toggle_masthead": "頁首",
     "toggle_masthead_sub": "頂部顯示 Spool 字標與模板名稱",
     "toggle_colophon": "版權頁",

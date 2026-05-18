@@ -451,8 +451,6 @@
     "redact_mixed": "Mixed — click to redact all {{label}}",
     "redact_allowAll": "Click to allow all {{label}}",
     "redact_appearsTimes_other": "Appears {{count}} times in the source",
-    "toggle_showSourceMark": "Show source mark",
-    "toggle_showSourceMark_sub": "Small glyph next to assistant turns",
     "toggle_masthead": "Masthead",
     "toggle_masthead_sub": "Spool wordmark and template label on top",
     "toggle_colophon": "Colophon",

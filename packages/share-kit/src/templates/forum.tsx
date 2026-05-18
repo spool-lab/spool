@@ -134,38 +134,26 @@ export function Forum({ convo, opts }: Props) {
               <div data-turn-body style={{ display: 'flex', gap: innerPad }}>
                 {/* Avatar column */}
                 <div style={{ flexShrink: 0 }}>
-                  {opts.avatars ? (
-                    <div
-                      aria-hidden
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: isUser ? 4 : '50%',
-                        background: isUser ? t.surface : accent,
-                        color: isUser ? t.text : '#FFFFFF',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontFamily: 'Geist Mono, monospace',
-                        fontSize: 9.5,
-                        fontWeight: 600,
-                        letterSpacing: '0.02em',
-                        border: isUser ? `1px solid ${t.border}` : 'none',
-                      }}
-                    >
-                      {initials}
-                    </div>
-                  ) : (
-                    <div
-                      aria-hidden
-                      style={{
-                        width: 3,
-                        height: 22,
-                        borderRadius: 2,
-                        background: isUser ? t.border : accent,
-                      }}
-                    />
-                  )}
+                  <div
+                    aria-hidden
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: isUser ? 4 : '50%',
+                      background: isUser ? t.surface : accent,
+                      color: isUser ? t.text : '#FFFFFF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 9.5,
+                      fontWeight: 600,
+                      letterSpacing: '0.02em',
+                      border: isUser ? `1px solid ${t.border}` : 'none',
+                    }}
+                  >
+                    {initials}
+                  </div>
                 </div>
 
                 {/* Post column */}

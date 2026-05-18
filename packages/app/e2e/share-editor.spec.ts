@@ -51,10 +51,10 @@ test('template / typeface / paper / colorway switches reflect in preview', async
   await expect(preview).toHaveAttribute('data-density', 'relaxed')
 })
 
-test('chrome toggles (masthead, colophon, avatars, hideEmptyTurns, showGaps) flip aria-checked', async () => {
+test('chrome toggles (masthead, colophon, hideEmptyTurns, showGaps) flip aria-checked', async () => {
   const { window } = ctx
   // Each toggle is a role="switch" with aria-checked reflecting state.
-  const ids = ['hideEmptyTurns', 'showGaps', 'avatars', 'showMasthead', 'showColophon']
+  const ids = ['hideEmptyTurns', 'showGaps', 'showMasthead', 'showColophon']
   for (const key of ids) {
     const sel = `[data-testid="share-editor-toggle-${key}"]`
     const before = await window.locator(sel).getAttribute('aria-checked')

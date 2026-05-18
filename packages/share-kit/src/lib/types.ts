@@ -234,7 +234,6 @@ export interface EditorOpts {
   colorway: Colorway['id']
   accentHex: string
   density: Density
-  avatars: boolean
   redact: boolean
   redactExclude?: RedactExclude | undefined
   /** Indices of turns to include in the artifact. `undefined` means
@@ -312,7 +311,6 @@ export const DEFAULT_OPTS: EditorOpts = {
   colorway: 'amber',
   accentHex: '#C85A00',
   density: 'compact',
-  avatars: true,
   redact: true,
   selected: undefined,
   showGaps: true,
