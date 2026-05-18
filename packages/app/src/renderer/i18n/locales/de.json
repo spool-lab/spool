@@ -451,8 +451,6 @@
     "redact_mixed": "Gemischt – klicken, um alle {{label}} zu schwärzen",
     "redact_allowAll": "Klicken, um alle {{label}} zuzulassen",
     "redact_appearsTimes_other": "Erscheint {{count}} Mal in der Quelle",
-    "toggle_showSourceMark": "Quellmarkierung anzeigen",
-    "toggle_showSourceMark_sub": "Kleines Symbol neben Agent-Turns",
     "toggle_masthead": "Kopfzeile",
     "toggle_masthead_sub": "Spool-Wortmarke und Vorlagenname oben",
     "toggle_colophon": "Impressum",

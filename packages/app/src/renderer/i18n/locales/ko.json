@@ -440,8 +440,6 @@
     "redact_mixed": "혼합 — 클릭하여 {{label}} 모두 가리기",
     "redact_allowAll": "클릭하여 {{label}} 모두 허용",
     "redact_appearsTimes_other": "원본에 {{count}}회 등장",
-    "toggle_showSourceMark": "소스 마크 표시",
-    "toggle_showSourceMark_sub": "Agent 턴 옆에 작은 표식",
     "toggle_masthead": "헤더",
     "toggle_masthead_sub": "상단에 Spool 워드마크와 템플릿 이름",
     "toggle_colophon": "판권면",

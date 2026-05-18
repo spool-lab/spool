@@ -31,7 +31,6 @@ test('opening a draft with retired template / paper / colorway ids coerces to de
       colorway: 'ink',
       accentHex: '#1C1C18',
       density: 'compact',
-      avatars: true,
       redact: true,
       showGaps: true,
       showMasthead: true,

@@ -2,7 +2,7 @@
 //
 // Honors the editor's content-affecting opts (selected, redact,
 // hideEmptyTurns, showGaps, showMasthead, showColophon). Visual opts
-// (template, paper, typeface, colorway, density, avatars) don't
+// (template, paper, typeface, colorway, density) don't
 // translate to markdown and are ignored.
 //
 // Body redactions reuse the same auto-detection used by the templates

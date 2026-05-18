@@ -451,8 +451,6 @@
     "redact_mixed": "Mixte — cliquez pour masquer tous les {{label}}",
     "redact_allowAll": "Cliquez pour autoriser tous les {{label}}",
     "redact_appearsTimes_other": "Apparaît {{count}} fois dans la source",
-    "toggle_showSourceMark": "Afficher la marque de source",
-    "toggle_showSourceMark_sub": "Petit glyphe à côté des tours de l'Agent",
     "toggle_masthead": "En-tête",
     "toggle_masthead_sub": "Logo Spool et nom du modèle en haut",
     "toggle_colophon": "Colophon",
