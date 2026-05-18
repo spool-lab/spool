@@ -93,6 +93,9 @@ test('arrow-down navigation keeps the active item in view at the bottom', async 
   // Recents list — press Down to the last option, then verify it is in viewport
   // (i.e. the scroll container scrolled to follow the active item).
   const options = overlay.locator('[role="option"]')
+  // Recents are now virtualized — wait for at least one option to actually
+  // mount before counting, otherwise we race the initial Virtuoso measure.
+  await options.first().waitFor({ state: 'visible', timeout: 3000 })
   const count = await options.count()
   expect(count).toBeGreaterThan(0)
 
