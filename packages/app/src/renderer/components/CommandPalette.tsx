@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search as SearchIcon, SlidersHorizontal } from 'lucide-react'
-import type { Session, SearchResult, SessionSource } from '@spool-lab/core'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
+import { AlertCircle, Inbox, Search as SearchIcon, SearchX, SlidersHorizontal } from 'lucide-react'
+import type { Session, SearchResult, SessionSource, SessionsCursor } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import Hint from './Hint.js'
 import ScopeSelector, { type ScopeValue } from './ScopeSelector.js'
@@ -27,7 +28,7 @@ export type PaletteRow = {
   messageId?: number
 }
 
-const RECENT_LIMIT = 30
+const RECENT_PAGE_SIZE = 50
 const SEARCH_LIMIT = 30
 const DEBOUNCE_MS = 150
 
@@ -42,10 +43,9 @@ export type CommandPaletteLabels = {
   emptyNoSessions: string
   /** Body when scope is set and that scope has no sessions. */
   emptyInProject: (projectName: string) => string
-  /** Footer total for search results. */
-  resultsTotal: (count: number) => string
-  /** Footer total for recents list. */
-  recentTotal: (count: number) => string
+  /** Footer affordance for search-mode results — clickable when `onCommit`
+   *  is set (jumps to the full results page). Omit to hide. */
+  resultsTotal?: (count: number) => string
 }
 
 type Props = {
@@ -100,6 +100,8 @@ export default function CommandPalette({
   const noTitle = t('common.noTitle')
   const [query, setQuery] = useState(initialQuery)
   const [recent, setRecent] = useState<Session[] | null>(null)
+  const [recentCursor, setRecentCursor] = useState<SessionsCursor | null>(null)
+  const [recentLoadingMore, setRecentLoadingMore] = useState(false)
   const [results, setResults] = useState<PaletteRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
@@ -107,7 +109,16 @@ export default function CommandPalette({
   const [filtersOpen, setFiltersOpen] = useState(scope !== null || optionsDefaultOpen)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null)
   const requestSeqRef = useRef(0)
+  const recentTokenRef = useRef(0)
+  // Refs keep the endReached closure stable — same pattern as LibraryLanding.
+  const recentCursorRef = useRef(recentCursor)
+  recentCursorRef.current = recentCursor
+  const recentLoadingRef = useRef(recentLoadingMore)
+  recentLoadingRef.current = recentLoadingMore
+  const scopeKeyRef = useRef(scope?.identityKey)
+  scopeKeyRef.current = scope?.identityKey
 
   // Auto-expand whenever scope flips to non-null so the user can see the
   // active filter; collapsing is left to the user via the toggle.
@@ -125,21 +136,50 @@ export default function CommandPalette({
   // and routes Escape to onClose.
   useHotkeys({ Escape: onClose }, { modal: true })
 
-  // Recents fetch (scoped if a project is selected).
+  // Recents fetch (scoped if a project is selected). Cursor pagination —
+  // initial page first, more on Virtuoso endReached.
   useEffect(() => {
-    let cancelled = false
-    const req = scope
-      ? window.spool.listSessionsByIdentity(scope.identityKey, { limit: RECENT_LIMIT })
-      : window.spool.listSessions({ limit: RECENT_LIMIT })
-    req
-      .then((page) => { if (!cancelled) setRecent(page.sessions) })
+    const token = ++recentTokenRef.current
+    setRecent(null)
+    setRecentCursor(null)
+    setRecentLoadingMore(false)
+    setError(null)
+    fetchRecentsPage(scope?.identityKey, null)
+      .then((page) => {
+        if (recentTokenRef.current !== token) return
+        setRecent(page.sessions)
+        setRecentCursor(page.nextCursor)
+      })
       .catch((err) => {
-        if (cancelled) return
+        if (recentTokenRef.current !== token) return
         setError(err instanceof Error ? err.message : t('common.error'))
         setRecent([])
+        setRecentCursor(null)
       })
-    return () => { cancelled = true }
   }, [scope?.identityKey])
+
+  const loadMoreRecents = useCallback(() => {
+    if (recentLoadingRef.current || !recentCursorRef.current) return
+    const token = recentTokenRef.current
+    setRecentLoadingMore(true)
+    fetchRecentsPage(scopeKeyRef.current, recentCursorRef.current)
+      .then((page) => {
+        if (recentTokenRef.current !== token) return
+        setRecent((prev) => {
+          const base = prev ?? []
+          const seen = new Set(base.map((s) => s.sessionUuid))
+          const additions = page.sessions.filter((s) => !seen.has(s.sessionUuid))
+          return additions.length === 0 ? base : [...base, ...additions]
+        })
+        setRecentCursor(page.nextCursor)
+        setRecentLoadingMore(false)
+      })
+      .catch(() => {
+        if (recentTokenRef.current !== token) return
+        setRecentLoadingMore(false)
+        setRecentCursor(null)
+      })
+  }, [])
 
   // FTS search with optional project scope. Skipped when `searchDisabled`
   // (AI mode etc.); empty query clears results and re-shows recents.
@@ -196,22 +236,35 @@ export default function CommandPalette({
 
   const showProjectOnRow = !scope
 
-  // Recents bucketing (cmdk style).
+  // Flatten recents into virtual items (headers + rows + loading sentinel).
+  // The header path only activates when groupRecentsByDate is set; otherwise
+  // it's just rows + sentinel.
   const tLoose = t as unknown as (k: string) => string
-  const recentBuckets = useMemo(() => {
-    if (!groupRecentsByDate || !recent) return null
-    return bucketSessionsByDate(recent, tLoose)
+  const virtualRecents = useMemo<{ items: VirtualItem[]; rowIndexToVirtualIndex: number[] }>(() => {
+    if (!recent) return { items: [], rowIndexToVirtualIndex: [] }
+    return buildVirtualRecents(recent, noTitle, groupRecentsByDate ? tLoose : null, recentLoadingMore)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupRecentsByDate, recent, t])
+  }, [recent, noTitle, groupRecentsByDate, recentLoadingMore, t])
 
-  // Reset active row whenever the visible list changes shape.
-  useEffect(() => { setActiveIndex(0) }, [rows?.length, inSearchMode, scope?.identityKey])
+  // Reset active row whenever the visible list changes shape (scope flip,
+  // mode toggle, or new search results). Appending a recents page should
+  // NOT reset, so we deliberately do not depend on `recent.length`.
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [inSearchMode, scope?.identityKey, results?.length])
 
   // Keep the active row scrolled into view.
   useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(`[data-row-index="${activeIndex}"]`)
-    el?.scrollIntoView({ block: 'nearest' })
-  }, [activeIndex])
+    if (inSearchMode) {
+      const el = listRef.current?.querySelector<HTMLElement>(`[data-row-index="${activeIndex}"]`)
+      el?.scrollIntoView({ block: 'nearest' })
+    } else {
+      const virtualIndex = virtualRecents.rowIndexToVirtualIndex[activeIndex]
+      if (virtualIndex != null) {
+        virtuosoRef.current?.scrollIntoView({ index: virtualIndex })
+      }
+    }
+  }, [activeIndex, inSearchMode, virtualRecents])
 
   function handleInputKey(e: React.KeyboardEvent<HTMLInputElement>): void {
     if (e.key === 'Tab' && contextualScope) {
@@ -330,40 +383,51 @@ export default function CommandPalette({
           </div>
         )}
 
-        {/* Results / recents */}
-        <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto">
+        {/* Results / recents. Min-height keeps the modal a usable shape even
+            when Virtuoso has no intrinsic height to push against the modal's
+            max-h-[70vh]; each branch owns its scroll context. */}
+        <div ref={listRef} className="flex-1 min-h-[40vh] flex flex-col">
           {rows === null ? (
-            <PaletteSkeleton count={6} />
+            <div className="overflow-y-auto">
+              <PaletteSkeleton count={6} />
+            </div>
           ) : error && !inSearchMode ? (
-            <p className="px-5 py-8 text-center text-sm text-warm-muted dark:text-dark-muted">
-              {t('newDraft.loadError', { error })}
-            </p>
+            <PaletteEmpty
+              icon={<AlertCircle size={18} strokeWidth={1.6} aria-hidden />}
+              message={t('newDraft.loadError', { error })}
+            />
           ) : rows.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-warm-muted dark:text-dark-muted">
-              {inSearchMode
+            <PaletteEmpty
+              icon={inSearchMode
+                ? <SearchX size={18} strokeWidth={1.6} aria-hidden />
+                : <Inbox size={18} strokeWidth={1.6} aria-hidden />}
+              message={inSearchMode
                 ? labels.noMatches(query.trim())
                 : scope
                   ? labels.emptyInProject(scope.displayName)
                   : labels.emptyNoSessions}
-            </p>
-          ) : recentBuckets && !inSearchMode ? (
-            <BucketedList
-              testId={testId}
-              buckets={recentBuckets}
-              activeIndex={activeIndex}
-              setActiveIndex={setActiveIndex}
-              onSelect={(row) => onSubmit(row, query)}
-              noTitle={noTitle}
-              showProject={showProjectOnRow}
             />
+          ) : inSearchMode ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <FlatList
+                testId={testId}
+                rows={rows}
+                queryTokens={queryTokens}
+                activeIndex={activeIndex}
+                setActiveIndex={setActiveIndex}
+                onSelect={(row) => onSubmit(row, query)}
+                showProject={showProjectOnRow}
+              />
+            </div>
           ) : (
-            <FlatList
+            <VirtualRecents
               testId={testId}
-              rows={rows}
-              queryTokens={queryTokens}
+              virtuosoRef={virtuosoRef}
+              items={virtualRecents.items}
               activeIndex={activeIndex}
               setActiveIndex={setActiveIndex}
               onSelect={(row) => onSubmit(row, query)}
+              onEndReached={loadMoreRecents}
               showProject={showProjectOnRow}
             />
           )}
@@ -383,15 +447,20 @@ export default function CommandPalette({
             )}
             <Hint keys={['esc']} label={t('newDraft.close')} />
           </div>
-          <div className="flex-none">
-            {rows && rows.length > 0 && (
-              <span>
-                {inSearchMode
-                  ? labels.resultsTotal(rows.length)
-                  : labels.recentTotal(rows.length)}
-              </span>
-            )}
-          </div>
+          {inSearchMode && labels.resultsTotal && rows && rows.length > 0 && (
+            onCommit ? (
+              <button
+                type="button"
+                data-testid={`${testId}-results-total`}
+                onClick={() => onCommit(query)}
+                className="flex-none rounded-md px-1.5 py-0.5 -my-0.5 hover:bg-warm-surface2 hover:text-warm-text dark:hover:bg-dark-surface2 dark:hover:text-dark-text transition-colors"
+              >
+                {labels.resultsTotal(rows.length)}
+              </button>
+            ) : (
+              <span className="flex-none">{labels.resultsTotal(rows.length)}</span>
+            )
+          )}
         </div>
       </div>
     </div>
@@ -439,59 +508,112 @@ function FlatList({
   )
 }
 
-function BucketedList({
+type VirtualItem =
+  | { kind: 'header'; key: string; label: string }
+  | { kind: 'row'; key: string; row: PaletteRow; rowIndex: number }
+  | { kind: 'loading'; key: 'loading-more' }
+
+function buildVirtualRecents(
+  sessions: Session[],
+  noTitle: string,
+  t: ((k: string) => string) | null,
+  loadingMore: boolean,
+): { items: VirtualItem[]; rowIndexToVirtualIndex: number[] } {
+  const items: VirtualItem[] = []
+  const rowIndexToVirtualIndex: number[] = []
+  const pushRow = (session: Session): void => {
+    rowIndexToVirtualIndex.push(items.length)
+    items.push({
+      kind: 'row',
+      key: session.sessionUuid,
+      row: sessionToRow(session, noTitle),
+      rowIndex: rowIndexToVirtualIndex.length - 1,
+    })
+  }
+  if (t) {
+    for (const bucket of bucketSessionsByDate(sessions, t)) {
+      items.push({ kind: 'header', key: `h-${bucket.label}`, label: bucket.label })
+      for (const session of bucket.sessions) pushRow(session)
+    }
+  } else {
+    for (const session of sessions) pushRow(session)
+  }
+  if (loadingMore) items.push({ kind: 'loading', key: 'loading-more' })
+  return { items, rowIndexToVirtualIndex }
+}
+
+function VirtualRecents({
   testId,
-  buckets,
+  virtuosoRef,
+  items,
   activeIndex,
   setActiveIndex,
   onSelect,
-  noTitle,
+  onEndReached,
   showProject,
 }: {
   testId: string
-  buckets: { label: string; sessions: Session[] }[]
+  virtuosoRef: React.MutableRefObject<VirtuosoHandle | null>
+  items: VirtualItem[]
   activeIndex: number
   setActiveIndex: (i: number) => void
   onSelect: (row: PaletteRow) => void
-  noTitle: string
+  onEndReached: () => void
   showProject: boolean
 }) {
-  let running = 0
+  const { t } = useTranslation()
   return (
-    <ul role="listbox">
-      {buckets.map(bucket => (
-        <li key={bucket.label}>
-          <div className="px-5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.04em] text-warm-faint dark:text-dark-muted">
-            {bucket.label}
+    <Virtuoso
+      ref={virtuosoRef}
+      data={items}
+      data-testid={`${testId}-virtual`}
+      computeItemKey={(_index, item) => item.key}
+      defaultItemHeight={40}
+      increaseViewportBy={200}
+      endReached={onEndReached}
+      role="listbox"
+      className="flex-1 min-h-0"
+      itemContent={(_virtualIndex, item) => {
+        if (item.kind === 'header') {
+          return (
+            <div
+              data-testid={`${testId}-bucket-header`}
+              className="px-5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.04em] text-warm-faint dark:text-dark-muted"
+            >
+              {item.label}
+            </div>
+          )
+        }
+        if (item.kind === 'loading') {
+          return (
+            <div
+              data-testid={`${testId}-loading-more`}
+              className="px-5 py-3 text-center text-[11px] text-warm-faint dark:text-dark-muted"
+            >
+              {t('library.footer_loadingMore')}
+            </div>
+          )
+        }
+        const active = item.rowIndex === activeIndex
+        return (
+          <div
+            role="option"
+            aria-selected={active}
+            data-row-index={item.rowIndex}
+            onMouseEnter={() => setActiveIndex(item.rowIndex)}
+          >
+            <PaletteRowButton
+              testId={testId}
+              row={item.row}
+              queryTokens={[]}
+              active={active}
+              showProject={showProject}
+              onSelect={() => onSelect(item.row)}
+            />
           </div>
-          <ul>
-            {bucket.sessions.map(session => {
-              const index = running++
-              const row = sessionToRow(session, noTitle)
-              const active = index === activeIndex
-              return (
-                <li
-                  key={session.sessionUuid}
-                  role="option"
-                  aria-selected={active}
-                  data-row-index={index}
-                  onMouseEnter={() => setActiveIndex(index)}
-                >
-                  <PaletteRowButton
-                    testId={testId}
-                    row={row}
-                    queryTokens={[]}
-                    active={active}
-                    showProject={showProject}
-                    onSelect={() => onSelect(row)}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-        </li>
-      ))}
-    </ul>
+        )
+      }}
+    />
   )
 }
 
@@ -523,6 +645,7 @@ function PaletteRowButton({
       data-testid={`${testId}-row`}
       data-session-uuid={row.sessionUuid}
       onClick={onSelect}
+      title={projectVisible ? `${row.title} · ${row.projectLabel}` : row.title}
       className={`w-full flex items-start gap-3 px-5 py-2 text-left transition-colors duration-75 ${activeBg}`}
     >
       <div className="flex-1 min-w-0">
@@ -531,7 +654,7 @@ function PaletteRowButton({
           <span className="flex-1 min-w-0 text-sm truncate">
             <span className="text-warm-text dark:text-dark-text">{row.title}</span>
             {projectVisible && (
-              <span className="text-warm-faint dark:text-dark-muted"> · {row.projectLabel}</span>
+              <span className="text-[11px] text-warm-faint dark:text-dark-muted"> · {row.projectLabel}</span>
             )}
           </span>
         </div>
@@ -549,6 +672,20 @@ function PaletteRowButton({
   )
 }
 
+function PaletteEmpty({ icon, message }: { icon: ReactNode; message: string }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+      <div
+        className="w-11 h-11 rounded-full flex items-center justify-center bg-warm-surface dark:bg-dark-surface text-warm-faint dark:text-dark-muted"
+        aria-hidden
+      >
+        {icon}
+      </div>
+      <p className="text-sm text-warm-muted dark:text-dark-muted max-w-[320px]">{message}</p>
+    </div>
+  )
+}
+
 function PaletteSkeleton({ count }: { count: number }) {
   return (
     <div aria-hidden>
@@ -561,6 +698,13 @@ function PaletteSkeleton({ count }: { count: number }) {
       ))}
     </div>
   )
+}
+
+function fetchRecentsPage(scopeKey: string | undefined, cursor: SessionsCursor | null) {
+  const options = { limit: RECENT_PAGE_SIZE, ...(cursor ? { cursor } : {}) }
+  return scopeKey
+    ? window.spool.listSessionsByIdentity(scopeKey, options)
+    : window.spool.listSessions(options)
 }
 
 function sessionToRow(s: Session, noTitle: string): PaletteRow {

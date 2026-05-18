@@ -94,9 +94,6 @@
     "hint_ask": "ask",
     "hint_viewAll": "view all",
     "hint_close": "close",
-    "recentCount_one": "{{count}} recent session",
-    "recentCount_other": "{{count}} recent sessions",
-    "resultsArrow_one": "{{count}} result →",
     "resultsArrow_other": "{{count}} results →"
   },
   "session": {
@@ -388,10 +385,6 @@
     "navigate": "navigate",
     "open": "open",
     "close": "close",
-    "results_one": "{{count}} result",
-    "results_other": "{{count}} results",
-    "recentSessions_one": "{{count}} recent session",
-    "recentSessions_other": "{{count}} recent sessions",
     "cancel": "Cancel"
   },
   "fragment": {

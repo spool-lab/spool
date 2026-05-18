@@ -93,7 +93,6 @@
     "hint_ask": "質問",
     "hint_viewAll": "すべて表示",
     "hint_close": "閉じる",
-    "recentCount_other": "最近のセッション {{count}} 件",
     "resultsArrow_other": "{{count}} 件の結果 →"
   },
   "session": {
@@ -376,8 +375,6 @@
     "navigate": "移動",
     "open": "開く",
     "close": "閉じる",
-    "results_other": "{{count}} 件の結果",
-    "recentSessions_other": "最近のセッション {{count}} 件",
     "cancel": "キャンセル"
   },
   "fragment": {
