@@ -54,10 +54,10 @@ test('row breadcrumb shows project label in default scope', async () => {
 test('recents are bucketed by date header', async () => {
   await openPicker()
   // At least one bucket label (Today / Yesterday / Earlier this week / ...)
-  // must render above the rows.
-  const buckets = ctx.window.locator('[data-testid="new-draft-picker"] ul[role="listbox"] > li > div').first()
-  await expect(buckets).toBeVisible({ timeout: 3000 })
-  await expect(buckets).toContainText(/Today|Yesterday|Earlier|Older/i)
+  // renders inside the virtualized recents list.
+  const header = ctx.window.locator('[data-testid="new-draft-picker-bucket-header"]').first()
+  await expect(header).toBeVisible({ timeout: 3000 })
+  await expect(header).toContainText(/Today|Yesterday|Earlier|Older/i)
   await closePicker()
 })
 

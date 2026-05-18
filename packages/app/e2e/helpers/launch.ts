@@ -16,7 +16,12 @@ export interface AppContext {
   cleanup: () => Promise<void>
 }
 
-export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}): Promise<AppContext> {
+export async function launchApp(opts: {
+  mockAgent?: 'success' | 'error'
+  /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
+   * have been copied and before Electron starts. Receives the resolved dirs. */
+  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string }) => void
+} = {}): Promise<AppContext> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-e2e-'))
 
   const claudeDir = join(tmpDir, 'claude', 'projects')
@@ -25,6 +30,8 @@ export async function launchApp(opts: { mockAgent?: 'success' | 'error' } = {}):
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'gemini-cli-home'), geminiCliHome, { recursive: true })
+
+  opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome })
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,

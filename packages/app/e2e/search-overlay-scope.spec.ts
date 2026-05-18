@@ -132,9 +132,9 @@ test('after popover close, focus returns to the search input', async () => {
 test('cmdk recents are bucketed by date header', async () => {
   await navigateToLibrary()
   await openOverlay()
-  const buckets = ctx.window.locator('[data-testid="search-overlay"] ul[role="listbox"] > li > div').first()
-  await expect(buckets).toBeVisible({ timeout: 3000 })
-  await expect(buckets).toContainText(/Today|Yesterday|Earlier|Older/i)
+  const header = ctx.window.locator('[data-testid="search-overlay-bucket-header"]').first()
+  await expect(header).toBeVisible({ timeout: 3000 })
+  await expect(header).toContainText(/Today|Yesterday|Earlier|Older/i)
   await closeOverlay()
 })
 
@@ -145,12 +145,17 @@ test('options toggle: clicking with scope set keeps scope active even when row h
   await navigateToProject()
   await openOverlay()
   await expect(ctx.window.locator('[data-testid="search-overlay-options-row"]')).toBeVisible()
-  const recentBefore = await ctx.window.locator('[data-testid="search-overlay-row"]').count()
+  const scopeLabelBefore = await ctx.window
+    .locator('[data-testid="search-overlay-scope-trigger"]')
+    .textContent()
   await ctx.window.locator('[data-testid="search-overlay-options-toggle"]').click()
   await expect(ctx.window.locator('[data-testid="search-overlay-options-row"]')).toHaveCount(0)
-  const recentAfter = await ctx.window.locator('[data-testid="search-overlay-row"]').count()
-  // Scope still in effect — same set of recents.
-  expect(recentAfter).toBe(recentBefore)
+  // Scope state survives even though the chip is hidden; toggling the
+  // options row back open should reveal the same label.
+  await ctx.window.locator('[data-testid="search-overlay-options-toggle"]').click()
+  await expect(ctx.window.locator('[data-testid="search-overlay-options-row"]')).toBeVisible()
+  await expect(ctx.window.locator('[data-testid="search-overlay-scope-trigger"]'))
+    .toHaveText(scopeLabelBefore ?? '')
   await closeOverlay()
 })
 
@@ -164,4 +169,31 @@ test('Shift+Enter from FTS results commits to results page', async () => {
   await input.press('Shift+Enter')
   await expect(ctx.window.locator('[data-testid="search-overlay"]')).toBeHidden({ timeout: 2000 })
   await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({ timeout: 3000 })
+})
+
+test('clicking the results-total badge commits to results page', async () => {
+  await navigateToLibrary()
+  await openOverlay()
+  const input = ctx.window.locator('[data-testid="search-overlay-input"]')
+  await input.fill('XYLOPHONE_CANARY_42')
+  const badge = ctx.window.locator('[data-testid="search-overlay-results-total"]')
+  await expect(badge).toBeVisible({ timeout: 3000 })
+  await badge.click()
+  await expect(ctx.window.locator('[data-testid="search-overlay"]')).toBeHidden({ timeout: 2000 })
+  await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({ timeout: 3000 })
+})
+
+test('results-total badge is hidden in recents mode and appears in search mode', async () => {
+  await navigateToLibrary()
+  await openOverlay()
+  // Empty query → recents view → no count badge (deliberate: the count was
+  // visual noise that distracted from the list).
+  await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toHaveCount(0)
+  const input = ctx.window.locator('[data-testid="search-overlay-input"]')
+  await input.fill('XYLOPHONE_CANARY_42')
+  await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toBeVisible({ timeout: 3000 })
+  // Clearing the query reverts to recents — badge disappears again.
+  await input.fill('')
+  await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toHaveCount(0)
+  await closeOverlay()
 })

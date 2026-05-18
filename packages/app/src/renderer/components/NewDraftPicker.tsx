@@ -25,8 +25,6 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
         noMatches: (query) => t('newDraft.empty', { query }),
         emptyNoSessions: t('newDraft.emptyNoSessions'),
         emptyInProject: (project) => t('newDraft.emptyInProject', { project }),
-        resultsTotal: (count) => t('newDraft.results_other', { count }),
-        recentTotal: (count) => t('newDraft.recentSessions_other', { count }),
       }}
       onSubmit={(row: PaletteRow) => onSelect(row.sessionUuid)}
       onClose={onClose}

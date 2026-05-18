@@ -93,7 +93,6 @@
     "hint_ask": "질문",
     "hint_viewAll": "전체 보기",
     "hint_close": "닫기",
-    "recentCount_other": "최근 세션 {{count}}개",
     "resultsArrow_other": "결과 {{count}}개 →"
   },
   "session": {
@@ -376,8 +375,6 @@
     "navigate": "이동",
     "open": "열기",
     "close": "닫기",
-    "results_other": "결과 {{count}}개",
-    "recentSessions_other": "최근 세션 {{count}}개",
     "cancel": "취소"
   },
   "fragment": {

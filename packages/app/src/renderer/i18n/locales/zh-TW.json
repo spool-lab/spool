@@ -93,7 +93,6 @@
     "hint_ask": "提問",
     "hint_viewAll": "檢視全部",
     "hint_close": "關閉",
-    "recentCount_other": "{{count}} 個最近會話",
     "resultsArrow_other": "{{count}} 筆結果 →"
   },
   "session": {
@@ -376,8 +375,6 @@
     "navigate": "切換",
     "open": "開啟",
     "close": "關閉",
-    "results_other": "{{count}} 個結果",
-    "recentSessions_other": "{{count}} 個最近會話",
     "cancel": "取消"
   },
   "fragment": {
