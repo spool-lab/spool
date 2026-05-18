@@ -15,6 +15,16 @@ Key rules at a glance:
 
 In QA mode, flag any code that doesn't match DESIGN.md.
 
+## Test discipline
+
+Every bug fix and feature PR must:
+
+1. **Add tests for the change.** Bug fix → a regression test that fails on the pre-fix code. Feature → primary path + non-obvious edges (empty / error / boundary). UI changes use Playwright e2e under `packages/app/e2e/`; pure logic uses vitest under `packages/*/src/**.test.ts`.
+2. **Run the adjacent suite, not just the new tests, before declaring done.** Changes ripple: virtualization breaks DOM-count assertions, selector renames break old e2e, fixture changes shift sort order. Fix any cascading failures in the same PR — never ship a regression with a TODO.
+3. **Don't fight flakiness.** A flake is a test that's lying. Diagnose root cause once; if it can't be made reliable without fighting the framework, drop it and document the coverage gap in the PR body rather than papering over with `--repeat-each`.
+
+Completion checklist: typecheck clean → new tests green → adjacent suite green → flaky candidates stress-run 2–3× → only then declare done.
+
 ## Release videos
 
 When asked to make a launch / release / announcement video for Spool,
